@@ -5,7 +5,7 @@ from pathlib import Path
 
 import yaml
 
-from ..settings import project_root
+from ..services.voice_config import voice_profiles_config_path
 
 
 @dataclass
@@ -26,7 +26,7 @@ class VoiceProfile:
 
 
 def load_voice_profiles(path: Path | None = None) -> list[VoiceProfile]:
-    profile_path = path or project_root() / "configs" / "voice-profiles.example.yaml"
+    profile_path = path or voice_profiles_config_path()
     if not profile_path.exists():
         return _default_profiles()
     data = yaml.safe_load(profile_path.read_text(encoding="utf-8")) or {}
@@ -58,4 +58,3 @@ def _default_profiles() -> list[VoiceProfile]:
             style_prompt="年轻男性工程师，语速中等，表达清晰，技术面试风格。",
         )
     ]
-

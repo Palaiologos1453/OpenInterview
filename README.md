@@ -30,10 +30,10 @@ cd OpenInterview
 http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 ```
 
-如果你要使用已经配置好的重型本地语音环境，可以加：
+如果项目根目录存在 `voice_venv`，脚本会自动用它启动 API，以便本地 SenseVoice/CosyVoice 可用。如果你只想使用轻量文本环境，可以加：
 
 ```powershell
-.\scripts\start-local.ps1 -UseVoicePython
+.\scripts\start-local.ps1 -NoVoicePython
 ```
 
 启动失败时脚本会打印常见修复建议和日志路径。大多数问题集中在 Python 未安装、版本低于 3.10、PowerShell 执行策略、依赖安装失败或端口被占用。
@@ -52,7 +52,7 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 
 LLM 测试失败时会显示错误类型和修复建议，例如 Key 错、模型不存在、Base URL 不匹配、额度不足、超时或返回格式不兼容。
 
-ASR/TTS 默认走浏览器能力，文本面试不依赖本地语音。建议第一次先只跑文本。需要语音时，可在配置区点击“测试 ASR”“测试 TTS”或“语音自检”确认浏览器/本地语音环境。
+ASR/TTS 默认走浏览器能力，文本面试不依赖本地语音。建议第一次先只跑文本。需要语音时，可在配置区点击“测试 ASR”“测试 TTS”或“语音自检”确认浏览器/本地语音环境。完整模型配置教程见 [Voice Setup](docs/voice-setup.md)。
 
 ## 面试模式
 
@@ -169,6 +169,20 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 - `models/tts/Fun-CosyVoice3-0.5B`
 
 使用 `/v1/readiness` 检查 ffmpeg、模型文件、FunASR、CosyVoice 和 CUDA 状态。使用 `/v1/readiness/smoke?include_voice=true` 可以做语音冒烟测试。
+
+一键准备语音环境：
+
+```powershell
+.\scripts\setup-voice.ps1
+```
+
+如需同时下载推荐 ASR/TTS 模型：
+
+```powershell
+.\scripts\setup-voice.ps1 -DownloadModels
+```
+
+模型路径可以通过 `configs/voice-models.local.yaml` 或环境变量覆盖；音色可以通过 `configs/voice-profiles.local.yaml` 自定义。详细步骤见 [Voice Setup](docs/voice-setup.md)。
 
 ## API 摘要
 

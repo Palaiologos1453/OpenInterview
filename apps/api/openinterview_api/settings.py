@@ -57,15 +57,21 @@ def voices_dir() -> Path:
 
 
 def default_vad_model() -> Path:
-    return models_dir() / "vad" / "silero-vad" / "silero_vad.onnx"
+    from .services.voice_config import vad_model_path
+
+    return vad_model_path()
 
 
 def default_asr_model_dir() -> Path:
-    return models_dir() / "asr" / "SenseVoiceSmall"
+    from .services.voice_config import asr_model_dir
+
+    return asr_model_dir()
 
 
 def default_tts_model_dir() -> Path:
-    return models_dir() / "tts" / "Fun-CosyVoice3-0.5B"
+    from .services.voice_config import tts_model_dir
+
+    return tts_model_dir()
 
 
 def require_auth() -> bool:

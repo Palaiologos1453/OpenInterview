@@ -1,7 +1,8 @@
 param(
     [int]$ApiPort = 8000,
     [int]$WebPort = 5173,
-    [switch]$UseVoicePython
+    [switch]$UseVoicePython,
+    [switch]$NoVoicePython
 )
 
 $ErrorActionPreference = "Stop"
@@ -103,7 +104,7 @@ function Wait-PortListening {
 
 function Resolve-Python {
     $voicePython = Join-Path $Root "voice_venv\Scripts\python.exe"
-    if ($UseVoicePython -and (Test-Path $voicePython)) {
+    if ((-not $NoVoicePython) -and (Test-Path $voicePython)) {
         return $voicePython
     }
     $localPython = Join-Path $ApiDir ".venv\Scripts\python.exe"
@@ -119,7 +120,8 @@ function Resolve-Python {
 
 function Ensure-ApiVenv {
     $voicePython = Join-Path $Root "voice_venv\Scripts\python.exe"
-    if ($UseVoicePython -and (Test-Path $voicePython)) {
+    if ((-not $NoVoicePython) -and (Test-Path $voicePython)) {
+        Write-Step "Using voice_venv for API so local ASR/TTS can work."
         return $voicePython
     }
 
@@ -157,7 +159,7 @@ try {
     Test-PythonVersion -PythonPath $WebPython | Out-Null
 
     $env:PYTHONPATH = $ApiDir
-    if ($UseVoicePython -and (Test-Path "D:\CosyVoice")) {
+    if ((-not $NoVoicePython) -and (Test-Path "D:\CosyVoice")) {
         $env:OPENINTERVIEW_COSYVOICE_PATH = "D:\CosyVoice"
         $env:PYTHONPATH = "D:\CosyVoice;$env:PYTHONPATH"
     }

@@ -1,0 +1,14 @@
+# Copy this file to configs/voice-models.local.yaml if your local model paths
+# differ from the repository defaults. Local files are ignored by git.
+
+vad:
+  default:
+    local_file: models/vad/silero-vad/silero_vad.onnx
+
+asr:
+  default:
+    local_dir: models/asr/SenseVoiceSmall
+
+tts:
+  default:
+    local_dir: models/tts/Fun-CosyVoice3-0.5B

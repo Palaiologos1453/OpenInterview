@@ -1,5 +1,6 @@
 import base64
 import io
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -10,7 +11,10 @@ from fastapi.testclient import TestClient
 
 from openinterview_api.main import app
 from openinterview_api.schemas import ProviderSettings
+from openinterview_api.settings import project_root
+from openinterview_api.services.voice_config import asr_model_dir, tts_model_dir, vad_model_path
 from openinterview_api.storage import Storage
+from openinterview_api.voice.voice_profiles import load_voice_profiles
 
 
 client = TestClient(app)
@@ -215,6 +219,97 @@ class OpenInterviewAPITest(unittest.TestCase):
         self.assertEqual(settings.llm.provider, "openai_compatible")
         self.assertEqual(settings.asr.provider, "browser")
         self.assertEqual(settings.tts.provider, "browser")
+
+    def test_voice_model_config_env_overrides(self):
+        previous = {
+            key: os.environ.get(key)
+            for key in [
+                "OPENINTERVIEW_VOICE_MODELS_CONFIG",
+                "OPENINTERVIEW_VAD_MODEL",
+                "OPENINTERVIEW_ASR_MODEL_DIR",
+                "OPENINTERVIEW_TTS_MODEL_DIR",
+            ]
+        }
+        try:
+            os.environ["OPENINTERVIEW_VAD_MODEL"] = "D:/voice/vad.onnx"
+            os.environ["OPENINTERVIEW_ASR_MODEL_DIR"] = "D:/voice/asr"
+            os.environ["OPENINTERVIEW_TTS_MODEL_DIR"] = "D:/voice/tts"
+
+            self.assertEqual(str(vad_model_path()).replace("\\", "/"), "D:/voice/vad.onnx")
+            self.assertEqual(str(asr_model_dir()).replace("\\", "/"), "D:/voice/asr")
+            self.assertEqual(str(tts_model_dir()).replace("\\", "/"), "D:/voice/tts")
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+    def test_voice_model_config_file_overrides(self):
+        previous = {
+            key: os.environ.get(key)
+            for key in [
+                "OPENINTERVIEW_VOICE_MODELS_CONFIG",
+                "OPENINTERVIEW_VAD_MODEL",
+                "OPENINTERVIEW_ASR_MODEL_DIR",
+                "OPENINTERVIEW_TTS_MODEL_DIR",
+            ]
+        }
+        try:
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+                config_path = Path(temp_dir) / "voice-models.local.yaml"
+                config_path.write_text(
+                    """
+vad:
+  default:
+    local_file: vad/local.onnx
+asr:
+  default:
+    local_dir: asr/local
+tts:
+  default:
+    local_dir: tts/local
+""".strip(),
+                    encoding="utf-8",
+                )
+                os.environ["OPENINTERVIEW_VOICE_MODELS_CONFIG"] = str(config_path)
+                os.environ.pop("OPENINTERVIEW_VAD_MODEL", None)
+                os.environ.pop("OPENINTERVIEW_ASR_MODEL_DIR", None)
+                os.environ.pop("OPENINTERVIEW_TTS_MODEL_DIR", None)
+
+                self.assertEqual(vad_model_path(), project_root() / "vad" / "local.onnx")
+                self.assertEqual(asr_model_dir(), project_root() / "asr" / "local")
+                self.assertEqual(tts_model_dir(), project_root() / "tts" / "local")
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+    def test_voice_profiles_can_load_local_file(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            path = Path(temp_dir) / "voice-profiles.local.yaml"
+            path.write_text(
+                """
+voice_profiles:
+  - id: custom
+    name: 自定义
+    persona: 技术面
+    gender: unknown
+    style: calm
+    provider: cosyvoice
+    mode: zero_shot
+    reference_audio: voices/custom.wav
+    reference_text: 你好，我是面试官。
+""".strip(),
+                encoding="utf-8",
+            )
+
+            profiles = load_voice_profiles(path)
+
+        self.assertEqual(profiles[0].id, "custom")
+        self.assertEqual(profiles[0].reference_audio, "voices/custom.wav")
 
     def test_storage_persists_question_meta(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:

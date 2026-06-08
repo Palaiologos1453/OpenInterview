@@ -35,11 +35,13 @@ huggingface-cli download FunAudioLLM/CosyVoice2-0.5B --local-dir models/tts/Cosy
 huggingface-cli download onnx-community/Kokoro-82M-v1.0-ONNX --local-dir models/tts/Kokoro-82M-v1.0-ONNX
 ```
 
-Silero VAD 建议通过 Python 包或运行时模型缓存加载：
+Silero VAD 当前默认读取本地 ONNX 文件：
 
-```powershell
-python -m pip install silero-vad
+```text
+models/vad/silero-vad/silero_vad.onnx
 ```
+
+如果没有该文件，后端会使用轻量能量检测兜底，适合 CI 和基础接口测试；真实实时语音建议配置 Silero ONNX。
 
 ## API fallback
 
@@ -75,3 +77,11 @@ microphone -> noise gate -> Silero VAD -> SenseVoiceSmall -> LLM -> CosyVoice3 -
 - 浏览器前端：已支持本地/云端 ASR、TTS provider 和音色 profile 选择。
 
 本机当前 Python 3.14 可运行核心 API 和 VAD 测试；ASR/TTS 建议单独使用 Python 3.10 voice runtime。
+
+本地路径覆盖优先级：
+
+1. 环境变量：`OPENINTERVIEW_VAD_MODEL`、`OPENINTERVIEW_ASR_MODEL_DIR`、`OPENINTERVIEW_TTS_MODEL_DIR`
+2. `configs/voice-models.local.yaml`
+3. 默认 `models/` 路径
+
+详细配置教程见 [Voice Setup](voice-setup.md)。

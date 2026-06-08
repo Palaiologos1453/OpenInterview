@@ -14,6 +14,7 @@ from ..settings import (
     ensure_portable_ffmpeg_on_path,
     portable_ffmpeg,
 )
+from .voice_config import voice_config_summary
 from ..voice.local_tts import write_silence_wav
 
 
@@ -50,6 +51,7 @@ def readiness_report() -> dict:
     return {
         "ready_for_core_api": True,
         "ready_for_local_voice": ready_for_local_voice,
+        "voice_config": voice_config_summary(),
         "checks": checks,
     }
 

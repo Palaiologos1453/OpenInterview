@@ -95,6 +95,20 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 
 先保持 ASR/TTS 为 `browser` 或 `disabled`，完成文本面试。配置区的“测试 ASR”“测试 TTS”和“语音自检”可以快速判断浏览器、本地 SenseVoice/CosyVoice 是否可用。SenseVoice/CosyVoice 属于重型可选增强，不是首次使用必需项。
 
+准备本地离线语音环境：
+
+```powershell
+.\scripts\setup-voice.ps1
+```
+
+如果要让脚本同时下载推荐模型：
+
+```powershell
+.\scripts\setup-voice.ps1 -DownloadModels
+```
+
+完整模型路径、自定义音色和 API 语音配置见 [Voice Setup](voice-setup.md)。
+
 ### PowerShell 脚本无法运行
 
 在 PowerShell 里执行：

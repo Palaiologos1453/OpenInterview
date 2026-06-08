@@ -1,0 +1,22 @@
+# Copy this file to configs/voice-profiles.local.yaml to customize local voice
+# profiles. Put reference audio under voices/ and keep local files out of git.
+
+voice_profiles:
+  - id: young_engineer
+    name: 青年工程师
+    persona: 技术一面
+    gender: male
+    style: calm, concise, technical
+    provider: cosyvoice
+    mode: instruct
+    style_prompt: 年轻男性工程师，语速中等，表达清晰，技术面试风格。
+
+  - id: custom_interviewer
+    name: 自定义面试官
+    persona: 本地克隆音色
+    gender: unknown
+    style: natural, technical
+    provider: cosyvoice
+    mode: zero_shot
+    reference_audio: voices/custom_interviewer.wav
+    reference_text: 你好，我是今天的技术面试官，我们会围绕你的项目和基础知识做一些追问。

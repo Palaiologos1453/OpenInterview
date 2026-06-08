@@ -32,6 +32,8 @@ voice_venv*/
 voices/*.wav
 voices/*.mp3
 Fun-CosyVoice3-0.5B-2512/
+configs/voice-models.local.yaml
+configs/voice-profiles.local.yaml
 
 # Local scratch / accidental downloads
 4.10.0
