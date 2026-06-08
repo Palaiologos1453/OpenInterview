@@ -148,6 +148,8 @@ const elements = {
   sendButton: $("#send-button"),
   listenButton: $("#listen-button"),
   reportButton: $("#report-button"),
+  coverageButton: $("#coverage-button"),
+  reviewItemsButton: $("#review-items-button"),
   historyButton: $("#history-button"),
   importResumeButton: $("#import-resume-button"),
   analyzeResumeButton: $("#analyze-resume-button"),
@@ -186,6 +188,8 @@ function wireEvents() {
   elements.setupForm.addEventListener("submit", safeHandler(startInterview));
   elements.answerForm.addEventListener("submit", safeHandler(submitAnswer));
   elements.reportButton.addEventListener("click", safeHandler(generateReport));
+  elements.coverageButton.addEventListener("click", safeHandler(loadQuestionCoverage));
+  elements.reviewItemsButton.addEventListener("click", safeHandler(loadReviewItems));
   elements.listenButton.addEventListener("click", safeHandler(handleVoiceInput));
   elements.saveProviderConfig.addEventListener("click", saveProviderConfig);
   elements.testLlmConfig.addEventListener("click", safeHandler(testLlmConfig));
@@ -368,6 +372,8 @@ function renderHistory(interviews) {
             <div class="history-actions">
               <button class="secondary" type="button" data-history-report="${escapeHtml(item.id)}">报告</button>
               <button class="secondary" type="button" data-history-drills="${escapeHtml(item.id)}">复练题</button>
+              <button class="secondary" type="button" data-history-md="${escapeHtml(item.id)}">导出 MD</button>
+              <button class="secondary" type="button" data-history-review="${escapeHtml(item.id)}">入错题本</button>
             </div>
           </article>
         `;
@@ -380,8 +386,127 @@ function renderHistory(interviews) {
   elements.report.querySelectorAll("[data-history-drills]").forEach((button) => {
     button.addEventListener("click", safeHandler(() => openHistoryDrills(button.dataset.historyDrills)));
   });
+  elements.report.querySelectorAll("[data-history-md]").forEach((button) => {
+    button.addEventListener("click", safeHandler(() => exportReportMarkdown(button.dataset.historyMd)));
+  });
+  elements.report.querySelectorAll("[data-history-review]").forEach((button) => {
+    button.addEventListener("click", safeHandler(() => createReviewItems(button.dataset.historyReview)));
+  });
   $("#export-history-button")?.addEventListener("click", safeHandler(exportHistory));
   $("#clear-history-button")?.addEventListener("click", safeHandler(clearHistory));
+}
+
+async function loadQuestionCoverage() {
+  ensureBackend();
+  const payload = await fetchJson(`${API_BASE}/v1/questions/coverage`);
+  renderQuestionCoverage(payload);
+  setStatus(`题库覆盖：后端题 ${payload.total} 道，优先补红色和黄色主题。`);
+}
+
+function renderQuestionCoverage(payload) {
+  elements.report.hidden = false;
+  elements.report.innerHTML = `
+    <div class="section-heading">
+      <h3>Java 后端题库覆盖</h3>
+      <span class="muted-text">${escapeHtml(String(payload.total || 0))} 道题</span>
+    </div>
+    <div class="coverage-grid">
+      ${(payload.topics || []).map((item) => `
+        <article class="coverage-item ${escapeHtml(item.status || "warn")}">
+          <div class="turn-review-title">
+            <strong>${escapeHtml(item.topic)}</strong>
+            <span>${escapeHtml(String(item.count || 0))} 题</span>
+          </div>
+          <p>${escapeHtml(item.next_action || "")}</p>
+          <div class="tags">
+            <span class="tag">追问 ${escapeHtml(String(item.with_followups || 0))}</span>
+            <span class="tag">评分点 ${escapeHtml(String(item.with_rubric || 0))}</span>
+          </div>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+async function loadReviewItems() {
+  ensureBackend();
+  const payload = await fetchJson(`${API_BASE}/v1/review-items`);
+  renderReviewItems(payload.items || []);
+  setStatus(`错题本：${payload.items.length} 条。`);
+}
+
+function renderReviewItems(items) {
+  elements.report.hidden = false;
+  elements.report.innerHTML = `
+    <div class="section-heading">
+      <h3>错题本</h3>
+      <div class="inline-actions">
+        <button id="clear-review-items-button" class="secondary danger-action" type="button">清空错题</button>
+      </div>
+    </div>
+    ${items.length ? `
+      <div class="turn-review">
+        ${items.map((item) => `
+          <article class="turn-review-item">
+            <div class="turn-review-title">
+              <strong>${escapeHtml(item.topic || "interview")}</strong>
+              <span>${escapeHtml(statusLabel(item.status))} / ${escapeHtml(String(item.score || 0))} 分</span>
+            </div>
+            <p>${escapeHtml(shortText(item.question || "", 180))}</p>
+            ${(item.gaps || []).length ? `<div class="tags">${item.gaps.slice(0, 3).map((gap) => `<span class="tag">${escapeHtml(gap)}</span>`).join("")}</div>` : ""}
+            ${renderGuideList("重答建议", item.rewrite_advice)}
+            <div class="history-actions review-actions">
+              <button class="secondary" type="button" data-review-status="${escapeHtml(item.id)}" data-status="todo">待复习</button>
+              <button class="secondary" type="button" data-review-status="${escapeHtml(item.id)}" data-status="practicing">复练中</button>
+              <button class="secondary" type="button" data-review-status="${escapeHtml(item.id)}" data-status="mastered">已掌握</button>
+              <button class="secondary danger-action" type="button" data-review-delete="${escapeHtml(item.id)}">删除</button>
+            </div>
+          </article>
+        `).join("")}
+      </div>
+    ` : `<p class="muted-text">还没有错题。先在历史里点击“入错题本”，或生成报告后加入。</p>`}
+  `;
+  elements.report.querySelectorAll("[data-review-status]").forEach((button) => {
+    button.addEventListener("click", safeHandler(() => updateReviewStatus(button.dataset.reviewStatus, button.dataset.status)));
+  });
+  elements.report.querySelectorAll("[data-review-delete]").forEach((button) => {
+    button.addEventListener("click", safeHandler(() => deleteReviewItem(button.dataset.reviewDelete)));
+  });
+  $("#clear-review-items-button")?.addEventListener("click", safeHandler(clearReviewItems));
+}
+
+async function updateReviewStatus(itemId, status) {
+  await patchJson(`${API_BASE}/v1/review-items/${itemId}`, { status });
+  await loadReviewItems();
+}
+
+async function deleteReviewItem(itemId) {
+  await deleteJson(`${API_BASE}/v1/review-items/${itemId}`);
+  await loadReviewItems();
+}
+
+async function clearReviewItems() {
+  const ok = window.confirm("确认清空全部错题本？不会删除面试历史。");
+  if (!ok) return;
+  const payload = await deleteJson(`${API_BASE}/v1/review-items`);
+  setStatus(`已清空 ${payload.deleted || 0} 条错题。`);
+  await loadReviewItems();
+}
+
+async function createReviewItems(sessionId) {
+  const payload = await postJson(`${API_BASE}/v1/interviews/${sessionId}/review-items`, {});
+  setStatus(`已加入 ${payload.created || 0} 条错题/复练项。`);
+  await loadReviewItems();
+}
+
+async function exportReportMarkdown(sessionId) {
+  const response = await authedFetch(`${API_BASE}/v1/interviews/${sessionId}/report.md`);
+  if (!response.ok) throw new Error(await response.text());
+  const blob = await response.blob();
+  const disposition = response.headers.get("Content-Disposition") || "";
+  const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `openinterview-report-${sessionId.slice(0, 8)}.md`;
+  downloadBlob(blob, filename);
+  setStatus("Markdown 报告已导出。");
 }
 
 async function exportHistory() {
@@ -391,14 +516,7 @@ async function exportHistory() {
   const blob = await response.blob();
   const disposition = response.headers.get("Content-Disposition") || "";
   const filename = disposition.match(/filename="([^"]+)"/)?.[1] || `openinterview-history-${Date.now()}.json`;
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  URL.revokeObjectURL(url);
+  downloadBlob(blob, filename);
   setStatus("历史记录已导出为 JSON 文件。");
 }
 
@@ -1407,6 +1525,16 @@ async function deleteJson(url) {
   return response.json();
 }
 
+async function patchJson(url, body) {
+  const response = await authedFetch(url, {
+    method: "PATCH",
+    headers: jsonHeaders(),
+    body: JSON.stringify(body)
+  });
+  if (!response.ok) throw new Error(await response.text());
+  return response.json();
+}
+
 async function authedFetch(url, options = {}) {
   const headers = new Headers(options.headers || {});
   if (state.authRequired && state.localAuth?.api_token && state.localAuth?.user_id) {
@@ -1459,6 +1587,26 @@ function ensureBackend() {
 
 function selectedName(select) {
   return select.options[select.selectedIndex]?.textContent || "";
+}
+
+function statusLabel(status) {
+  return ({
+    todo: "待复习",
+    practicing: "复练中",
+    mastered: "已掌握",
+    ignored: "已忽略"
+  })[status] || status || "待复习";
+}
+
+function downloadBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }
 
 function showProviderNotice(message) {

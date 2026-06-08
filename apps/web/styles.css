@@ -466,7 +466,8 @@ textarea:focus {
 
 .history-list,
 .answer-guides,
-.study-guides {
+.study-guides,
+.coverage-grid {
   display: grid;
   gap: 10px;
 }
@@ -497,7 +498,38 @@ textarea:focus {
 
 .history-actions {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
+}
+
+.review-actions button {
+  min-height: 34px;
+  padding: 7px 10px;
+}
+
+.coverage-item {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 12px;
+}
+
+.coverage-item.ok {
+  border-color: #b7d7c1;
+}
+
+.coverage-item.warn {
+  border-color: #e3c08e;
+}
+
+.coverage-item.bad {
+  border-color: #dfaaaa;
+}
+
+.coverage-item p {
+  margin: 8px 0;
+  color: var(--muted);
+  line-height: 1.5;
 }
 
 .turn-review {

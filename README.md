@@ -86,10 +86,21 @@ data/openinterview.sqlite
 
 - 打开历史报告。
 - 只看复练题。
+- 导出单次 Markdown 报告。
+- 将低分题和缺口加入错题本。
 - 导出历史为 JSON。
 - 清空全部面试历史。
 
 清空历史只删除面试记录、报告、转写和 trace，不会清空浏览器里的模型配置。
+
+## 错题本和题库覆盖
+
+前端顶部提供：
+
+- `错题本`：集中查看待复习题、重答建议和缺失评分点，可标记待复习、复练中、已掌握。
+- `题库覆盖`：按 Java 后端主题统计题量、追问覆盖和评分点覆盖，用来判断下一步该补哪些题。
+
+历史记录里的“入错题本”会从报告中提取低分题、缺失评分点和重答建议，适合做长期复练。
 
 ## 数据和隐私
 
@@ -159,6 +170,11 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 - `GET /v1/questions`
 - `POST /v1/resume/analyze`
 - `POST /v1/resume/extract`
+- `GET /v1/questions/coverage`
+- `GET /v1/interviews/{session_id}/report.md`
+- `POST /v1/interviews/{session_id}/review-items`
+- `GET /v1/review-items`
+- `PATCH /v1/review-items/{item_id}`
 - `POST /v1/interviews`
 - `POST /v1/interviews/{session_id}/turn`
 - `GET /v1/interviews/{session_id}/report`

@@ -63,6 +63,22 @@ CREATE TABLE IF NOT EXISTS traces (
     created_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS review_items (
+    id TEXT PRIMARY KEY,
+    interview_id TEXT,
+    question_id TEXT,
+    topic TEXT NOT NULL,
+    question TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    score REAL NOT NULL,
+    gaps_json TEXT NOT NULL,
+    rewrite_advice_json TEXT NOT NULL,
+    status TEXT NOT NULL,
+    attempts_json TEXT NOT NULL,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+
 CREATE TABLE IF NOT EXISTS schema_migrations (
     version INTEGER PRIMARY KEY,
     name TEXT NOT NULL,
@@ -71,11 +87,12 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 """
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 MIGRATIONS = [
     (1, "add_turn_question_meta", "ALTER TABLE turns ADD COLUMN question_meta_json TEXT"),
     (2, "add_schema_migrations_table", None),
+    (3, "add_review_items_table", None),
 ]
 
 
@@ -102,6 +119,7 @@ class Storage:
 
     def _apply_migrations(self, connection: sqlite3.Connection) -> None:
         _ensure_column(connection, "turns", "question_meta_json", "TEXT")
+        _ensure_review_items_table(connection)
         applied = {
             row[0]
             for row in connection.execute("SELECT version FROM schema_migrations").fetchall()
@@ -290,6 +308,7 @@ class Storage:
                 """,
                 json_columns=("metadata_json",),
             ),
+            "review_items": self.list_review_items(limit=100000),
         }
 
     def _all_turns(self) -> list[dict]:
@@ -365,14 +384,90 @@ class Storage:
                 return False
             for table in ("turns", "transcripts", "traces"):
                 connection.execute(f"DELETE FROM {table} WHERE interview_id = ?", (interview_id,))
+            connection.execute("DELETE FROM review_items WHERE interview_id = ?", (interview_id,))
             connection.execute("DELETE FROM interviews WHERE id = ?", (interview_id,))
             return True
 
     def clear_interviews(self) -> int:
         with self.connect() as connection:
             count = connection.execute("SELECT COUNT(*) FROM interviews").fetchone()[0]
-            for table in ("turns", "transcripts", "traces", "interviews"):
+            for table in ("turns", "transcripts", "traces", "review_items", "interviews"):
                 connection.execute(f"DELETE FROM {table}")
+            return int(count)
+
+    def upsert_review_item(self, item: dict) -> None:
+        now = utc_now()
+        with self.connect() as connection:
+            existing = connection.execute(
+                "SELECT attempts_json, status, created_at FROM review_items WHERE id = ?",
+                (item["id"],),
+            ).fetchone()
+            attempts = list(item.get("attempts") or [])
+            status = item.get("status") or "todo"
+            created_at = now
+            if existing:
+                old_attempts = json.loads(existing["attempts_json"] or "[]")
+                attempts = old_attempts + attempts
+                status = existing["status"] if item.get("preserve_status", True) else status
+                created_at = existing["created_at"]
+            connection.execute(
+                """
+                INSERT OR REPLACE INTO review_items (
+                    id, interview_id, question_id, topic, question, answer, score,
+                    gaps_json, rewrite_advice_json, status, attempts_json, created_at, updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """,
+                (
+                    item["id"],
+                    item.get("interview_id"),
+                    item.get("question_id"),
+                    item.get("topic") or "interview",
+                    item.get("question") or "",
+                    item.get("answer") or "",
+                    float(item.get("score") or 0),
+                    json.dumps(item.get("gaps") or [], ensure_ascii=False),
+                    json.dumps(item.get("rewrite_advice") or [], ensure_ascii=False),
+                    status,
+                    json.dumps(attempts, ensure_ascii=False),
+                    created_at,
+                    now,
+                ),
+            )
+
+    def list_review_items(self, limit: int = 100, status: str | None = None) -> list[dict]:
+        query = """
+            SELECT id, interview_id, question_id, topic, question, answer, score,
+                   gaps_json, rewrite_advice_json, status, attempts_json, created_at, updated_at
+            FROM review_items
+        """
+        params: tuple[object, ...] = ()
+        if status:
+            query += " WHERE status = ?"
+            params = (status,)
+        query += " ORDER BY updated_at DESC LIMIT ?"
+        params = (*params, limit)
+        with self.connect() as connection:
+            rows = connection.execute(query, params).fetchall()
+        return [_review_item_from_row(row) for row in rows]
+
+    def update_review_item_status(self, item_id: str, status: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute(
+                "UPDATE review_items SET status = ?, updated_at = ? WHERE id = ?",
+                (status, utc_now(), item_id),
+            )
+            return cursor.rowcount > 0
+
+    def delete_review_item(self, item_id: str) -> bool:
+        with self.connect() as connection:
+            cursor = connection.execute("DELETE FROM review_items WHERE id = ?", (item_id,))
+            return cursor.rowcount > 0
+
+    def clear_review_items(self) -> int:
+        with self.connect() as connection:
+            count = connection.execute("SELECT COUNT(*) FROM review_items").fetchone()[0]
+            connection.execute("DELETE FROM review_items")
             return int(count)
 
     def utc_timestamp_for_filename(self) -> str:
@@ -431,3 +526,43 @@ def _migration_already_applied(connection: sqlite3.Connection, sql: str) -> bool
     column = parts[5]
     columns = {row[1] for row in connection.execute(f"PRAGMA table_info({table})")}
     return column in columns
+
+
+def _ensure_review_items_table(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE TABLE IF NOT EXISTS review_items (
+            id TEXT PRIMARY KEY,
+            interview_id TEXT,
+            question_id TEXT,
+            topic TEXT NOT NULL,
+            question TEXT NOT NULL,
+            answer TEXT NOT NULL,
+            score REAL NOT NULL,
+            gaps_json TEXT NOT NULL,
+            rewrite_advice_json TEXT NOT NULL,
+            status TEXT NOT NULL,
+            attempts_json TEXT NOT NULL,
+            created_at TEXT NOT NULL,
+            updated_at TEXT NOT NULL
+        )
+        """
+    )
+
+
+def _review_item_from_row(row: sqlite3.Row) -> dict:
+    return {
+        "id": row["id"],
+        "interview_id": row["interview_id"],
+        "question_id": row["question_id"],
+        "topic": row["topic"],
+        "question": row["question"],
+        "answer": row["answer"],
+        "score": row["score"],
+        "gaps": json.loads(row["gaps_json"]),
+        "rewrite_advice": json.loads(row["rewrite_advice_json"]),
+        "status": row["status"],
+        "attempts": json.loads(row["attempts_json"]),
+        "created_at": row["created_at"],
+        "updated_at": row["updated_at"],
+    }

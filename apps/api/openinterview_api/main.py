@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, Response
+from fastapi.responses import JSONResponse, PlainTextResponse, Response
 
 from .adapters.llm import build_llm_adapter, is_real_llm, llm_temperature
 from .adapters.asr import build_asr_adapter
@@ -17,8 +17,10 @@ from .catalog import get_catalog
 from .interview_engine import CampusInterviewEngine, InterviewConfig, InterviewSession, Turn
 from .security import hash_token, new_api_token
 from .services.question_bank import default_question_bank
+from .services.coverage import question_coverage
 from .services.provider_diagnostics import diagnose_llm_error
 from .services.readiness import readiness_report, readiness_smoke_report
+from .services.review import report_to_markdown, review_items_from_report
 from .services.resume import analyze_resume
 from .services.resume_file import extract_resume_text
 from .services.realtime import RealtimeRegistry
@@ -317,6 +319,11 @@ def list_questions(direction_id: str | None = None) -> dict:
     return {"questions": question_bank.list_questions("backend")}
 
 
+@app.get("/v1/questions/coverage")
+def questions_coverage() -> dict:
+    return question_coverage(question_bank.list_questions("backend"))
+
+
 @app.get("/v1/questions/{question_id}")
 def get_question(question_id: str) -> dict:
     question = question_bank.get_question(question_id)
@@ -342,6 +349,26 @@ async def resume_extract(file: UploadFile = File(...)) -> dict:
 @app.get("/v1/interviews")
 def list_interviews(limit: int = 50) -> dict:
     return {"interviews": storage.list_interviews(limit)}
+
+
+@app.post("/v1/interviews/{session_id}/review-items")
+def create_review_items(session_id: str) -> dict:
+    payload = report(session_id)
+    items = review_items_from_report(payload)
+    for item in items:
+        storage.upsert_review_item(item)
+    return {"created": len(items), "items": items}
+
+
+@app.get("/v1/interviews/{session_id}/report.md")
+def export_report_markdown(session_id: str) -> PlainTextResponse:
+    payload = report(session_id)
+    filename = f"openinterview-report-{session_id[:8]}.md"
+    return PlainTextResponse(
+        report_to_markdown(payload),
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @app.get("/v1/interviews/export")
@@ -372,6 +399,33 @@ def delete_interview(session_id: str) -> dict:
     deleted = storage.delete_interview(session_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Unknown session: {session_id}")
+    return {"deleted": True}
+
+
+@app.get("/v1/review-items")
+def list_review_items(limit: int = 100, status: str | None = None) -> dict:
+    return {"items": storage.list_review_items(limit=limit, status=status)}
+
+
+@app.patch("/v1/review-items/{item_id}")
+def update_review_item(item_id: str, payload: dict) -> dict:
+    status = str(payload.get("status") or "").strip()
+    if status not in {"todo", "practicing", "mastered", "ignored"}:
+        raise HTTPException(status_code=400, detail="status must be todo/practicing/mastered/ignored")
+    if not storage.update_review_item_status(item_id, status):
+        raise HTTPException(status_code=404, detail=f"Unknown review item: {item_id}")
+    return {"updated": True}
+
+
+@app.delete("/v1/review-items")
+def clear_review_items() -> dict:
+    return {"deleted": storage.clear_review_items()}
+
+
+@app.delete("/v1/review-items/{item_id}")
+def delete_review_item(item_id: str) -> dict:
+    if not storage.delete_review_item(item_id):
+        raise HTTPException(status_code=404, detail=f"Unknown review item: {item_id}")
     return {"deleted": True}
 
 

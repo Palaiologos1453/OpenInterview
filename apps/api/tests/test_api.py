@@ -151,6 +151,13 @@ class OpenInterviewAPITest(unittest.TestCase):
         frontend_question = client.get("/v1/questions/frontend-url-render")
         self.assertEqual(frontend_question.status_code, 404)
 
+    def test_question_coverage(self):
+        response = client.get("/v1/questions/coverage")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertGreater(payload["total"], 50)
+        self.assertTrue(any(item["topic"] == "java-basis" for item in payload["topics"]))
+
     def test_provider_defaults_are_local_text_first(self):
         settings = ProviderSettings()
         self.assertEqual(settings.llm.provider, "openai_compatible")
@@ -208,11 +215,47 @@ class OpenInterviewAPITest(unittest.TestCase):
             exported = storage.export_interviews()
             deleted = storage.clear_interviews()
 
-            self.assertEqual(exported["schema_version"], 2)
+            self.assertEqual(exported["schema_version"], 3)
             self.assertEqual(len(exported["interviews"]), 1)
             self.assertEqual(len(exported["turns"]), 1)
             self.assertEqual(deleted, 1)
             self.assertEqual(storage.list_interviews(), [])
+
+    def test_review_items_and_markdown_export(self):
+        interview = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "fundamentals",
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(interview.status_code, 200)
+        session_id = interview.json()["session_id"]
+        turn = client.post(
+            f"/v1/interviews/{session_id}/turn",
+            json={"answer": "不太清楚。"},
+        )
+        self.assertEqual(turn.status_code, 200)
+
+        md = client.get(f"/v1/interviews/{session_id}/report.md")
+        self.assertEqual(md.status_code, 200)
+        self.assertIn("OpenInterview 面试报告", md.text)
+
+        created = client.post(f"/v1/interviews/{session_id}/review-items")
+        self.assertEqual(created.status_code, 200)
+        self.assertGreaterEqual(created.json()["created"], 1)
+        items = client.get("/v1/review-items")
+        self.assertEqual(items.status_code, 200)
+        self.assertTrue(items.json()["items"])
+        item_id = items.json()["items"][0]["id"]
+        patched = client.patch(f"/v1/review-items/{item_id}", json={"status": "mastered"})
+        self.assertEqual(patched.status_code, 200)
 
     def test_vad_accepts_wav(self):
         audio = _silence_wav_base64()
