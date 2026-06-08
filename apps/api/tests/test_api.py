@@ -21,6 +21,8 @@ class OpenInterviewAPITest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertIn("voice_profiles", response.json())
         self.assertNotIn("coding", {item["id"] for item in response.json()["modes"]})
+        direction_ids = {item["id"] for item in response.json()["directions"]}
+        self.assertEqual(direction_ids, {"backend"})
         mode_names = {item["id"]: item["name"] for item in response.json()["modes"]}
         self.assertEqual(mode_names["fundamentals"], "单纯八股")
         self.assertEqual(mode_names["project_deep_dive"], "简历拷打")
@@ -33,12 +35,22 @@ class OpenInterviewAPITest(unittest.TestCase):
     def test_resume_analyze(self):
         response = client.post(
             "/v1/resume/analyze",
-            json={"text": "项目：Redis 缓存平台。使用 Java、MySQL、Redis，优化接口延迟降低 30%。"},
+            json={
+                "text": (
+                    "项目：Redis 缓存平台。负责缓存一致性和接口优化。"
+                    "使用 Java、MySQL、Redis，优化接口延迟降低 30%，线上压测发现过缓存击穿问题。"
+                )
+            },
         )
         self.assertEqual(response.status_code, 200)
         payload = response.json()
         self.assertIn("Java", payload["tech_stack"])
         self.assertTrue(payload["highlights"])
+        self.assertTrue(payload["project_cards"])
+        self.assertTrue(payload["contributions"])
+        self.assertTrue(payload["metric_questions"])
+        self.assertTrue(payload["tech_choice_questions"])
+        self.assertTrue(payload["incident_questions"])
 
     def test_start_requires_real_llm_config_by_default(self):
         response = client.post(
@@ -87,6 +99,12 @@ class OpenInterviewAPITest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["questions"])
         self.assertTrue(all(item.get("type") != "coding" for item in response.json()["questions"]))
+        self.assertTrue(all("backend" in item.get("directions", []) for item in response.json()["questions"]))
+        hidden = client.get("/v1/questions?direction_id=frontend")
+        self.assertEqual(hidden.status_code, 200)
+        self.assertEqual(hidden.json()["questions"], [])
+        frontend_question = client.get("/v1/questions/frontend-url-render")
+        self.assertEqual(frontend_question.status_code, 404)
 
     def test_provider_defaults_are_local_text_first(self):
         settings = ProviderSettings()

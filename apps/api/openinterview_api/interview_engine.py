@@ -7,6 +7,7 @@ from uuid import uuid4
 from .adapters.llm import build_llm_adapter, is_real_llm, llm_temperature
 from .catalog import RUBRIC, find_difficulty, find_direction, find_mode
 from .services.question_bank import default_question_bank
+from .services.resume import analyze_resume
 
 
 QUESTION_BANK = {
@@ -23,46 +24,6 @@ QUESTION_BANK = {
             "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
             "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
             "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
-        ],
-        "frontend": [
-            "浏览器从输入 URL 到页面展示，中间发生了哪些关键步骤？",
-            "React 或 Vue 的状态更新为什么不是简单的直接 DOM 修改？请结合渲染流程说明。",
-            "前端性能优化你会从哪些指标和手段入手？",
-        ],
-        "algorithm": [
-            "训练集效果很好但验证集效果明显变差，可能原因是什么？你会怎么验证和改进？",
-            "请解释 precision、recall 和 F1 的差异，以及不同业务下如何选择指标。",
-            "特征泄漏是什么？在真实项目里如何排查？",
-        ],
-        "test_dev": [
-            "如果要测试一个登录接口，你会如何设计测试用例？",
-            "自动化测试不稳定通常有哪些原因？你会怎么定位？",
-            "性能测试中 QPS、RT、错误率之间是什么关系？",
-        ],
-        "data_engineering": [
-            "数仓分层通常怎么设计？每一层解决什么问题？",
-            "如果一个核心指标突然下降，你会如何排查数据链路？",
-            "离线计算和实时计算在一致性、延迟和成本上有什么取舍？",
-        ],
-        "ml_engineering": [
-            "模型上线后效果下降，你会从数据、模型和服务三方面如何排查？",
-            "向量检索系统里召回率和延迟之间如何权衡？",
-            "推理服务优化可以从哪些层面入手？",
-        ],
-        "security": [
-            "请解释 SQL 注入的原理，以及服务端应该如何防护。",
-            "你会如何对一个 Web 系统做基础威胁建模？",
-            "漏洞修复后如何验证风险已经被有效降低？",
-        ],
-        "embedded": [
-            "C/C++ 中栈和堆的区别是什么？嵌入式场景为什么更关注内存管理？",
-            "实时系统中的实时性通常如何衡量？哪些因素会破坏实时性？",
-            "遇到偶发硬件通信异常，你会如何定位？",
-        ],
-        "sre": [
-            "线上服务突然延迟升高，你会按什么顺序排查？",
-            "监控告警应该如何设计，才能减少漏报和误报？",
-            "容器化部署相比传统部署带来了哪些稳定性收益和新风险？",
         ],
     },
     "system_design": [
@@ -227,6 +188,7 @@ class CampusInterviewEngine:
             "review_plan": self._review_plan(session),
             "practice_drills": self._practice_drills(session),
             "answer_guides": self._answer_guides(session),
+            "study_guides": self._study_guides(session),
             "turns": [
                 {
                     "question": turn.question,
@@ -294,7 +256,10 @@ class CampusInterviewEngine:
                     "tags": self._default_phase_tags(session, phase),
                 }
                 return generated
-            questions = QUESTION_BANK["fundamentals"][session.config.direction_id]
+            questions = QUESTION_BANK["fundamentals"].get(
+                session.config.direction_id,
+                QUESTION_BANK["fundamentals"]["backend"],
+            )
             session.current_question_meta = {
                 "source": "builtin",
                 "phase": phase,
@@ -461,19 +426,34 @@ class CampusInterviewEngine:
 
     def _select_project_question(self, session: InterviewSession, step: int) -> str:
         resume = session.config.resume_text or ""
+        resume_analysis = self._resume_analysis(session)
+        project_cards = list(resume_analysis.get("project_cards") or [])
+        card = project_cards[step % len(project_cards)] if project_cards else None
         session.current_question_meta = {
             "source": "builtin",
             "phase": "project",
-            "tags": session.direction["project_focus"][:3],
+            "tags": self._project_tags(session, card),
             "followups": self._project_followups(session, step),
             "rubric": [
                 "是否讲清业务背景和目标",
                 "是否说明个人贡献和关键技术方案",
                 "是否给出指标结果、验证方式和复盘",
+                "是否能解释技术选型依据、故障风险和项目真实性",
             ],
         }
+        if card:
+            card_name = card.get("name") or "这个项目"
+            summary = card.get("summary") or ""
+            if step == 0:
+                return (
+                    f"我把你的简历先拆成项目卡片，第一张是「{card_name}」。"
+                    f"请用 2 分钟讲清它的背景、你的个人贡献、核心方案和结果。"
+                    f"{' 简历片段：' + summary if summary else ''}"
+                )
+            prompt_pool = self._project_card_prompts(card, resume_analysis)
+            return prompt_pool[step % len(prompt_pool)]
         if step == 0 and resume.strip():
-            focus = "、".join(session.direction["project_focus"][:3])
+            focus = "、".join(session.direction["project_focus"][:4])
             return (
                 "我看到你提供了简历内容。请选其中最能体现岗位匹配度的项目，"
                 f"重点讲 {focus}，并说明你的个人贡献。"
@@ -483,13 +463,85 @@ class CampusInterviewEngine:
 
     def _project_followups(self, session: InterviewSession, step: int) -> list[str]:
         focus = session.direction["project_focus"]
+        resume_analysis = self._resume_analysis(session)
+        targeted: list[str] = []
+        for card in resume_analysis.get("project_cards") or []:
+            targeted.extend(str(item) for item in card.get("followup_questions") or [])
+        targeted.extend(str(item) for item in resume_analysis.get("metric_questions") or [])
+        targeted.extend(str(item) for item in resume_analysis.get("tech_choice_questions") or [])
+        targeted.extend(str(item) for item in resume_analysis.get("incident_questions") or [])
+        targeted.extend(
+            f"你简历里的「{item}」比较模糊，请用事实、指标或代码细节解释它到底代表什么。"
+            for item in resume_analysis.get("vague_claims") or []
+        )
         followups = [
             "你在这个项目中的个人贡献和不可替代部分是什么？请区分团队成果和你自己的工作。",
             f"围绕{focus[0]}和{focus[1]}，当时还有哪些备选方案？为什么没有选它们？",
             "这个项目上线或验收后，核心指标怎么变化？你如何证明变化来自你的方案？",
             f"如果面试官质疑{focus[2]}或{focus[3]}，你会怎么解释边界条件和风险兜底？",
+            "项目中有没有线上故障、压测瓶颈或需求变更？你当时怎么定位、恢复和复盘？",
         ]
+        followups = list(dict.fromkeys(targeted + followups))
         return followups[step % len(followups):] + followups[:step % len(followups)]
+
+    def _resume_analysis(self, session: InterviewSession) -> dict:
+        resume = (session.config.resume_text or "").strip()
+        if not resume:
+            return {}
+        return analyze_resume(resume).as_dict()
+
+    def _project_tags(self, session: InterviewSession, card: dict | None) -> list[str]:
+        tags = list(session.direction["project_focus"][:3])
+        if card:
+            tags.extend(str(item) for item in card.get("tech_stack") or [])
+            tags.insert(0, str(card.get("name") or "项目卡片"))
+        return list(dict.fromkeys(tags))[:5]
+
+    def _project_card_prompts(self, card: dict, resume_analysis: dict) -> list[str]:
+        name = card.get("name") or "这个项目"
+        contribution = self._first_text(card.get("contribution_signals")) or self._first_text(
+            resume_analysis.get("contributions")
+        )
+        metric = self._first_text(card.get("metrics"))
+        vague = self._first_text(card.get("vague_claims")) or self._first_text(resume_analysis.get("vague_claims"))
+        choice = self._first_text(card.get("tech_choices"))
+        incident = self._first_text(card.get("incident_signals"))
+        return [
+            (
+                f"继续深挖「{name}」："
+                f"{'你写到「' + contribution + '」，' if contribution else ''}"
+                "请拆出你自己的设计、编码、联调、上线和复盘动作，哪些不是团队其他人完成的？"
+            ),
+            (
+                f"「{name}」的技术选型依据是什么？"
+                f"{'简历里相关表述是「' + choice + '」。' if choice else ''}"
+                "当时至少有哪些替代方案，分别为什么没选？"
+            ),
+            (
+                f"「{name}」的效果怎么证明？"
+                f"{'你写到「' + metric + '」，' if metric else ''}"
+                "请说明指标来源、统计口径、上线前基线、上线后对比和归因方式。"
+            ),
+            (
+                f"「{name}」如果在真实线上环境出问题，最可能的故障点是什么？"
+                f"{'你简历里提到「' + incident + '」，' if incident else ''}"
+                "请讲一次排查、恢复、兜底和复盘改进。"
+            ),
+            (
+                f"「{name}」里有没有包装过度或边界不清的表述？"
+                f"{'比如「' + vague + '」。' if vague else ''}"
+                "请把它改成面试官可验证的事实、证据和代码/数据细节。"
+            ),
+        ]
+
+    def _first_text(self, items: object) -> str:
+        if not isinstance(items, list):
+            return ""
+        for item in items:
+            text = str(item).strip()
+            if text:
+                return text
+        return ""
 
     def _feedback(self, session: InterviewSession, answer: str) -> tuple[str, float]:
         if not answer:
@@ -896,6 +948,193 @@ class CampusInterviewEngine:
             "例如先说明概念或机制，再讲它解决什么问题、会带来什么代价。"
             f"针对“{focus}”，需要补充适用场景、边界条件和常见误区。"
             "最后落到工程里，可以说如何通过日志、指标、实验或测试来验证自己的判断。"
+        )
+
+    def _study_guides(self, session: InterviewSession) -> list[dict]:
+        guides: list[dict] = []
+        seen: set[str] = set()
+        turns = [
+            turn for turn in sorted(session.history, key=lambda item: item.score)
+            if (turn.question_meta or {}).get("phase") != "closing"
+        ]
+        for turn in turns:
+            meta = turn.question_meta or {}
+            source_key = str(meta.get("parent_id") or meta.get("id") or turn.question)
+            if source_key in seen:
+                continue
+            seen.add(source_key)
+            gaps = self._rubric_coverage(turn.answer, meta)[1]
+            focus = gaps[0] if gaps else "回答结构和关键细节"
+            guides.append(
+                {
+                    "topic": meta.get("topic") or meta.get("phase") or "interview",
+                    "source_question_id": meta.get("parent_id") or meta.get("id"),
+                    "question": turn.question.split("\n", 1)[0],
+                    "focus": focus,
+                    "related_knowledge": self._related_knowledge(meta, focus),
+                    "reference_answer": self._reference_answer(turn, focus),
+                    "common_mistakes": self._common_mistakes(meta, focus),
+                    "interviewer_followups": self._interviewer_followups(meta, focus),
+                    "low_score_answer": self._low_score_answer(meta, focus),
+                    "high_score_answer": self._high_score_answer(meta, focus),
+                }
+            )
+            if len(guides) >= 5:
+                break
+
+        if guides:
+            return guides
+
+        return [
+            {
+                "topic": "communication",
+                "source_question_id": None,
+                "question": "任选本轮一道题重新回答。",
+                "focus": "结构化表达",
+                "related_knowledge": ["结论先行", "STAR", "技术取舍", "验证方式"],
+                "reference_answer": (
+                    "先直接给结论，再解释关键依据；随后补一个项目或工程场景，"
+                    "说明为什么选这个方案、有什么代价，最后用指标、日志、测试或压测结果验证。"
+                ),
+                "common_mistakes": ["只背概念，不说明场景。", "只说做了什么，不说明为什么。", "没有验证方式或量化结果。"],
+                "interviewer_followups": ["这个结论在什么边界下不成立？", "如果线上指标变差，你会怎么验证原因？"],
+                "low_score_answer": "这个我知道，大概就是按常规方案做，效果应该还可以。",
+                "high_score_answer": (
+                    "我的结论是先明确约束，再选方案。原因是不同场景下成本、稳定性和一致性要求不同。"
+                    "我会给出备选方案对比，并用指标或实验说明最终方案是否有效。"
+                ),
+            }
+        ]
+
+    def _related_knowledge(self, question_meta: dict, focus: str) -> list[str]:
+        items: list[str] = []
+        for value in [
+            question_meta.get("topic"),
+            question_meta.get("difficulty"),
+            focus,
+            *list(question_meta.get("tags") or []),
+        ]:
+            if value:
+                items.append(str(value))
+        for rubric in question_meta.get("rubric") or []:
+            label = self._rubric_label(str(rubric))
+            if label:
+                items.append(label)
+        return list(dict.fromkeys(items))[:8]
+
+    def _reference_answer(self, turn: Turn, focus: str) -> str:
+        meta = turn.question_meta or {}
+        phase = meta.get("phase")
+        topic = meta.get("topic") or "本题"
+        rubric_labels = [self._rubric_label(str(item)) for item in meta.get("rubric") or []]
+        rubric_text = "、".join(label for label in rubric_labels if label) or focus
+
+        if phase == "project":
+            return (
+                "参考结构：先用一句话说明项目背景和目标，再明确自己负责的模块、关键动作和交付边界。"
+                "接着对比至少两个技术方案，解释选择依据和放弃原因。"
+                f"围绕“{rubric_text}”补充核心实现、指标来源、上线验证、故障风险和复盘改进。"
+            )
+        if phase == "system_design":
+            return (
+                "参考结构：先澄清用户规模、读写比例、延迟目标、一致性和可用性要求。"
+                "再拆模块、数据流和核心表，说明缓存、消息队列、存储、幂等和降级策略。"
+                f"围绕“{rubric_text}”给出容量估算、故障场景、监控指标和验证方式。"
+            )
+        if phase == "self_intro":
+            return (
+                "参考结构：用 10 秒说明目标岗位和技术栈，用 30 秒讲最匹配的项目贡献，"
+                "再用 15 秒补充可被追问的技术亮点，最后把话题引到自己最有把握的项目或知识点。"
+            )
+        return (
+            f"参考结构：先给出 {topic} 的直接结论或定义，再解释底层机制和关键约束。"
+            f"围绕“{rubric_text}”补齐适用场景、优缺点、边界条件和常见误区。"
+            "最后落到 Java 后端工程里，说明如何通过日志、指标、测试、压测或代码设计验证。"
+        )
+
+    def _common_mistakes(self, question_meta: dict, focus: str) -> list[str]:
+        phase = question_meta.get("phase")
+        if phase == "project":
+            return [
+                "把团队成果说成个人成果，缺少自己的决策和实现细节。",
+                "只说用了某个技术，不说明为什么选、替代方案是什么。",
+                "指标没有来源，无法解释统计口径、基线和验证方式。",
+                "不谈故障、风险和复盘，像包装过的项目陈述。",
+            ]
+        if phase == "system_design":
+            return [
+                "没有先澄清规模、读写比例、一致性和延迟目标。",
+                "只画模块，不说明数据流、容量和故障处理。",
+                "缓存、队列、分库分表等技术堆叠但缺少取舍依据。",
+            ]
+        if phase == "self_intro":
+            return [
+                "像背简历流水账，没有突出岗位匹配度。",
+                "技术亮点过多过散，面试官不知道该追问哪里。",
+                "没有把话题引向自己准备充分的项目。",
+            ]
+        return [
+            "只背概念定义，不解释机制和适用边界。",
+            f"没有展开“{focus}”。",
+            "没有结合 Java 后端场景说明工程落地和验证方式。",
+            "把相近概念混用，缺少对比和反例。",
+        ]
+
+    def _interviewer_followups(self, question_meta: dict, focus: str) -> list[str]:
+        followups = [
+            str(item).strip()
+            for item in question_meta.get("followups", [])
+            if str(item).strip()
+        ]
+        if followups:
+            return followups[:5]
+        phase = question_meta.get("phase")
+        if phase == "project":
+            return [
+                "这个项目里哪些工作是你独立完成的？怎么证明？",
+                "核心指标的统计口径、基线和数据来源是什么？",
+                "如果当时的技术选型被质疑，你怎么解释取舍？",
+                "上线后有没有故障或负反馈？你怎么复盘？",
+            ]
+        if phase == "system_design":
+            return [
+                "读写比例和容量扩大 10 倍后，瓶颈会在哪里？",
+                "缓存和数据库不一致时怎么发现、恢复和兜底？",
+                "你会监控哪些指标来证明设计有效？",
+            ]
+        return [
+            f"请继续展开“{focus}”。",
+            "这个结论在什么场景下不成立？",
+            "如果线上出现相反现象，你会怎么排查？",
+        ]
+
+    def _low_score_answer(self, question_meta: dict, focus: str) -> str:
+        phase = question_meta.get("phase")
+        if phase == "project":
+            return "我主要负责后端开发，用了一些缓存和数据库优化，最后项目效果还不错。"
+        if phase == "system_design":
+            return "我会用 Spring Boot 做服务，再加 Redis 和 MySQL，流量大了就加机器。"
+        return f"这个问题大概就是{focus}，平时开发里会用到，按常规做就可以。"
+
+    def _high_score_answer(self, question_meta: dict, focus: str) -> str:
+        phase = question_meta.get("phase")
+        if phase == "project":
+            return (
+                "我先说明项目目标和我的职责边界，再讲关键方案。"
+                "当时比较过直接改 SQL、加缓存和异步化三种方案，最终按瓶颈和交付成本选择。"
+                f"针对“{focus}”，我会给出指标口径、上线前后对比、异常兜底和复盘结论。"
+            )
+        if phase == "system_design":
+            return (
+                "我会先确认 QPS、数据量、读写比例、延迟目标和一致性要求。"
+                "然后拆接入层、业务层、存储层和异步任务，分别说明缓存、队列、幂等和降级。"
+                f"针对“{focus}”，补容量估算、风险点和用压测/监控验证的方案。"
+            )
+        topic = question_meta.get("topic") or "这个知识点"
+        return (
+            f"{topic} 我会先给结论，再解释机制。"
+            f"重点补“{focus}”，包括适用场景、边界条件、和相近方案对比。"
+            "最后结合 Java 后端场景说明排查或验证方法，比如日志、指标、单测、压测或线上监控。"
         )
 
     def _review_plan(self, session: InterviewSession) -> list[str]:

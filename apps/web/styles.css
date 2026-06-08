@@ -231,6 +231,24 @@ textarea:focus {
   gap: 10px;
 }
 
+.resume-cards {
+  display: grid;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.resume-card {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+  display: grid;
+  gap: 8px;
+}
+
+.resume-card p {
+  margin: 0;
+  line-height: 1.55;
+}
+
 .checklist-title {
   color: var(--text);
   font-weight: 800;
@@ -441,7 +459,8 @@ textarea:focus {
 }
 
 .history-list,
-.answer-guides {
+.answer-guides,
+.study-guides {
   display: grid;
   gap: 10px;
 }
@@ -507,10 +526,56 @@ textarea:focus {
   padding: 12px;
 }
 
+.study-guide {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fbfcfb;
+  padding: 12px;
+  display: grid;
+  gap: 10px;
+}
+
 .guide-question {
   color: var(--muted);
   line-height: 1.55;
   margin: 8px 0;
+}
+
+.guide-block {
+  display: grid;
+  gap: 6px;
+}
+
+.guide-block p {
+  margin: 0;
+  color: var(--text);
+  line-height: 1.65;
+}
+
+.compact-list {
+  margin: 0;
+  padding-left: 20px;
+  line-height: 1.65;
+  color: var(--muted);
+}
+
+.answer-compare {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.answer-compare > div {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+  padding: 10px;
+}
+
+.answer-compare p {
+  margin: 6px 0 0;
+  line-height: 1.6;
+  color: var(--muted);
 }
 
 .guide-structure {
@@ -562,6 +627,10 @@ textarea:focus {
 
   .history-actions button {
     flex: 1;
+  }
+
+  .answer-compare {
+    grid-template-columns: 1fr;
   }
 
 }

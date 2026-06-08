@@ -306,13 +306,15 @@ def detect_voice_activity(request: VADRequest) -> dict:
 
 @app.get("/v1/questions")
 def list_questions(direction_id: str | None = None) -> dict:
-    return {"questions": question_bank.list_questions(direction_id)}
+    if direction_id and direction_id != "backend":
+        return {"questions": []}
+    return {"questions": question_bank.list_questions("backend")}
 
 
 @app.get("/v1/questions/{question_id}")
 def get_question(question_id: str) -> dict:
     question = question_bank.get_question(question_id)
-    if not question:
+    if not question or "backend" not in question.get("directions", []):
         raise HTTPException(status_code=404, detail=f"Unknown question: {question_id}")
     return question
 
@@ -581,6 +583,8 @@ def _restore_session(session_id: str) -> InterviewSession | None:
     if not record:
         return None
     config = record["config"]
+    if config.get("direction_id") != "backend":
+        config["direction_id"] = "backend"
     provider_config = config.get("provider_config")
     redacted_provider_config = False
     if isinstance(provider_config, dict):

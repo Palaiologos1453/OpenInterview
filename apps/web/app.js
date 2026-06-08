@@ -229,7 +229,13 @@ async function analyzeResume() {
     <strong>简历分析</strong>
     ${renderMiniList("技术栈", result.tech_stack)}
     ${renderMiniList("项目", result.projects)}
+    ${renderMiniList("个人贡献", result.contributions)}
+    ${renderMiniList("模糊/易被质疑表述", result.vague_claims)}
     ${renderMiniList("风险", result.risks)}
+    ${renderResumeProjectCards(result.project_cards || [])}
+    ${renderResumeQuestionList("指标来源追问", result.metric_questions)}
+    ${renderResumeQuestionList("技术选型追问", result.tech_choice_questions)}
+    ${renderResumeQuestionList("故障复盘追问", result.incident_questions)}
   `;
 }
 
@@ -356,6 +362,7 @@ async function openHistoryDrills(sessionId) {
     ${report.ai_summary ? `<p>${escapeHtml(report.ai_summary)}</p>` : ""}
     ${renderPracticeDrills(report.practice_drills || [])}
     ${renderAnswerGuides(report.answer_guides || [])}
+    ${renderStudyGuides(report.study_guides || [])}
   `;
   setStatus("已打开历史复练题。");
 }
@@ -1014,6 +1021,7 @@ function renderReport(report) {
     ${renderList("复习计划", report.review_plan)}
     ${renderPracticeDrills(report.practice_drills || [])}
     ${renderAnswerGuides(report.answer_guides || [])}
+    ${renderStudyGuides(report.study_guides || [])}
     ${renderTurnReview(report.turns || [])}
   `;
 }
@@ -1059,6 +1067,63 @@ function renderAnswerGuides(guides) {
           <div class="example-answer">${escapeHtml(guide.example_answer || "")}</div>
         </article>
       `).join("")}
+    </div>
+  `;
+}
+
+function renderStudyGuides(guides) {
+  if (!guides.length) return "";
+  return `
+    <h3>题目学习卡</h3>
+    <div class="study-guides">
+      ${guides.map((guide) => `
+        <article class="study-guide">
+          <div class="turn-review-title">
+            <strong>${escapeHtml(guide.topic || "interview")}</strong>
+            <span>${escapeHtml(guide.focus || "")}</span>
+          </div>
+          <p class="guide-question">${escapeHtml(shortText(guide.question || "", 180))}</p>
+          ${renderGuideTags("关联知识点", guide.related_knowledge)}
+          <div class="guide-block">
+            <b>参考答案</b>
+            <p>${escapeHtml(guide.reference_answer || "")}</p>
+          </div>
+          ${renderGuideList("常见错误", guide.common_mistakes)}
+          ${renderGuideList("面试官追问点", guide.interviewer_followups)}
+          <div class="answer-compare">
+            <div>
+              <b>低分回答</b>
+              <p>${escapeHtml(guide.low_score_answer || "")}</p>
+            </div>
+            <div>
+              <b>高分回答</b>
+              <p>${escapeHtml(guide.high_score_answer || "")}</p>
+            </div>
+          </div>
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderGuideTags(title, items = []) {
+  if (!Array.isArray(items) || !items.length) return "";
+  return `
+    <div class="guide-block">
+      <b>${escapeHtml(title)}</b>
+      <div class="tags">${items.map((item) => `<span class="tag">${escapeHtml(item)}</span>`).join("")}</div>
+    </div>
+  `;
+}
+
+function renderGuideList(title, items = []) {
+  if (!Array.isArray(items) || !items.length) return "";
+  return `
+    <div class="guide-block">
+      <b>${escapeHtml(title)}</b>
+      <ul class="compact-list">
+        ${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}
+      </ul>
     </div>
   `;
 }
@@ -1112,6 +1177,30 @@ function renderList(title, items = []) {
 
 function renderMiniList(title, items = []) {
   return `<div><b>${escapeHtml(title)}：</b>${items.length ? items.map(escapeHtml).join("、") : "无"}</div>`;
+}
+
+function renderResumeProjectCards(cards = []) {
+  if (!Array.isArray(cards) || !cards.length) return "";
+  return `
+    <div class="resume-cards">
+      ${cards.map((card) => `
+        <article class="resume-card">
+          <b>${escapeHtml(card.name || "项目卡片")}</b>
+          <p>${escapeHtml(card.summary || "")}</p>
+          ${renderGuideTags("技术栈", card.tech_stack)}
+          ${renderGuideList("个人贡献信号", card.contribution_signals)}
+          ${renderGuideList("指标信号", card.metrics)}
+          ${renderGuideList("易被质疑表述", card.vague_claims)}
+          ${renderGuideList("项目拷打问题", card.followup_questions)}
+        </article>
+      `).join("")}
+    </div>
+  `;
+}
+
+function renderResumeQuestionList(title, items = []) {
+  if (!Array.isArray(items) || !items.length) return "";
+  return renderGuideList(title, items);
 }
 
 function catalogName(group, id) {

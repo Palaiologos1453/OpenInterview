@@ -28,7 +28,7 @@ class CampusInterviewEngineTest(unittest.TestCase):
         payload = result["payload"]
 
         self.assertEqual(payload["session_id"], session.session_id)
-        self.assertIn("后端开发", payload["opening_message"])
+        self.assertIn("Java 后端", payload["opening_message"])
         self.assertTrue(payload["next_question"])
 
         turn = engine.answer(
@@ -44,17 +44,17 @@ class CampusInterviewEngineTest(unittest.TestCase):
         engine = CampusInterviewEngine()
         result = engine.start(
             InterviewConfig(
-                direction_id="frontend",
+                direction_id="backend",
                 difficulty_id="internship",
                 provider_config=MOCK_PROVIDER,
             )
         )
         session = result["session"]
-        engine.answer(session, "我会从背景、方案、结果三个部分回答，并补充浏览器渲染和网络请求细节。")
+        engine.answer(session, "我会从背景、方案、结果三个部分回答，并补充 Java、数据库和缓存细节。")
 
         report = engine.report(session)
 
-        self.assertEqual(report["direction"], "前端开发")
+        self.assertEqual(report["direction"], "Java 后端")
         self.assertEqual(len(report["dimensions"]), 4)
         self.assertTrue(report["review_plan"])
 
@@ -82,6 +82,13 @@ class CampusInterviewEngineTest(unittest.TestCase):
         self.assertTrue(report["practice_drills"])
         self.assertTrue(report["answer_guides"])
         self.assertIn("example_answer", report["answer_guides"][0])
+        self.assertTrue(report["study_guides"])
+        self.assertIn("reference_answer", report["study_guides"][0])
+        self.assertIn("common_mistakes", report["study_guides"][0])
+        self.assertIn("interviewer_followups", report["study_guides"][0])
+        self.assertIn("low_score_answer", report["study_guides"][0])
+        self.assertIn("high_score_answer", report["study_guides"][0])
+        self.assertIn("related_knowledge", report["study_guides"][0])
 
     def test_low_score_answer_gets_followup(self):
         engine = CampusInterviewEngine()
@@ -107,7 +114,10 @@ class CampusInterviewEngineTest(unittest.TestCase):
                 direction_id="backend",
                 difficulty_id="campus",
                 mode_id="project_deep_dive",
-                resume_text="项目：订单系统，负责缓存、接口和数据库优化。",
+                resume_text=(
+                    "项目：订单系统，负责缓存、接口和数据库优化。"
+                    "使用 Java、Spring Boot、MySQL、Redis，接口延迟降低 30%，线上压测发现过缓存击穿问题。"
+                ),
                 provider_config=MOCK_PROVIDER,
             )
         )
@@ -116,7 +126,7 @@ class CampusInterviewEngineTest(unittest.TestCase):
         turn = engine.answer(session, "做了一个项目。")
 
         self.assertIn("继续补充", turn["next_question"])
-        self.assertIn("个人贡献", turn["next_question"])
+        self.assertTrue(any(keyword in turn["next_question"] for keyword in ["个人贡献", "数据来源", "统计口径", "技术选型", "故障"]))
         self.assertEqual(session.current_question_meta["phase"], "project")
 
 

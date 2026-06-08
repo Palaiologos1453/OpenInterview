@@ -88,6 +88,7 @@ class ReportResponse(BaseModel):
     review_plan: list[str]
     practice_drills: list[dict] = Field(default_factory=list)
     answer_guides: list[dict] = Field(default_factory=list)
+    study_guides: list[dict] = Field(default_factory=list)
     turns: list[dict]
 
 
