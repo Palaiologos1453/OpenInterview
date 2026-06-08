@@ -1,0 +1,14 @@
+questions:
+  - id: frontend-url-render
+    directions: ["frontend"]
+    difficulty: campus
+    topic: browser
+    type: fundamentals
+    prompt: "浏览器从输入 URL 到页面展示，中间发生了哪些关键步骤？"
+    followups:
+      - "DNS、TCP、TLS、HTTP 分别在什么阶段发生？"
+      - "渲染过程中重排和重绘有什么区别？"
+    rubric:
+      - "能覆盖网络请求、HTML/CSS/JS 解析和渲染流程。"
+      - "能讲清关键性能指标和优化点。"
+

@@ -1,0 +1,37 @@
+voice_profiles:
+  - id: young_engineer
+    name: 青年工程师
+    persona: 技术一面
+    gender: male
+    style: calm, concise, technical
+    provider: cosyvoice
+    mode: instruct
+    style_prompt: 年轻男性工程师，语速中等，表达清晰，技术面试风格。
+
+  - id: senior_leader
+    name: 中年技术领导
+    persona: 二面/主管面
+    gender: male
+    style: steady, strict, strategic
+    provider: cosyvoice
+    mode: instruct
+    style_prompt: 中年男性技术负责人，语气沉稳，追问偏架构和取舍。
+
+  - id: female_hr
+    name: 女性 HR
+    persona: HR 面
+    gender: female
+    style: warm, clear, conversational
+    provider: cosyvoice
+    mode: instruct
+    style_prompt: 女性 HR 面试官，语气温和清晰，关注动机、沟通和稳定性。
+
+  - id: anime_original
+    name: 原创二次元面试官
+    persona: 趣味训练
+    gender: female
+    style: lively, friendly, anime-like
+    provider: cosyvoice
+    mode: instruct
+    style_prompt: 原创二次元风格女性面试官，活泼但不夸张，保持面试专业性。
+

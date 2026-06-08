@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>OpenInterview</title>
+    <link rel="stylesheet" href="./styles.css" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <aside class="sidebar">
+        <div class="brand">
+          <div class="brand-mark">OI</div>
+          <div>
+            <h1>OpenInterview</h1>
+            <p>计算机校招 AI 模拟面试</p>
+          </div>
+        </div>
+
+        <form id="setup-form" class="setup">
+          <label>面试方向<select id="direction"></select></label>
+          <label>难度<select id="difficulty"></select></label>
+          <label>模式<select id="mode"></select></label>
+          <label>面试官音色<select id="voice-profile"></select></label>
+          <label>候选人姓名<input id="candidate-name" type="text" placeholder="可选" /></label>
+          <label>
+            简历 / 项目经历
+            <textarea id="resume" rows="7" placeholder="粘贴简历片段，系统会抽取技术栈、项目和风险点"></textarea>
+          </label>
+
+          <div class="inline-actions">
+            <button id="analyze-resume-button" class="secondary" type="button">分析简历</button>
+            <button id="start-button" type="submit">开始面试</button>
+          </div>
+
+          <details class="provider-panel">
+            <summary>模型配置（本机保存）</summary>
+            <p class="provider-note">
+              默认使用文本面试：填写 LLM 的 API Base、Model 和 API Key 即可。语音输入/播报默认走浏览器，本地 SenseVoice/CosyVoice 属于可选增强。
+            </p>
+            <div class="provider-grid">
+              <h3>LLM</h3>
+              <label>Provider
+                <select id="llm-provider">
+                  <option value="mock">Mock</option>
+                  <option value="openai_compatible">OpenAI Compatible</option>
+                  <option value="ollama">Ollama</option>
+                </select>
+              </label>
+              <label>API Base<input id="llm-api-base" type="text" placeholder="例如 https://api.openai.com/v1" /></label>
+              <label>Model<input id="llm-model" type="text" placeholder="例如 gpt-4o-mini 或兼容模型名" /></label>
+              <label>API Key<input id="llm-api-key" type="password" autocomplete="off" /></label>
+              <label>Temperature<input id="llm-temperature" type="number" min="0" max="2" step="0.1" /></label>
+
+              <h3>ASR</h3>
+              <label>Provider
+                <select id="asr-provider">
+                  <option value="browser">Browser</option>
+                  <option value="sensevoice">Local SenseVoice</option>
+                  <option value="openai_compatible">OpenAI Compatible</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+              </label>
+              <label>Model / Path<input id="asr-model" type="text" placeholder="浏览器语音可留空" /></label>
+              <label>API Base<input id="asr-api-base" type="text" placeholder="API ASR 时填写" /></label>
+              <label>API Key<input id="asr-api-key" type="password" autocomplete="off" /></label>
+
+              <h3>TTS</h3>
+              <label>Provider
+                <select id="tts-provider">
+                  <option value="browser">Browser</option>
+                  <option value="cosyvoice">Local CosyVoice</option>
+                  <option value="openai_compatible">OpenAI Compatible</option>
+                  <option value="disabled">Disabled</option>
+                </select>
+              </label>
+              <label>Model / Path<input id="tts-model" type="text" placeholder="浏览器播报可留空" /></label>
+              <label>API Base<input id="tts-api-base" type="text" placeholder="API TTS 时填写" /></label>
+              <label>Voice<input id="tts-voice" type="text" /></label>
+              <label>API Key<input id="tts-api-key" type="password" autocomplete="off" /></label>
+
+              <div class="provider-actions">
+                <button id="save-provider-config" class="secondary" type="button">保存配置</button>
+                <button id="test-llm-config" class="secondary" type="button">测试 LLM</button>
+                <button id="clear-provider-config" class="secondary" type="button">清空配置</button>
+              </div>
+            </div>
+          </details>
+
+          <div class="voice-row">
+            <label class="toggle"><input id="voice-output" type="checkbox" /><span>语音播报</span></label>
+          </div>
+        </form>
+
+        <section id="setup-checklist" class="status setup-checklist" aria-live="polite"></section>
+        <div id="runtime-status" class="status">正在加载目录...</div>
+        <div id="resume-panel" class="status" hidden></div>
+      </aside>
+
+      <section class="workspace">
+        <div class="interview-header">
+          <div>
+            <p class="eyebrow">Campus CS Interview</p>
+            <h2 id="session-title">选择方向后开始模拟</h2>
+          </div>
+          <div class="inline-actions">
+            <button id="report-button" class="secondary" type="button" disabled>生成报告</button>
+            <button id="history-button" class="secondary" type="button">历史</button>
+          </div>
+        </div>
+
+        <section id="conversation" class="conversation" aria-live="polite">
+          <div class="empty-state">
+            <strong>OpenInterview</strong>
+            <span>选择方向和难度，填写本地模型配置后开始一轮计算机校招模拟面试。</span>
+          </div>
+        </section>
+
+        <form id="answer-form" class="answer-box">
+          <textarea id="answer" rows="5" placeholder="输入你的回答。建议按背景、方案、取舍、结果组织。" disabled></textarea>
+          <div class="answer-actions">
+            <button id="listen-button" class="secondary" type="button" disabled>语音输入</button>
+            <button id="send-button" type="submit" disabled>提交回答</button>
+          </div>
+        </form>
+
+        <section id="report" class="report" hidden></section>
+      </section>
+    </main>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

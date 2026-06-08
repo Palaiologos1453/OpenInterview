@@ -1,0 +1,200 @@
+questions:
+  - id: cs-os-process-thread-switch
+    directions: ["backend", "sre", "embedded"]
+    difficulty: campus
+    topic: operating-system
+    type: fundamentals
+    tags: ["OS", "Process", "Thread"]
+    prompt: "进程、线程和协程分别解决什么问题？在后端服务里它们各自适合什么场景？"
+    followups:
+      - "线程上下文切换的主要成本来自哪里？"
+      - "协程为什么能提升高并发 IO 场景下的资源利用率？"
+      - "多进程模型和多线程模型在故障隔离上有什么差异？"
+    rubric:
+      - "能区分资源隔离、调度单位和用户态协作调度。"
+      - "能结合 CPU 密集、IO 密集、故障隔离说明适用场景。"
+      - "能提到上下文切换、共享内存和同步成本。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/operating-system/operating-system-basic-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cs-os-deadlock
+    directions: ["backend", "sre", "embedded"]
+    difficulty: campus
+    topic: operating-system
+    type: scenario
+    tags: ["OS", "Deadlock", "Concurrency"]
+    prompt: "如果线上服务出现线程长时间阻塞，你如何判断是否存在死锁？死锁的必要条件和预防手段是什么？"
+    followups:
+      - "互斥、占有且等待、不可抢占、循环等待分别如何破坏？"
+      - "Java 里可以用哪些工具定位死锁？"
+      - "锁顺序设计为什么能降低死锁风险？"
+    rubric:
+      - "能列出死锁四个必要条件并解释含义。"
+      - "能给出日志、线程 dump、监控指标等定位手段。"
+      - "能提出锁排序、超时、减小锁粒度等预防方案。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/operating-system/operating-system-basic-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cs-os-virtual-memory
+    directions: ["backend", "sre", "embedded"]
+    difficulty: bigtech
+    topic: operating-system
+    type: fundamentals
+    tags: ["OS", "Memory", "Paging"]
+    prompt: "虚拟内存解决了什么问题？分页、缺页中断和页面置换如何影响应用性能？"
+    followups:
+      - "为什么频繁缺页会导致系统吞吐下降？"
+      - "内存映射文件适合什么场景？"
+      - "应用出现 swap 飙升时你会如何排查？"
+    rubric:
+      - "能说明虚拟地址空间带来的隔离、扩展和简化编程模型。"
+      - "能解释页表、缺页中断、页面置换和磁盘 IO 成本。"
+      - "能结合监控指标说明内存压力排查思路。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/operating-system/operating-system-basic-questions-02.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cs-network-tcp-handshake
+    directions: ["backend", "frontend", "sre"]
+    difficulty: campus
+    topic: computer-network
+    type: fundamentals
+    tags: ["Network", "TCP"]
+    prompt: "TCP 为什么需要三次握手和四次挥手？请说明每一步要确认的信息。"
+    followups:
+      - "为什么两次握手不够？"
+      - "服务端大量 SYN_RECV 可能是什么问题？"
+      - "四次挥手里为什么主动关闭方通常会进入 TIME_WAIT？"
+    rubric:
+      - "能说明三次握手用于确认双方收发能力和初始序列号。"
+      - "能说明挥手涉及双向半关闭，因此常见为四次。"
+      - "能关联半连接队列、全连接队列、TIME_WAIT 等工程问题。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/network/tcp-connection-and-disconnection.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cs-network-time-wait-close-wait
+    directions: ["backend", "sre"]
+    difficulty: bigtech
+    topic: computer-network
+    type: scenario
+    tags: ["Network", "TCP", "Troubleshooting"]
+    prompt: "线上机器出现大量 TIME_WAIT 或 CLOSE_WAIT 时，你会如何判断风险和定位原因？"
+    followups:
+      - "TIME_WAIT 多一定是故障吗？"
+      - "CLOSE_WAIT 通常更像哪一侧没有正确关闭连接？"
+      - "排查时你会看哪些命令、指标和调用链信息？"
+    rubric:
+      - "能区分 TIME_WAIT 是主动关闭方等待，CLOSE_WAIT 多与应用未关闭连接相关。"
+      - "能结合连接方向、端口、进程和调用路径定位问题。"
+      - "能提出连接池、超时、资源释放和内核参数的审慎优化方案。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/network/tcp-time-wait.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cs-network-http-https
+    directions: ["backend", "frontend", "security"]
+    difficulty: campus
+    topic: computer-network
+    type: fundamentals
+    tags: ["Network", "HTTP", "HTTPS"]
+    prompt: "HTTP 和 HTTPS 的核心差异是什么？TLS 握手主要解决了哪些安全问题？"
+    followups:
+      - "对称加密和非对称加密在 TLS 中分别起什么作用？"
+      - "证书链为什么能防止中间人攻击？"
+      - "HTTPS 会带来哪些性能成本，如何优化？"
+    rubric:
+      - "能说明 HTTPS 在 HTTP 上增加 TLS，提供加密、认证和完整性保护。"
+      - "能讲清证书、密钥协商、对称加密传输的关系。"
+      - "能提到连接复用、会话恢复、HTTP/2 等优化方向。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/network/http-vs-https.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cs-network-http-rpc
+    directions: ["backend"]
+    difficulty: campus
+    topic: computer-network
+    type: fundamentals
+    tags: ["Network", "HTTP", "RPC"]
+    prompt: "HTTP 调用和 RPC 调用有什么差异？为什么微服务内部常会选择 RPC 框架？"
+    followups:
+      - "RPC 框架一般包括哪些核心模块？"
+      - "序列化协议会如何影响性能和兼容性？"
+      - "服务注册发现、负载均衡和超时重试分别解决什么问题？"
+    rubric:
+      - "能区分协议语义、调用体验、治理能力和性能开销。"
+      - "能说明 RPC 不只是通信协议，还包含服务治理能力。"
+      - "能结合内部服务调用和对外 API 的边界说明选择。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/network/http-vs-rpc.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cs-network-url-flow
+    directions: ["backend", "frontend"]
+    difficulty: campus
+    topic: computer-network
+    type: fundamentals
+    tags: ["Network", "DNS", "HTTP"]
+    prompt: "从浏览器输入 URL 到后端服务收到请求，中间会经过哪些关键阶段？"
+    followups:
+      - "DNS 查询可能在哪些层级命中缓存？"
+      - "如果是 HTTPS，请补充 TLS 握手阶段。"
+      - "服务端返回慢时，你会如何判断瓶颈在网络还是应用？"
+    rubric:
+      - "能覆盖 URL 解析、DNS、TCP、TLS、HTTP 请求响应等阶段。"
+      - "能说明缓存、连接复用、代理和负载均衡可能参与链路。"
+      - "能给出网络延迟、服务端处理和客户端渲染的分段排查思路。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/network/the-whole-process-of-accessing-web-pages.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cs-network-tcp-reliability
+    directions: ["backend", "sre"]
+    difficulty: bigtech
+    topic: computer-network
+    type: fundamentals
+    tags: ["Network", "TCP", "Reliability"]
+    prompt: "TCP 通过哪些机制保证可靠传输？请说明确认应答、重传、滑动窗口和拥塞控制之间的关系。"
+    followups:
+      - "超时重传和快速重传分别在什么情况下触发？"
+      - "流量控制和拥塞控制有什么区别？"
+      - "SACK 或 D-SACK 能解决什么问题？"
+    rubric:
+      - "能说明序列号、ACK、重传和校验等基础机制。"
+      - "能区分接收端能力约束和网络拥塞约束。"
+      - "能把窗口、RTT、丢包和吞吐变化联系起来。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/network/tcp-reliability-guarantee.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cs-network-keepalive
+    directions: ["backend", "sre"]
+    difficulty: campus
+    topic: computer-network
+    type: scenario
+    tags: ["Network", "KeepAlive", "Connection Pool"]
+    prompt: "HTTP Keep-Alive 和 TCP Keepalive 分别解决什么问题？连接池设计时需要注意哪些超时配置？"
+    followups:
+      - "为什么长连接也需要空闲回收？"
+      - "客户端连接池超时比服务端 idle timeout 长会发生什么？"
+      - "TCP Keepalive 为什么不能替代业务层超时？"
+    rubric:
+      - "能区分 HTTP 连接复用和 TCP 探活机制。"
+      - "能说明连接池、服务端 idle timeout、NAT 或负载均衡超时的配合。"
+      - "能指出业务超时、读写超时和探活的不同职责。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/network/tcp-keepalive-vs-http-keepalive.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"

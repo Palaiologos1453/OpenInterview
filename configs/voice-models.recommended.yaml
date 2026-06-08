@@ -1,0 +1,73 @@
+# OpenInterview recommended local voice model stack.
+# The files are not committed to the repo. Download them into models/ at runtime.
+
+vad:
+  default:
+    id: silero-vad
+    provider: silero
+    package: silero-vad
+    local_file: models/vad/silero-vad/silero_vad.onnx
+    role: turn_detection
+    why: "Stable open-source VAD for realtime endpointing, interruption, and noise gating."
+
+asr:
+  default:
+    id: FunAudioLLM/SenseVoiceSmall
+    modelscope_id: iic/SenseVoiceSmall
+    provider: funasr
+    local_dir: models/asr/SenseVoiceSmall
+    languages: ["zh", "en", "yue", "ja", "ko"]
+    role: campus_interview_primary
+    why: "Best default for Chinese CS campus interviews; handles Mandarin, English terms, emotion/event tags, and low-latency inference."
+
+  fallback_multilingual:
+    id: Systran/faster-whisper-large-v3
+    provider: faster-whisper
+    local_dir: models/asr/faster-whisper-large-v3
+    languages: ["multilingual"]
+    role: robust_fallback
+    why: "Strong multilingual fallback and a mature ecosystem for timestamps, batching, and diarization integrations."
+
+  optional_fast_english:
+    id: distil-whisper/distil-large-v3
+    provider: faster-whisper
+    local_dir: models/asr/distil-large-v3
+    languages: ["en"]
+    role: english_fast_path
+    why: "Useful for English-only interview practice where speed matters more than broad language coverage."
+
+tts:
+  default:
+    id: FunAudioLLM/Fun-CosyVoice3-0.5B-2512
+    modelscope_id: FunAudioLLM/Fun-CosyVoice3-0.5B-2512
+    provider: cosyvoice
+    local_dir: models/tts/Fun-CosyVoice3-0.5B
+    auxiliary_models:
+      - id: FunAudioLLM/CosyVoice-ttsfrd
+        local_dir: models/tts/CosyVoice-ttsfrd
+        optional: true
+    role: natural_streaming_interviewer_voice
+    why: "Best default for natural Chinese/English interviewer voice, streaming output, and controllable pronunciation."
+
+  fallback_stable:
+    id: FunAudioLLM/CosyVoice2-0.5B
+    provider: cosyvoice
+    local_dir: models/tts/CosyVoice2-0.5B
+    role: compatibility_fallback
+    why: "Keep as compatibility fallback if CosyVoice3 runtime is unstable on a contributor's machine."
+
+  optional_lightweight:
+    id: onnx-community/Kokoro-82M-v1.0-ONNX
+    provider: kokoro-onnx
+    local_dir: models/tts/Kokoro-82M-v1.0-ONNX
+    role: lightweight_cpu_demo
+    why: "Small ONNX TTS for quick local demos; not the primary Chinese interviewer voice."
+
+api_fallback:
+  asr:
+    provider: openai_compatible
+    model: gpt-4o-mini-transcribe
+  tts:
+    provider: openai_compatible
+    model: gpt-4o-mini-tts
+    voice: alloy

@@ -1,0 +1,200 @@
+questions:
+  - id: scenario-spike-sale
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: system-design
+    type: scenario
+    tags: ["System Design", "High Concurrency", "Inventory"]
+    prompt: "如果让你设计一个秒杀下单系统，你会如何保护入口流量、库存一致性和订单链路？"
+    followups:
+      - "限流、排队、削峰分别放在哪一层？"
+      - "库存预扣、最终扣减和超时释放如何设计？"
+      - "如何防止重复下单和超卖？"
+    rubric:
+      - "能从入口限流、静态化、缓存、队列、异步下单拆链路。"
+      - "能说明库存扣减需要原子性、幂等和补偿机制。"
+      - "能考虑降级、监控、压测、容量预估和异常恢复。"
+    source: "JavaGuide"
+    source_path: "docs/zhuanlan/back-end-interview-high-frequency-system-design-and-scenario-questions.md"
+    source_license: "Apache-2.0"
+    source_usage: "inspired"
+
+  - id: scenario-short-url
+    directions: ["backend"]
+    difficulty: campus
+    topic: system-design
+    type: scenario
+    tags: ["System Design", "Short URL", "Cache"]
+    prompt: "请设计一个短链系统，说明短码生成、跳转查询、缓存和防滥用策略。"
+    followups:
+      - "短码如何保证唯一？自增 ID、哈希和随机码各有什么取舍？"
+      - "热点短链如何缓存？缓存击穿怎么办？"
+      - "如何做访问统计和恶意链接治理？"
+    rubric:
+      - "能说明核心表结构、短码生成、唯一约束和冲突处理。"
+      - "能设计读多写少场景下的缓存和降级。"
+      - "能考虑过期时间、黑名单、统计异步化和防刷。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/system-design-questions.md"
+    source_license: "Apache-2.0"
+    source_usage: "inspired"
+
+  - id: scenario-message-push
+    directions: ["backend", "sre"]
+    difficulty: bigtech
+    topic: system-design
+    type: scenario
+    tags: ["System Design", "Realtime", "WebSocket"]
+    prompt: "如何设计一个 Web 实时消息推送系统？请说明连接管理、消息路由和离线消息处理。"
+    followups:
+      - "WebSocket 长连接如何做水平扩展？"
+      - "用户连接在哪台机器上，其他服务如何找到它？"
+      - "离线消息和在线消息的一致性如何保证？"
+    rubric:
+      - "能拆分接入层、连接状态、消息投递、存储和确认机制。"
+      - "能说明连接路由、心跳、断线重连和水平扩容。"
+      - "能考虑消息顺序、重复投递、离线补偿和监控告警。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/web-real-time-message-push.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: scenario-idempotent-payment
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: high-availability
+    type: scenario
+    tags: ["Idempotency", "Payment", "Reliability"]
+    prompt: "支付回调或下单接口可能重复请求，你会如何设计幂等、防重和状态流转？"
+    followups:
+      - "唯一请求号、去重表、数据库唯一约束、状态机分别怎么用？"
+      - "如果第一次请求执行成功但响应超时，第二次重试应该返回什么？"
+      - "幂等记录何时创建、何时过期？"
+    rubric:
+      - "能说明幂等不是简单禁止重复，而是相同请求得到一致结果。"
+      - "能结合业务唯一键、状态机、事务和锁做设计。"
+      - "能考虑超时、重试、并发请求、对账和人工补偿。"
+    source: "JavaGuide"
+    source_path: "docs/high-availability/idempotency.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: scenario-rate-limit
+    directions: ["backend", "sre"]
+    difficulty: campus
+    topic: high-availability
+    type: scenario
+    tags: ["Rate Limit", "High Availability"]
+    prompt: "如果一个开放 API 被突发流量打满，你会如何设计限流策略？"
+    followups:
+      - "固定窗口、滑动窗口、漏桶、令牌桶有什么区别？"
+      - "限流应该按用户、IP、接口还是全局维度做？"
+      - "被限流后的响应、重试和告警如何设计？"
+    rubric:
+      - "能比较不同限流算法的平滑性、突发处理和实现成本。"
+      - "能按租户、接口、资源成本和下游容量设计多维限流。"
+      - "能说明限流结果、Retry-After、监控告警和灰度配置。"
+    source: "JavaGuide"
+    source_path: "docs/high-availability/limit-request.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: scenario-timeout-retry
+    directions: ["backend", "sre"]
+    difficulty: bigtech
+    topic: high-availability
+    type: scenario
+    tags: ["Timeout", "Retry", "Fault Tolerance"]
+    prompt: "下游服务偶发超时，你会如何配置超时、重试、熔断和降级，避免故障扩散？"
+    followups:
+      - "哪些错误适合重试，哪些不适合？"
+      - "指数退避和随机抖动解决什么问题？"
+      - "重试为什么必须和幂等、限流配合？"
+    rubric:
+      - "能说明远程调用必须有连接、读写、整体 deadline 等超时控制。"
+      - "能指出重试会放大流量，需要退避、抖动、次数限制和预算。"
+      - "能结合熔断、隔离、降级和幂等设计故障保护。"
+    source: "JavaGuide"
+    source_path: "docs/high-availability/timeout-and-retry.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: scenario-circuit-breaker-fallback
+    directions: ["backend", "sre"]
+    difficulty: bigtech
+    topic: high-availability
+    type: scenario
+    tags: ["Circuit Breaker", "Fallback"]
+    prompt: "降级和熔断有什么区别？如果推荐服务异常，你会如何保证主链路可用？"
+    followups:
+      - "熔断器的关闭、打开、半开状态分别表示什么？"
+      - "什么场景可以返回兜底数据，什么场景必须失败？"
+      - "如何避免降级逻辑本身成为新故障点？"
+    rubric:
+      - "能区分主动牺牲非核心能力的降级和自动切断故障依赖的熔断。"
+      - "能说明错误率、慢调用比例、最小请求数、恢复探测等规则。"
+      - "能结合核心链路、兜底数据、缓存和告警恢复说明完整方案。"
+    source: "JavaGuide"
+    source_path: "docs/high-availability/fallback-and-circuit-breaker.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: scenario-performance-test
+    directions: ["backend", "sre", "test_dev"]
+    difficulty: campus
+    topic: high-availability
+    type: scenario
+    tags: ["Performance Test", "Capacity"]
+    prompt: "上线前你会如何做压测和容量评估？请说明 QPS、RT、错误率和资源使用率如何一起看。"
+    followups:
+      - "单接口压测和全链路压测有什么差异？"
+      - "压测流量如何避免污染线上数据？"
+      - "如何根据压测结果推导机器容量和限流阈值？"
+    rubric:
+      - "能说明压测目标、流量模型、数据隔离和观测指标。"
+      - "能把吞吐、延迟、错误率、CPU、内存、数据库和缓存指标关联。"
+      - "能产出容量边界、扩容计划、限流阈值和回滚预案。"
+    source: "JavaGuide"
+    source_path: "docs/high-availability/performance-test.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: scenario-cold-hot-data
+    directions: ["backend", "data_engineering"]
+    difficulty: bigtech
+    topic: high-performance
+    type: scenario
+    tags: ["Data", "Storage", "Performance"]
+    prompt: "业务数据持续增长导致核心表越来越慢，你会如何设计冷热数据分离？"
+    followups:
+      - "冷热划分按时间、状态还是访问频率？"
+      - "历史数据查询如何兼顾成本和体验？"
+      - "迁移过程中如何保证一致性和可回滚？"
+    rubric:
+      - "能说明冷热划分标准、归档表或存储介质选择。"
+      - "能考虑查询路由、索引、报表和合规留存。"
+      - "能提出双写、校验、灰度迁移、回滚和监控方案。"
+    source: "JavaGuide"
+    source_path: "docs/high-performance/data-cold-hot-separation.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: scenario-read-write-splitting-sharding
+    directions: ["backend", "data_engineering"]
+    difficulty: bigtech
+    topic: high-performance
+    type: scenario
+    tags: ["MySQL", "Sharding", "Read Write Splitting"]
+    prompt: "数据库读写压力持续升高时，读写分离和分库分表分别解决什么问题？引入后会带来哪些新问题？"
+    followups:
+      - "主从延迟会影响哪些业务？如何处理读己之写？"
+      - "分片键如何选择？"
+      - "跨分片查询、事务和扩容怎么处理？"
+    rubric:
+      - "能区分读扩展和写/容量扩展的目标差异。"
+      - "能说明主从延迟、路由、分布式 ID、跨库事务、聚合查询等成本。"
+      - "能按业务访问模式选择分片键，并设计扩容迁移方案。"
+    source: "JavaGuide"
+    source_path: "docs/high-performance/read-and-write-separation-and-library-subtable.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"

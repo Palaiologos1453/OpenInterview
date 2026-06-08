@@ -1,0 +1,20 @@
+# Use a Python 3.10 environment for the local voice runtime.
+# RTX 50-series users should install a PyTorch build that supports their CUDA driver first.
+#
+# Example:
+#   python -m venv .venv-voice
+#   .\.venv-voice\Scripts\Activate.ps1
+#   pip install torch torchaudio --index-url https://download.pytorch.org/whl/cu128
+#   pip install -r requirements-voice.txt
+
+funasr
+modelscope
+onnxruntime-gpu
+numpy
+soundfile
+librosa
+torchaudio
+silero-vad
+
+# CosyVoice is not published as a simple wheel in all environments.
+# Install from the official CosyVoice repository that matches Fun-CosyVoice3.

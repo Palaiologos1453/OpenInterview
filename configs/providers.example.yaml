@@ -1,0 +1,27 @@
+llm:
+  # mock | openai_compatible | ollama
+  provider: openai_compatible
+  api_base: ""
+  model: ""
+  api_key_env: OPENINTERVIEW_LLM_API_KEY
+  temperature: 0.4
+
+asr:
+  # sensevoice | browser | openai_compatible | disabled
+  provider: browser
+  api_base: ""
+  model: ""
+  api_key_env: OPENINTERVIEW_ASR_API_KEY
+
+tts:
+  # cosyvoice | browser | openai_compatible | disabled
+  provider: browser
+  api_base: ""
+  model: ""
+  voice: ""
+  api_key_env: OPENINTERVIEW_TTS_API_KEY
+
+runtime:
+  language: zh-CN
+  save_audio: false
+  save_transcripts: true

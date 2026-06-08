@@ -1,0 +1,37 @@
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+env/
+dist/
+build/
+*.egg-info/
+
+# Node / frontend
+node_modules/
+.vite/
+
+# Local runtime
+.env
+.env.*
+*.sqlite
+*.db
+recordings/
+uploads/
+logs/
+models/
+tools/
+voice_venv*/
+voices/*.wav
+voices/*.mp3
+Fun-CosyVoice3-0.5B-2512/
+
+# Local scratch / accidental downloads
+4.10.0

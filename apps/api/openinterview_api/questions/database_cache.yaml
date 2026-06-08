@@ -1,0 +1,260 @@
+questions:
+  - id: db-mysql-index-bplus-tree
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: mysql
+    type: fundamentals
+    tags: ["MySQL", "Index", "B+Tree"]
+    prompt: "MySQL InnoDB 为什么常用 B+ 树作为索引结构？它相比哈希索引和 B 树更适合哪些查询？"
+    followups:
+      - "范围查询为什么适合 B+ 树？"
+      - "聚簇索引和二级索引有什么区别？"
+      - "回表和覆盖索引分别是什么意思？"
+    rubric:
+      - "能说明 B+ 树多叉、层高低、叶子节点有序链表等特点。"
+      - "能比较哈希索引不适合范围查询和排序。"
+      - "能解释聚簇索引、二级索引、回表、覆盖索引的工程影响。"
+    source: "JavaGuide"
+    source_path: "docs/database/mysql/mysql-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: db-mysql-index-invalid
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: mysql
+    type: scenario
+    tags: ["MySQL", "Index", "SQL"]
+    prompt: "一个查询明明建了索引却走了全表扫描，你会从哪些角度排查索引失效？"
+    followups:
+      - "隐式类型转换为什么可能导致索引失效？"
+      - "最左前缀原则如何影响联合索引设计？"
+      - "LIKE、函数计算、范围查询分别有哪些注意点？"
+    rubric:
+      - "能覆盖函数计算、隐式转换、最左前缀、选择性差等常见原因。"
+      - "能使用 EXPLAIN 观察 type、key、rows、Extra 等字段。"
+      - "能从 SQL 改写、索引重建、统计信息和数据分布角度给出方案。"
+    source: "JavaGuide"
+    source_path: "docs/database/mysql/mysql-index-invalidation.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: db-mysql-transaction-isolation
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: mysql
+    type: fundamentals
+    tags: ["MySQL", "Transaction", "Isolation"]
+    prompt: "MySQL 事务隔离级别有哪些？可重复读如何解决不可重复读，又如何看待幻读问题？"
+    followups:
+      - "脏读、不可重复读、幻读分别是什么？"
+      - "MySQL 默认隔离级别是什么？"
+      - "MVCC 和锁在隔离级别里分别发挥什么作用？"
+    rubric:
+      - "能说明读未提交、读已提交、可重复读、串行化的差异。"
+      - "能用具体读写例子区分不可重复读和幻读。"
+      - "能提到 MVCC、快照读、当前读和 next-key lock 的作用边界。"
+    source: "JavaGuide"
+    source_path: "docs/database/mysql/transaction-isolation-level.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: db-mysql-mvcc
+    directions: ["backend", "data_engineering"]
+    difficulty: bigtech
+    topic: mysql
+    type: fundamentals
+    tags: ["MySQL", "MVCC", "InnoDB"]
+    prompt: "InnoDB 的 MVCC 大致如何实现？ReadView、undo log 和隐藏字段分别起什么作用？"
+    followups:
+      - "快照读和当前读有什么差异？"
+      - "读已提交和可重复读下 ReadView 生成时机有什么不同？"
+      - "长事务为什么会影响 undo log 清理？"
+    rubric:
+      - "能说明版本链、undo log 和 ReadView 的关系。"
+      - "能区分 RC 与 RR 的快照生成时机差异。"
+      - "能指出长事务可能导致历史版本堆积和存储压力。"
+    source: "JavaGuide"
+    source_path: "docs/database/mysql/innodb-implementation-of-mvcc.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: db-mysql-locks
+    directions: ["backend", "data_engineering"]
+    difficulty: bigtech
+    topic: mysql
+    type: scenario
+    tags: ["MySQL", "Lock", "Transaction"]
+    prompt: "如果一个接口偶发超时，排查发现数据库锁等待，你会如何定位是哪类锁导致的？"
+    followups:
+      - "表锁、行锁、间隙锁、next-key lock 分别解决什么问题？"
+      - "当前读为什么可能加锁？"
+      - "如何降低锁等待和死锁概率？"
+    rubric:
+      - "能区分锁粒度和锁模式，以及快照读/当前读差异。"
+      - "能提出查看事务、锁等待、慢 SQL、执行计划等定位手段。"
+      - "能给出缩短事务、合理索引、固定更新顺序等优化方案。"
+    source: "JavaGuide"
+    source_path: "docs/database/mysql/mysql-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: db-mysql-explain
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: mysql
+    type: scenario
+    tags: ["MySQL", "EXPLAIN", "SQL Optimization"]
+    prompt: "拿到一条慢 SQL 后，你会如何使用 EXPLAIN 判断它的问题？"
+    followups:
+      - "type 字段里 const、ref、range、ALL 大致代表什么？"
+      - "rows 和 filtered 应该如何结合看？"
+      - "Extra 里的 Using filesort、Using temporary、Using index 分别意味着什么？"
+    rubric:
+      - "能说明执行计划核心字段的排查价值。"
+      - "能结合索引命中、扫描行数、排序和临时表判断瓶颈。"
+      - "能给出 SQL 改写、索引调整、分页优化等后续动作。"
+    source: "JavaGuide"
+    source_path: "docs/database/mysql/mysql-query-execution-plan.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: db-mysql-deep-pagination
+    directions: ["backend", "data_engineering"]
+    difficulty: bigtech
+    topic: mysql
+    type: scenario
+    tags: ["MySQL", "Pagination", "Performance"]
+    prompt: "MySQL 深分页为什么慢？如果业务要翻到很靠后的页，你会如何优化？"
+    followups:
+      - "LIMIT offset, size 的主要成本在哪里？"
+      - "基于游标或上次最大 ID 的翻页有什么限制？"
+      - "覆盖索引 + 回表优化适合什么场景？"
+    rubric:
+      - "能说明深 offset 需要扫描并丢弃大量记录。"
+      - "能提出延迟关联、游标翻页、搜索引擎或业务限制等方案。"
+      - "能指出排序稳定性、跳页需求和数据变更带来的边界。"
+    source: "JavaGuide"
+    source_path: "docs/high-performance/deep-pagination-optimization.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cache-redis-why-fast
+    directions: ["backend"]
+    difficulty: campus
+    topic: redis
+    type: fundamentals
+    tags: ["Redis", "Cache", "Performance"]
+    prompt: "Redis 为什么快？请从内存存储、IO 模型、数据结构和协议设计几个角度回答。"
+    followups:
+      - "Redis 单线程为什么还能支撑高并发？"
+      - "Redis 6 引入多线程主要解决哪部分开销？"
+      - "为什么不能简单把 Redis 当成主数据库？"
+    rubric:
+      - "能说明内存访问、IO 多路复用、事件循环和高效编码的作用。"
+      - "能区分命令执行单线程和网络 IO 多线程优化。"
+      - "能指出内存成本、持久化风险和数据模型限制。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/redis-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cache-redis-data-structures
+    directions: ["backend"]
+    difficulty: campus
+    topic: redis
+    type: scenario
+    tags: ["Redis", "Data Structure"]
+    prompt: "请分别举例说明 Redis String、Hash、Set、ZSet、Bitmap 适合哪些业务场景。"
+    followups:
+      - "排行榜为什么常用 ZSet？"
+      - "购物车用 Hash 有什么好处和限制？"
+      - "签到或活跃用户统计为什么可以考虑 Bitmap？"
+    rubric:
+      - "能把数据结构特性和真实业务查询模式对应起来。"
+      - "能说明时间复杂度、内存占用和数据规模的影响。"
+      - "能指出大 key、热 key 和序列化粒度的风险。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/redis-data-structures-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cache-redis-cache-penetration-breakdown-avalanche
+    directions: ["backend"]
+    difficulty: campus
+    topic: redis
+    type: scenario
+    tags: ["Redis", "Cache", "Availability"]
+    prompt: "缓存穿透、缓存击穿和缓存雪崩有什么区别？请分别给出治理方案。"
+    followups:
+      - "布隆过滤器能解决什么，误判会带来什么影响？"
+      - "热点 key 失效时为什么需要互斥重建或逻辑过期？"
+      - "大量 key 同时过期如何避免打垮数据库？"
+    rubric:
+      - "能准确区分不存在数据、热点 key 失效、大量 key 同时失效。"
+      - "能提出空值缓存、布隆过滤器、互斥锁、随机过期、预热等方案。"
+      - "能结合降级、限流和监控说明兜底策略。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/cache-basics.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cache-redis-persistence
+    directions: ["backend"]
+    difficulty: campus
+    topic: redis
+    type: fundamentals
+    tags: ["Redis", "Persistence", "RDB", "AOF"]
+    prompt: "Redis 的 RDB 和 AOF 持久化机制有什么区别？生产环境通常如何取舍？"
+    followups:
+      - "RDB 为什么恢复快但可能丢更多数据？"
+      - "AOF rewrite 解决什么问题？"
+      - "如果 Redis 用作缓存，持久化策略可以和主存储有什么不同？"
+    rubric:
+      - "能说明 RDB 快照和 AOF 追加日志的基本机制。"
+      - "能比较恢复速度、数据丢失窗口、文件大小和写入开销。"
+      - "能按缓存、会话、排行榜等场景说明持久化要求差异。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/redis-persistence.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cache-redis-eviction-expiration
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: redis
+    type: fundamentals
+    tags: ["Redis", "Memory", "Eviction"]
+    prompt: "Redis key 的过期删除和内存淘汰分别是什么？内存打满时可能发生什么？"
+    followups:
+      - "惰性删除和定期删除各有什么优缺点？"
+      - "常见淘汰策略如何选择？"
+      - "大 key 和内存碎片会如何影响 Redis 稳定性？"
+    rubric:
+      - "能区分 key 到期后的删除机制和 maxmemory 触发的淘汰机制。"
+      - "能说明 LRU、LFU、random、ttl 等策略的适用场景。"
+      - "能提出内存监控、拆分大 key、合理 TTL 和容量预估。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/redis-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cache-redis-distributed-lock
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: redis
+    type: scenario
+    tags: ["Redis", "Distributed Lock", "Lua"]
+    prompt: "用 Redis 实现分布式锁时，为什么需要唯一标识、过期时间和 Lua 脚本释放锁？"
+    followups:
+      - "业务执行时间超过锁过期时间会发生什么？"
+      - "Redisson 看门狗解决了什么问题？"
+      - "Redis 主从切换时分布式锁可能有什么一致性风险？"
+    rubric:
+      - "能说明 SET NX EX 的基本语义和过期时间防死锁作用。"
+      - "能解释唯一 value + Lua 校验删除避免误删他人锁。"
+      - "能指出续期、主从复制延迟、锁粒度和幂等兜底。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/distributed-lock-implementations.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"

@@ -1,0 +1,29 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "openinterview-api"
+version = "0.1.0"
+description = "Campus CS interview simulator API for OpenInterview"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+dependencies = [
+  "fastapi>=0.110",
+  "uvicorn[standard]>=0.27",
+  "pydantic>=2.0",
+  "PyYAML>=6.0"
+]
+
+[project.optional-dependencies]
+dev = [
+  "ruff>=0.4",
+  "mypy>=1.8"
+]
+
+[tool.setuptools.packages.find]
+include = ["openinterview_api*"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"

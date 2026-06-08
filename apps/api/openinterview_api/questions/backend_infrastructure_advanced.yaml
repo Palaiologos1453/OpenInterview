@@ -1,0 +1,520 @@
+questions:
+  - id: mysql-log-binlog-redo-undo
+    directions: ["backend", "data_engineering"]
+    difficulty: bigtech
+    topic: mysql
+    type: fundamentals
+    tags: ["MySQL", "Log", "Transaction"]
+    prompt: "MySQL 的 redo log、undo log 和 binlog 分别解决什么问题？一次事务提交过程中它们如何协同？"
+    followups:
+      - "redo log 为什么能保证崩溃恢复？"
+      - "binlog 和 redo log 的两阶段提交解决什么一致性问题？"
+      - "undo log 除了回滚，还和 MVCC 有什么关系？"
+    rubric:
+      - "能区分物理重做日志、逻辑归档日志和回滚日志的职责。"
+      - "能说明事务提交、刷盘策略、崩溃恢复和主从复制的关系。"
+      - "能解释两阶段提交避免 binlog 与 redo log 状态不一致。"
+    source: "JavaGuide"
+    source_path: "docs/database/mysql/mysql-logs.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mysql-auto-increment-primary-key
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: mysql
+    type: fundamentals
+    tags: ["MySQL", "Primary Key", "InnoDB"]
+    prompt: "InnoDB 为什么通常推荐使用自增主键？它和 UUID 主键在索引结构、写入性能和存储成本上有什么差异？"
+    followups:
+      - "聚簇索引叶子节点保存什么数据？"
+      - "随机主键为什么可能导致页分裂？"
+      - "分布式系统里如果不能用数据库自增，应该如何补足全局唯一和趋势递增？"
+    rubric:
+      - "能说明聚簇索引按主键组织数据，自增主键更利于顺序写入。"
+      - "能比较 UUID 随机写、索引膨胀、二级索引存储主键的成本。"
+      - "能结合分布式 ID、业务可读性和数据迁移做取舍。"
+    source: "JavaGuide"
+    source_path: "docs/database/mysql/mysql-auto-increment-primary-key-continuous.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mysql-sql-execution-flow
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: mysql
+    type: fundamentals
+    tags: ["MySQL", "SQL", "Optimizer"]
+    prompt: "一条 SQL 从客户端发送到 MySQL 返回结果，中间大致经历哪些模块？优化器主要会做哪些选择？"
+    followups:
+      - "连接器、分析器、优化器、执行器分别负责什么？"
+      - "优化器为什么可能不选择你期望的索引？"
+      - "统计信息不准确时如何处理？"
+    rubric:
+      - "能描述连接、解析、预处理、优化、执行和存储引擎交互流程。"
+      - "能说明优化器基于成本、选择性、统计信息做执行计划选择。"
+      - "能提出 ANALYZE TABLE、索引调整、SQL 改写和执行计划验证。"
+    source: "JavaGuide"
+    source_path: "docs/database/mysql/how-sql-executed-in-mysql.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mysql-time-storage-design
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: mysql
+    type: scenario
+    tags: ["MySQL", "Time", "Data Modeling"]
+    prompt: "系统需要支持多时区订单查询和审计，你会如何选择 DATETIME、TIMESTAMP 或时间戳字段？"
+    followups:
+      - "TIMESTAMP 和 DATETIME 在时区处理上有什么差异？"
+      - "接口、数据库和日志里时间格式如何统一？"
+      - "历史数据跨时区迁移时如何避免歧义？"
+    rubric:
+      - "能说明存储 UTC、展示本地时区和保留原始业务时区的设计思路。"
+      - "能比较 DATETIME、TIMESTAMP、bigint 时间戳的范围和语义差异。"
+      - "能考虑审计、排序、索引、序列化和迁移兼容性。"
+    source: "JavaGuide"
+    source_path: "docs/database/mysql/some-thoughts-on-database-storage-time.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: sql-window-function-ranking
+    directions: ["data_engineering", "backend"]
+    difficulty: campus
+    topic: sql
+    type: fundamentals
+    tags: ["SQL", "Window Function"]
+    prompt: "如果要查询每个班级成绩前三名，你会如何使用窗口函数？窗口函数和 GROUP BY 的语义差异是什么？"
+    followups:
+      - "row_number、rank、dense_rank 有什么区别？"
+      - "partition by 和 order by 分别控制什么？"
+      - "窗口函数可能带来哪些排序和内存成本？"
+    rubric:
+      - "能说明窗口函数在保留明细行的同时计算分组内排名或聚合。"
+      - "能区分 row_number、rank、dense_rank 的并列排名行为。"
+      - "能关注索引、排序、数据量和分页场景的性能。"
+    source: "JavaGuide"
+    source_path: "docs/database/sql/sql-questions-04.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: redis-cluster-slot-migration
+    directions: ["backend", "sre"]
+    difficulty: bigtech
+    topic: redis
+    type: scenario
+    tags: ["Redis", "Cluster", "Sharding"]
+    prompt: "Redis Cluster 如何通过槽位实现分片？扩容迁移、MOVED/ASK 重定向和多 key 操作会带来哪些工程问题？"
+    followups:
+      - "为什么 Redis Cluster 使用 16384 个 slot？"
+      - "跨 slot 的 mget 或事务为什么受限制？"
+      - "扩容迁移期间客户端需要具备什么能力？"
+    rubric:
+      - "能说明 key 到 slot 再到节点的路由关系。"
+      - "能解释 MOVED、ASK、slot 迁移和客户端拓扑缓存。"
+      - "能指出 hash tag、多 key 限制、热点 slot 和迁移期间延迟风险。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/redis-cluster.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: redis-hot-key-big-key
+    directions: ["backend", "sre"]
+    difficulty: bigtech
+    topic: redis
+    type: scenario
+    tags: ["Redis", "Hot Key", "Big Key"]
+    prompt: "线上 Redis CPU 飙高并伴随慢查询，你会如何判断是否存在 hot key 或 big key，并如何治理？"
+    followups:
+      - "hot key 和 big key 分别对 Redis 有什么影响？"
+      - "删除大 key 为什么可能阻塞？"
+      - "热点缓存如何拆分、复制或限流？"
+    rubric:
+      - "能通过监控、slowlog、命令统计、采样扫描等手段定位。"
+      - "能说明大 key 会阻塞单线程、占用内存和放大网络传输。"
+      - "能提出拆 key、分片、异步删除、热点副本、本地缓存和限流方案。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/redis-common-blocking-problems-summary.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: redis-stream-delayed-task
+    directions: ["backend"]
+    difficulty: campus
+    topic: redis
+    type: scenario
+    tags: ["Redis", "Stream", "Delayed Task"]
+    prompt: "如果用 Redis 做延迟任务或轻量消息队列，你会如何选择 ZSet、Stream 或 Pub/Sub？"
+    followups:
+      - "ZSet 实现延迟队列需要如何避免重复消费？"
+      - "Redis Stream 的消费者组和 pending list 解决什么问题？"
+      - "为什么 Pub/Sub 不适合可靠任务投递？"
+    rubric:
+      - "能比较 ZSet、Stream、Pub/Sub 在可靠性、顺序和消费确认上的差异。"
+      - "能设计重试、幂等、可见性超时和死信处理。"
+      - "能指出 Redis 方案适合轻量场景，复杂场景应考虑专业 MQ。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/redis-delayed-task.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: redis-memory-fragmentation
+    directions: ["backend", "sre"]
+    difficulty: bigtech
+    topic: redis
+    type: scenario
+    tags: ["Redis", "Memory", "Troubleshooting"]
+    prompt: "Redis used_memory 不高但进程 RSS 很大，可能是什么原因？你会如何分析和处理内存碎片？"
+    followups:
+      - "mem_fragmentation_ratio 如何解读？"
+      - "jemalloc 和大 key 释放会如何影响 RSS？"
+      - "在线整理或重启主从切换需要注意什么？"
+    rubric:
+      - "能区分业务数据内存、allocator 碎片和操作系统 RSS。"
+      - "能使用 info memory、对象分析和监控判断碎片程度。"
+      - "能提出主动碎片整理、数据结构优化、主从切换重启等低风险方案。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/redis-memory-fragmentation.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: es-inverted-index-query
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: elasticsearch
+    type: fundamentals
+    tags: ["Elasticsearch", "Search", "Index"]
+    prompt: "Elasticsearch 的倒排索引解决什么问题？term 查询和 match 查询的差异是什么？"
+    followups:
+      - "分词器会如何影响查询结果？"
+      - "keyword 和 text 字段如何选择？"
+      - "相关性排序和过滤缓存分别适合什么场景？"
+    rubric:
+      - "能说明倒排索引从词项映射到文档，适合全文检索。"
+      - "能区分精确 term 查询和经过分析器的 match 查询。"
+      - "能结合 mapping、分词、排序、filter 和分页说明查询设计。"
+    source: "JavaGuide"
+    source_path: "docs/database/elasticsearch/elasticsearch-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: es-deep-pagination-consistency
+    directions: ["backend", "data_engineering"]
+    difficulty: bigtech
+    topic: elasticsearch
+    type: scenario
+    tags: ["Elasticsearch", "Pagination", "Performance"]
+    prompt: "Elasticsearch 深分页为什么成本高？如果业务需要翻很多页或导出大量结果，你会如何设计？"
+    followups:
+      - "from + size 的主要开销在哪里？"
+      - "search_after 和 scroll 分别适合什么场景？"
+      - "排序字段如何保证稳定和唯一？"
+    rubric:
+      - "能说明分片需要各自取大量候选再全局排序合并。"
+      - "能根据用户翻页、后台导出、实时性要求选择 search_after、scroll 或异步任务。"
+      - "能考虑一致性、排序稳定性、资源隔离和导出限流。"
+    source: "JavaGuide"
+    source_path: "docs/database/elasticsearch/elasticsearch-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mongodb-document-model-index
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: mongodb
+    type: scenario
+    tags: ["MongoDB", "Document", "Index"]
+    prompt: "什么场景适合用 MongoDB 文档模型？设计集合和索引时如何避免文档过大、数组索引膨胀和查询不可控？"
+    followups:
+      - "内嵌文档和引用文档如何取舍？"
+      - "复合索引和多键索引分别需要注意什么？"
+      - "MongoDB 事务是否应该像关系型数据库一样频繁使用？"
+    rubric:
+      - "能说明文档模型适合结构灵活、聚合读取、弱关联场景。"
+      - "能按查询模式设计字段、嵌入/引用关系和索引。"
+      - "能指出文档大小、数组膨胀、事务成本和一致性边界。"
+    source: "JavaGuide"
+    source_path: "docs/database/mongodb/mongodb-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mq-kafka-partition-rebalance
+    directions: ["backend", "data_engineering"]
+    difficulty: bigtech
+    topic: message-queue
+    type: scenario
+    tags: ["Kafka", "Partition", "Rebalance"]
+    prompt: "Kafka 消费组扩缩容时为什么会发生 Rebalance？它对消费延迟、重复消费和顺序性有什么影响？"
+    followups:
+      - "分区数和消费者数的关系如何影响并行度？"
+      - "Rebalance 期间为什么可能暂停消费？"
+      - "如何降低频繁 Rebalance 的影响？"
+    rubric:
+      - "能说明消费者组内分区分配和成员变更触发 Rebalance。"
+      - "能指出 Rebalance 会影响消费连续性、offset 提交和局部顺序。"
+      - "能提出静态成员、合理 session 配置、优雅下线和幂等消费方案。"
+    source: "JavaGuide"
+    source_path: "docs/high-performance/message-queue/kafka-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mq-kafka-zero-copy-sequential-write
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: message-queue
+    type: fundamentals
+    tags: ["Kafka", "Performance", "Zero Copy"]
+    prompt: "Kafka 为什么能做到较高吞吐？请从顺序写、批量发送、页缓存和零拷贝角度说明。"
+    followups:
+      - "顺序写磁盘为什么可能比随机写快很多？"
+      - "sendfile 或零拷贝减少了哪些数据拷贝？"
+      - "批量和压缩如何影响延迟与吞吐？"
+    rubric:
+      - "能覆盖顺序追加、批量、压缩、页缓存、零拷贝、分区并行。"
+      - "能说明吞吐优化通常会引入一定延迟和内存缓冲。"
+      - "能结合生产者参数、Broker IO 和消费者拉取解释端到端性能。"
+    source: "JavaGuide"
+    source_path: "docs/high-performance/message-queue/kafka-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mq-rocketmq-transaction-message
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: message-queue
+    type: scenario
+    tags: ["RocketMQ", "Transaction Message", "Consistency"]
+    prompt: "本地订单入库和发送 MQ 消息需要保持一致，你会如何使用 RocketMQ 事务消息或本地消息表设计？"
+    followups:
+      - "半消息和事务回查分别解决什么问题？"
+      - "事务消息是否能替代下游消费幂等？"
+      - "本地事务成功但回查失败时如何兜底？"
+    rubric:
+      - "能说明事务消息把本地事务结果和消息可见性关联起来。"
+      - "能解释半消息、提交/回滚、事务回查和异常恢复。"
+      - "能补充消费幂等、重试、对账、告警和人工补偿。"
+    source: "JavaGuide"
+    source_path: "docs/high-performance/message-queue/rocketmq-questions.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mq-rabbitmq-dead-letter-delay
+    directions: ["backend"]
+    difficulty: campus
+    topic: message-queue
+    type: scenario
+    tags: ["RabbitMQ", "DLX", "Delay Queue"]
+    prompt: "RabbitMQ 如何实现延迟队列和死信队列？订单超时未支付关闭这种场景需要注意哪些可靠性问题？"
+    followups:
+      - "消息在什么情况下会进入死信交换机？"
+      - "TTL 设置在队列和消息上有什么差异？"
+      - "延迟消息到期后如何避免重复关闭已支付订单？"
+    rubric:
+      - "能说明 TTL、死信交换机、路由键和消费确认的关系。"
+      - "能指出延迟队列不保证绝对准时，需要业务状态校验。"
+      - "能结合幂等、重试、死信监控和补偿任务保证可靠性。"
+    source: "JavaGuide"
+    source_path: "docs/high-performance/message-queue/rabbitmq-questions.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: dist-zookeeper-watch-election
+    directions: ["backend", "sre"]
+    difficulty: bigtech
+    topic: distributed-system
+    type: fundamentals
+    tags: ["ZooKeeper", "Coordination", "Watch"]
+    prompt: "ZooKeeper 适合做哪些分布式协调工作？临时节点、顺序节点和 Watch 机制分别能支撑哪些场景？"
+    followups:
+      - "为什么临时节点适合做服务注册或故障感知？"
+      - "分布式锁如何使用临时顺序节点降低羊群效应？"
+      - "Watch 一次性触发会带来什么使用注意点？"
+    rubric:
+      - "能说明 ZK 提供一致性元数据存储和协调能力。"
+      - "能结合注册发现、选主、锁、配置通知说明节点类型和 Watch。"
+      - "能指出会话超时、羊群效应、Watch 丢失和可用性边界。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/distributed-process-coordination/zookeeper/zookeeper-intro.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: dist-config-center-dynamic-refresh
+    directions: ["backend", "sre"]
+    difficulty: campus
+    topic: distributed-system
+    type: scenario
+    tags: ["Config Center", "Distributed"]
+    prompt: "配置中心需要支持动态刷新、灰度发布和回滚，你会如何设计配置模型、推送机制和故障兜底？"
+    followups:
+      - "客户端是长轮询、推送还是定时拉取？"
+      - "配置变更如何保证审批、审计和版本回滚？"
+      - "配置中心不可用时业务服务应该如何启动和运行？"
+    rubric:
+      - "能说明命名空间、应用、环境、版本和灰度维度。"
+      - "能设计客户端缓存、变更通知、校验、回滚和审计流程。"
+      - "能考虑配置错误爆炸半径、降级、本地快照和权限控制。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/distributed-configuration-center.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: dist-lock-redis-zookeeper-db
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: distributed-system
+    type: scenario
+    tags: ["Distributed Lock", "Redis", "ZooKeeper"]
+    prompt: "如果要防止同一订单被多个实例并发处理，你会如何选择 Redis、ZooKeeper 或数据库实现分布式锁？"
+    followups:
+      - "Redis 锁为什么必须设置唯一 token 和过期时间？"
+      - "锁续期和业务执行超时如何配合？"
+      - "锁失效后重复执行如何靠幂等兜底？"
+    rubric:
+      - "能比较 Redis、ZK、数据库锁在性能、一致性、实现复杂度上的差异。"
+      - "能说明加锁、续期、释放、超时和异常崩溃处理。"
+      - "能指出分布式锁不是唯一防线，业务幂等和状态机仍然必要。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/distributed-lock-implementations.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: gateway-auth-rate-limit-observability
+    directions: ["backend", "sre", "security"]
+    difficulty: bigtech
+    topic: distributed-system
+    type: scenario
+    tags: ["API Gateway", "Security", "Observability"]
+    prompt: "网关要统一接入认证、限流、灰度和链路追踪，你会如何设计过滤器顺序和故障隔离？"
+    followups:
+      - "认证失败、限流拒绝和下游超时分别应该返回什么语义？"
+      - "灰度路由如何与用户、租户或版本绑定？"
+      - "网关如何避免成为单点和性能瓶颈？"
+    rubric:
+      - "能按认证、鉴权、限流、路由、熔断、观测等职责组织链路。"
+      - "能考虑规则配置、热更新、回滚、指标和日志 trace。"
+      - "能设计高可用部署、无状态扩容、限流降级和故障隔离。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/spring-cloud-gateway-questions.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: network-dns-cache-troubleshooting
+    directions: ["backend", "frontend", "sre"]
+    difficulty: campus
+    topic: computer-network
+    type: scenario
+    tags: ["Network", "DNS", "Troubleshooting"]
+    prompt: "域名解析偶发变慢或解析到旧 IP，你会如何排查 DNS 缓存、TTL、递归解析和客户端配置？"
+    followups:
+      - "DNS 查询大致经过哪些层级？"
+      - "TTL 设置过长或过短分别有什么影响？"
+      - "Java 应用自身 DNS 缓存可能带来什么问题？"
+    rubric:
+      - "能说明浏览器、系统、本地 DNS、递归服务器和权威服务器的解析链路。"
+      - "能结合 dig/nslookup、TTL、缓存命中和解析日志定位问题。"
+      - "能考虑应用缓存、容器 DNS、灰度切流和故障回滚。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/network/dns.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: network-nat-port-exhaustion
+    directions: ["backend", "sre"]
+    difficulty: bigtech
+    topic: computer-network
+    type: scenario
+    tags: ["Network", "NAT", "Port"]
+    prompt: "大量服务通过 NAT 出口访问同一下游时，为什么可能出现端口耗尽或连接失败？你会如何定位和缓解？"
+    followups:
+      - "NAT 会记录哪些连接映射信息？"
+      - "短连接和 TIME_WAIT 会如何放大端口压力？"
+      - "连接池、长连接、多出口和内核参数分别如何缓解？"
+    rubric:
+      - "能说明五元组、源端口复用限制和 NAT 映射表容量。"
+      - "能结合连接数、TIME_WAIT、下游地址集中度和端口范围排查。"
+      - "能提出连接复用、限流、扩展出口 IP、调整超时和容量规划。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/network/nat.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: network-http-status-design
+    directions: ["backend", "frontend", "test_dev"]
+    difficulty: campus
+    topic: computer-network
+    type: scenario
+    tags: ["HTTP", "API", "Status Code"]
+    prompt: "设计 REST API 时，参数错误、未登录、无权限、资源不存在、限流和服务异常分别应该如何选择 HTTP 状态码？"
+    followups:
+      - "401 和 403 的差异是什么？"
+      - "业务错误码和 HTTP 状态码应该如何配合？"
+      - "幂等接口返回 200、201、202、204 有什么语义差异？"
+    rubric:
+      - "能准确区分 4xx 调用方错误和 5xx 服务端错误。"
+      - "能说明认证、授权、资源状态、限流和异步处理的状态码语义。"
+      - "能设计统一错误响应、traceId、可读提示和可重试标识。"
+    source: "JavaGuide"
+    source_path: "docs/cs-basics/network/http-status-codes.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: security-jwt-session-sso
+    directions: ["backend", "security"]
+    difficulty: campus
+    topic: security
+    type: scenario
+    tags: ["JWT", "Session", "SSO"]
+    prompt: "登录态设计时，Session、JWT 和 SSO 分别适合什么场景？如果要支持退出登录和权限变更立即生效，你会如何设计？"
+    followups:
+      - "JWT 无状态带来的优势和撤销难点是什么？"
+      - "Refresh Token 和 Access Token 如何配合？"
+      - "单点登录如何在多个系统间建立信任？"
+    rubric:
+      - "能比较服务端 Session、无状态 JWT 和 SSO 在扩展性与控制力上的取舍。"
+      - "能提出短期 token、刷新令牌、黑名单、版本号或集中会话管理方案。"
+      - "能考虑密钥轮换、签名验证、跨域 Cookie、安全存储和审计。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/security/jwt-intro.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: security-password-reset-design
+    directions: ["backend", "security"]
+    difficulty: campus
+    topic: security
+    type: scenario
+    tags: ["Security", "Password", "Account"]
+    prompt: "为什么很多系统只支持重置密码而不是找回原密码？设计密码重置流程时需要防哪些风险？"
+    followups:
+      - "密码应该如何存储？"
+      - "重置链接或验证码如何设置有效期和次数限制？"
+      - "如何防止撞库、枚举账号和社工攻击？"
+    rubric:
+      - "能说明密码应不可逆哈希存储，系统不应该知道明文。"
+      - "能设计一次性 token、过期时间、限流、通知和设备下线。"
+      - "能考虑账号枚举、验证码暴力破解、审计和异常告警。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/security/why-password-reset-instead-of-retrieval.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: security-data-desensitization
+    directions: ["backend", "security", "data_engineering"]
+    difficulty: campus
+    topic: security
+    type: scenario
+    tags: ["Security", "Data", "Privacy"]
+    prompt: "用户手机号、身份证号、银行卡号在日志、接口和数据库中分别应该如何脱敏或加密？"
+    followups:
+      - "脱敏、加密、哈希分别适合什么场景？"
+      - "搜索手机号时如何兼顾可检索性和隐私保护？"
+      - "日志里出现敏感信息如何治理？"
+    rubric:
+      - "能区分展示脱敏、传输加密、存储加密和不可逆哈希。"
+      - "能根据检索、比对、展示、审计需求选择保护方式。"
+      - "能提出日志过滤、权限控制、密钥管理、数据分级和合规审计。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/security/data-desensitization.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"

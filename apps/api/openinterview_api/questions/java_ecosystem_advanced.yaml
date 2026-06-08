@@ -1,0 +1,420 @@
+questions:
+  - id: java-bigdecimal-money
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-basis
+    type: scenario
+    tags: ["Java", "BigDecimal", "Money"]
+    prompt: "订单金额计算为什么不建议使用 float 或 double？如果你要设计优惠、税费和支付金额计算，会如何使用 BigDecimal？"
+    followups:
+      - "BigDecimal 的构造方式为什么推荐使用字符串或 valueOf？"
+      - "金额除法出现无限小数时应该如何处理舍入模式？"
+      - "金额字段在数据库和接口传输中如何保证精度一致？"
+    rubric:
+      - "能说明二进制浮点数存在精度误差，不适合金额计算。"
+      - "能正确使用 scale、rounding mode、compareTo 等 BigDecimal 细节。"
+      - "能结合数据库 decimal 类型、接口单位和统一舍入策略说明工程落地。"
+    source: "JavaGuide"
+    source_path: "docs/java/basis/bigdecimal.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-serialization-compatibility-security
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-basis
+    type: scenario
+    tags: ["Java", "Serialization", "Security"]
+    prompt: "如果服务之间需要传输对象，Java 原生序列化有哪些兼容性、性能和安全风险？你会如何替代或加固？"
+    followups:
+      - "serialVersionUID 的作用是什么？"
+      - "反序列化漏洞通常为什么危险？"
+      - "JSON、Protobuf、Kryo 等方案分别适合什么场景？"
+    rubric:
+      - "能说明原生序列化体积、性能、版本兼容和远程代码执行风险。"
+      - "能解释 serialVersionUID 对类结构变更兼容性的影响。"
+      - "能提出白名单、禁用不可信反序列化、协议替换和网关校验等方案。"
+    source: "JavaGuide"
+    source_path: "docs/java/basis/serialization.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-spi-plugin-extension
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-basis
+    type: fundamentals
+    tags: ["Java", "SPI", "Plugin"]
+    prompt: "Java SPI 解决什么扩展问题？请结合 JDBC 驱动加载或日志框架适配说明它的工作机制。"
+    followups:
+      - "SPI 和普通 API 调用的依赖方向有什么不同？"
+      - "ServiceLoader 如何发现实现类？"
+      - "SPI 在大规模服务中可能带来哪些类加载和启动性能问题？"
+    rubric:
+      - "能说明 SPI 面向接口发现第三方实现，适合插件化扩展。"
+      - "能讲清 META-INF/services 配置和 ServiceLoader 加载流程。"
+      - "能指出实现类过多、初始化副作用、类加载隔离等工程风险。"
+    source: "JavaGuide"
+    source_path: "docs/java/basis/spi.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-threadlocal-context-leak
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: java-concurrency
+    type: scenario
+    tags: ["Java", "ThreadLocal", "Memory Leak"]
+    prompt: "Web 服务里用 ThreadLocal 保存用户上下文或 traceId 时，为什么在线程池场景下容易出现数据串用或内存泄漏？"
+    followups:
+      - "ThreadLocalMap 的 key 和 value 分别如何被引用？"
+      - "为什么请求结束后必须 remove？"
+      - "异步线程或线程池切换后上下文如何传递更安全？"
+    rubric:
+      - "能说明线程复用导致 ThreadLocal 值跨请求残留。"
+      - "能解释弱引用 key、强引用 value 和 remove 缺失造成的泄漏风险。"
+      - "能提出 finally 清理、装饰线程池、显式上下文传参或 TTL 类方案。"
+    source: "JavaGuide"
+    source_path: "docs/java/concurrent/threadlocal.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-cas-aba-optimistic-lock
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: java-concurrency
+    type: fundamentals
+    tags: ["Java", "CAS", "Optimistic Lock"]
+    prompt: "CAS 如何实现无锁更新？ABA 问题是什么，为什么在库存扣减或状态流转中不能忽视？"
+    followups:
+      - "CAS 的比较和交换分别比较什么内容？"
+      - "自旋 CAS 在高竞争下会带来什么成本？"
+      - "版本号、时间戳或 AtomicStampedReference 如何缓解 ABA？"
+    rubric:
+      - "能说明 CAS 基于预期值和新值完成原子更新。"
+      - "能指出 ABA 会掩盖中间状态变化，影响状态正确性。"
+      - "能结合版本号、锁退化、分段降低竞争等方式做取舍。"
+    source: "JavaGuide"
+    source_path: "docs/java/concurrent/cas.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-atomic-classes-adder-accumulator
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-concurrency
+    type: fundamentals
+    tags: ["Java", "Atomic", "LongAdder"]
+    prompt: "AtomicInteger、LongAdder 和 synchronized 计数在高并发统计场景下有什么差异？"
+    followups:
+      - "LongAdder 为什么在热点计数上吞吐更高？"
+      - "LongAdder 的 sum() 是否一定是强一致快照？"
+      - "什么场景仍然应该选择锁或数据库原子更新？"
+    rubric:
+      - "能比较 CAS 单点竞争、分段累加和互斥锁的成本。"
+      - "能说明 LongAdder 适合高并发统计，但读取不一定强一致。"
+      - "能根据业务是否需要精确一致性选择方案。"
+    source: "JavaGuide"
+    source_path: "docs/java/concurrent/atomic-classes.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-aqs-latch-semaphore
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: java-concurrency
+    type: fundamentals
+    tags: ["Java", "AQS", "Synchronization"]
+    prompt: "AQS 如何支撑 ReentrantLock、CountDownLatch 和 Semaphore 这类同步器？请从 state 和等待队列角度说明。"
+    followups:
+      - "独占模式和共享模式有什么差异？"
+      - "CountDownLatch 和 CyclicBarrier 分别适合什么场景？"
+      - "Semaphore 用于限流时需要注意什么释放时机？"
+    rubric:
+      - "能说明 AQS 以 state 表示同步状态，并维护阻塞等待队列。"
+      - "能区分独占锁和共享同步器的获取/释放语义。"
+      - "能结合并发协调、资源许可和异常释放说明工程使用边界。"
+    source: "JavaGuide"
+    source_path: "docs/java/concurrent/aqs.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-completablefuture-timeout-exception
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: java-concurrency
+    type: scenario
+    tags: ["Java", "CompletableFuture", "Async"]
+    prompt: "聚合接口需要并行调用多个下游服务时，你会如何使用 CompletableFuture 设计超时、异常和线程池隔离？"
+    followups:
+      - "allOf 和 anyOf 分别适合什么聚合语义？"
+      - "异常处理应该放在 exceptionally、handle 还是统一封装层？"
+      - "为什么不能默认使用公共 ForkJoinPool 承载阻塞 IO？"
+    rubric:
+      - "能说明异步编排、结果合并、超时控制和降级兜底。"
+      - "能指出不同下游应该有隔离线程池和容量限制。"
+      - "能考虑异常传播、部分成功、取消和链路追踪上下文传递。"
+    source: "JavaGuide"
+    source_path: "docs/java/concurrent/completablefuture-intro.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-virtual-thread-use-cases
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: java-concurrency
+    type: fundamentals
+    tags: ["Java", "Virtual Thread", "JDK"]
+    prompt: "虚拟线程适合解决什么类型的并发问题？它能否直接替代线程池和响应式编程？"
+    followups:
+      - "虚拟线程对阻塞 IO 场景的价值在哪里？"
+      - "CPU 密集型任务使用虚拟线程是否一定更快？"
+      - "pinning、ThreadLocal 和连接池容量需要注意什么？"
+    rubric:
+      - "能说明虚拟线程降低线程创建和阻塞等待成本，适合大量 IO 等待。"
+      - "能指出吞吐仍受 CPU、数据库连接池、下游容量等资源约束。"
+      - "能讨论迁移时的监控、限流、ThreadLocal 和兼容性风险。"
+    source: "JavaGuide"
+    source_path: "docs/java/concurrent/virtual-thread.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-io-model-bio-nio-aio
+    directions: ["backend", "sre"]
+    difficulty: campus
+    topic: java-io
+    type: fundamentals
+    tags: ["Java", "IO", "NIO"]
+    prompt: "BIO、NIO 和 AIO 的核心差异是什么？在高并发网络服务中为什么常见 NIO 模型？"
+    followups:
+      - "阻塞、非阻塞、同步、异步分别如何区分？"
+      - "Selector 解决了什么问题？"
+      - "线程池加 BIO 是否就能完全替代 NIO？"
+    rubric:
+      - "能区分阻塞 IO、多路复用和异步通知模型。"
+      - "能说明 NIO 使用少量线程管理大量连接，降低线程阻塞成本。"
+      - "能结合连接数、处理耗时、编码复杂度做方案取舍。"
+    source: "JavaGuide"
+    source_path: "docs/java/io/io-model.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-nio-buffer-selector
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: java-io
+    type: fundamentals
+    tags: ["Java", "NIO", "Selector"]
+    prompt: "Java NIO 里的 Buffer、Channel 和 Selector 分别承担什么职责？一次网络读写事件大致如何流转？"
+    followups:
+      - "Buffer 的 position、limit、capacity 如何变化？"
+      - "为什么网络写也可能需要关注半包、粘包和写不完？"
+      - "Selector 空轮询或 CPU 飙高时你会如何排查？"
+    rubric:
+      - "能说明 Channel 负责连接读写，Buffer 负责数据承载，Selector 负责事件分发。"
+      - "能描述注册、就绪事件、读写处理和状态维护流程。"
+      - "能关注协议拆包、背压、连接生命周期和异常处理。"
+    source: "JavaGuide"
+    source_path: "docs/java/io/nio-basis.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: jvm-gc-collector-selection
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: jvm
+    type: scenario
+    tags: ["Java", "JVM", "GC"]
+    prompt: "接口 P99 延迟对停顿很敏感时，你会如何选择和调优垃圾收集器？请比较 G1、ZGC 与吞吐优先收集器的取舍。"
+    followups:
+      - "吞吐量和停顿时间为什么经常需要取舍？"
+      - "G1 的 Region 和可预测停顿目标如何理解？"
+      - "ZGC 低停顿的收益和成本分别是什么？"
+    rubric:
+      - "能按延迟敏感、堆大小、吞吐目标和 JDK 版本选择 GC。"
+      - "能说明 G1、ZGC、Parallel 等收集器关注点差异。"
+      - "能结合 GC 日志、P99、CPU、堆占用和业务峰值做调优闭环。"
+    source: "JavaGuide"
+    source_path: "docs/java/jvm/jvm-garbage-collection.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: jvm-memory-leak-troubleshooting
+    directions: ["backend", "sre"]
+    difficulty: bigtech
+    topic: jvm
+    type: scenario
+    tags: ["Java", "JVM", "Troubleshooting"]
+    prompt: "线上 Java 服务内存持续上涨，最终 OOM，你会如何定位是内存泄漏、瞬时流量还是堆参数不合理？"
+    followups:
+      - "你会收集哪些 JVM 指标、dump 和日志？"
+      - "如何判断老年代对象持续增长的来源？"
+      - "生产环境抓 heap dump 需要注意什么风险？"
+    rubric:
+      - "能按监控、GC 日志、jstat/jmap、heap dump、MAT 分析逐层定位。"
+      - "能区分内存泄漏、缓存无界、对象峰值、直接内存和元空间问题。"
+      - "能考虑线上 dump 的停顿、磁盘、隐私和降级恢复方案。"
+    source: "JavaGuide"
+    source_path: "docs/java/jvm/jdk-monitoring-and-troubleshooting-tools.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: jvm-class-loading-initialization
+    directions: ["backend"]
+    difficulty: campus
+    topic: jvm
+    type: fundamentals
+    tags: ["Java", "JVM", "Class Loading"]
+    prompt: "Java 类从被加载到可以使用，大致经历哪些阶段？类初始化的触发条件有哪些？"
+    followups:
+      - "加载、验证、准备、解析、初始化分别做什么？"
+      - "静态变量赋默认值和执行静态代码块分别发生在哪个阶段？"
+      - "类初始化顺序会如何影响单例或静态依赖？"
+    rubric:
+      - "能完整说明类加载生命周期中的关键阶段。"
+      - "能区分准备阶段默认值和初始化阶段显式赋值。"
+      - "能结合静态字段、父子类初始化顺序和并发初始化风险举例。"
+    source: "JavaGuide"
+    source_path: "docs/java/jvm/class-loading-process.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: jvm-classloader-parent-delegation
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: jvm
+    type: fundamentals
+    tags: ["Java", "ClassLoader", "JVM"]
+    prompt: "双亲委派模型解决了什么问题？在插件化、热部署或 SPI 场景下为什么可能需要打破它？"
+    followups:
+      - "父加载器和子加载器的查找顺序是什么？"
+      - "为什么核心类库不应该被应用类覆盖？"
+      - "Tomcat 或插件系统如何处理类隔离？"
+    rubric:
+      - "能说明双亲委派保证核心类库安全和类加载一致性。"
+      - "能指出类身份由类本身和加载它的 ClassLoader 共同决定。"
+      - "能讨论 Web 容器、插件隔离、热部署和 SPI 的特殊加载需求。"
+    source: "JavaGuide"
+    source_path: "docs/java/jvm/classloader.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: jvm-parameters-heap-metaspace-direct
+    directions: ["backend", "sre"]
+    difficulty: campus
+    topic: jvm
+    type: scenario
+    tags: ["Java", "JVM", "Memory"]
+    prompt: "部署 Java 服务时，你会如何设置堆、元空间、直接内存和 GC 日志参数？"
+    followups:
+      - "Xms 和 Xmx 是否应该设置为相同值？为什么？"
+      - "容器环境下 JVM 内存限制需要注意什么？"
+      - "直接内存 OOM 和堆 OOM 的排查路径有什么不同？"
+    rubric:
+      - "能说明堆、元空间、线程栈、直接内存都占用进程内存。"
+      - "能结合容器限制、业务峰值、GC 行为设置参数。"
+      - "能保留 GC 日志、OOM dump 和监控指标，便于故障复盘。"
+    source: "JavaGuide"
+    source_path: "docs/java/jvm/jvm-parameters-intro.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: springboot-auto-configuration
+    directions: ["backend"]
+    difficulty: campus
+    topic: spring
+    type: fundamentals
+    tags: ["Spring Boot", "Auto Configuration"]
+    prompt: "Spring Boot 自动装配的核心流程是什么？为什么引入 starter 后少量配置就能启用组件能力？"
+    followups:
+      - "@SpringBootApplication 包含哪些关键注解？"
+      - "自动配置类如何按需生效？"
+      - "Spring Boot 2 和 3 在自动配置加载文件上有什么差异？"
+    rubric:
+      - "能说明 @EnableAutoConfiguration 和 AutoConfigurationImportSelector 的作用。"
+      - "能讲清 starter、自动配置类、条件注解和配置属性的关系。"
+      - "能指出自动装配不是无条件加载，需要类路径、Bean、属性等条件满足。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/framework/spring/spring-boot-auto-assembly-principles.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: spring-bean-lifecycle-circular-dependency
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: spring
+    type: fundamentals
+    tags: ["Spring", "Bean", "Circular Dependency"]
+    prompt: "Spring Bean 生命周期有哪些关键阶段？单例 Bean 的循环依赖为什么有时能解决，有时又不能？"
+    followups:
+      - "实例化、属性填充、初始化和销毁分别对应哪些扩展点？"
+      - "三级缓存大致解决什么问题？"
+      - "构造器注入循环依赖为什么更难处理？"
+    rubric:
+      - "能说明 Bean 创建、依赖注入、Aware、BeanPostProcessor、初始化和销毁流程。"
+      - "能解释单例属性注入循环依赖与提前暴露引用的关系。"
+      - "能指出构造器循环、原型 Bean、代理对象等场景的边界。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/framework/spring/spring-knowledge-and-questions-summary.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: spring-async-threadpool-context
+    directions: ["backend"]
+    difficulty: campus
+    topic: spring
+    type: scenario
+    tags: ["Spring", "Async", "ThreadPool"]
+    prompt: "在 Spring 项目中使用 @Async 时，你会如何配置线程池、异常处理和上下文传递？"
+    followups:
+      - "@Async 为什么在同类内部调用时可能不生效？"
+      - "异步方法抛异常时调用方一定能感知吗？"
+      - "traceId、登录用户等上下文如何传给异步线程？"
+    rubric:
+      - "能说明 @Async 依赖代理增强，存在自调用边界。"
+      - "能配置独立线程池，避免使用默认无界或不可控资源。"
+      - "能考虑异常回调、日志 trace、上下文复制和任务拒绝策略。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/framework/spring/async.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mybatis-n-plus-one-cache
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: mybatis
+    type: scenario
+    tags: ["MyBatis", "SQL", "Performance"]
+    prompt: "使用 MyBatis 查询订单及明细时出现 N+1 查询和慢 SQL，你会如何从 Mapper、SQL 和缓存层面优化？"
+    followups:
+      - "resultMap 嵌套查询和嵌套结果有什么取舍？"
+      - "一级缓存和二级缓存分别是什么作用域？"
+      - "动态 SQL 如何避免拼接错误和 SQL 注入？"
+    rubric:
+      - "能识别 N+1 查询、无索引、分页不合理和字段过多等慢 SQL 原因。"
+      - "能结合 join、批量查询、结果映射和分页策略优化。"
+      - "能说明 MyBatis 缓存作用域、失效风险和动态 SQL 安全边界。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/framework/mybatis/mybatis-interview.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: netty-reactor-backpressure
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: netty
+    type: scenario
+    tags: ["Netty", "Reactor", "Backpressure"]
+    prompt: "如果用 Netty 实现一个长连接网关，你会如何设计 Reactor 线程模型、编解码和背压保护？"
+    followups:
+      - "BossGroup 和 WorkerGroup 分别负责什么？"
+      - "粘包半包问题通常如何处理？"
+      - "写缓冲堆积时如何保护内存和下游？"
+    rubric:
+      - "能说明事件循环、连接接入、IO 读写和业务线程隔离。"
+      - "能设计长度字段、分隔符或协议帧解决拆包粘包。"
+      - "能考虑水位线、限流、超时、连接关闭和监控告警。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/framework/netty.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"

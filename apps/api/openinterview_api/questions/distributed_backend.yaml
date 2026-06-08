@@ -1,0 +1,240 @@
+questions:
+  - id: dist-cap-base
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: distributed-system
+    type: fundamentals
+    tags: ["Distributed", "CAP", "BASE"]
+    prompt: "CAP 和 BASE 理论如何帮助你理解分布式系统的一致性与可用性取舍？"
+    followups:
+      - "为什么分布式系统里 P 基本无法回避？"
+      - "最终一致性通常通过哪些工程手段落地？"
+      - "哪些业务必须强一致，哪些业务可以接受最终一致？"
+    rubric:
+      - "能纠正 CAP 不是简单三选二，而是在分区场景下做 C/A 取舍。"
+      - "能说明 BASE 与 ACID 的侧重点差异。"
+      - "能结合支付、库存、消息通知等场景做一致性分级。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/protocol/cap-and-base-theorem.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: dist-rpc-framework
+    directions: ["backend"]
+    difficulty: campus
+    topic: distributed-system
+    type: fundamentals
+    tags: ["RPC", "Microservices", "Service Governance"]
+    prompt: "一个 RPC 框架通常包含哪些核心模块？从一次服务调用链路讲起。"
+    followups:
+      - "注册中心在调用链路里起什么作用？"
+      - "序列化、负载均衡、超时重试分别如何影响稳定性？"
+      - "为什么内部 RPC 调用也必须做熔断和限流？"
+    rubric:
+      - "能覆盖代理、序列化、网络传输、注册发现、负载均衡等模块。"
+      - "能说明超时、重试、熔断、降级是服务治理关键能力。"
+      - "能把调用链路和异常路径说完整。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/rpc/rpc-intro.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: dist-api-gateway
+    directions: ["backend", "sre"]
+    difficulty: campus
+    topic: distributed-system
+    type: scenario
+    tags: ["API Gateway", "Microservices"]
+    prompt: "API 网关在微服务架构中解决什么问题？它和 Nginx、BFF、服务内部 RPC 的边界是什么？"
+    followups:
+      - "网关适合放哪些能力，哪些能力不应该放进去？"
+      - "认证鉴权、限流、灰度、路由在网关如何协同？"
+      - "网关本身成为瓶颈或单点时怎么处理？"
+    rubric:
+      - "能说明网关统一入口、路由、鉴权、限流、观测等职责。"
+      - "能区分七层代理、业务聚合层和服务间调用治理。"
+      - "能考虑网关高可用、性能、配置变更和故障隔离。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/api-gateway.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: dist-id-design
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: distributed-system
+    type: scenario
+    tags: ["Distributed ID", "Snowflake"]
+    prompt: "分库分表后为什么不能简单依赖数据库自增 ID？你会如何设计全局唯一 ID？"
+    followups:
+      - "UUID、号段模式、Redis 自增、Snowflake 各有什么优缺点？"
+      - "Snowflake 时钟回拨会带来什么问题？"
+      - "ID 是否需要趋势递增，取决于哪些业务和数据库因素？"
+    rubric:
+      - "能说明全局唯一、趋势递增、可用性、性能和可读性要求。"
+      - "能比较多种方案在吞吐、依赖、排序、长度上的取舍。"
+      - "能提出时钟回拨、机器号分配、号段耗尽等异常处理。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/distributed-id.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: dist-transaction-solutions
+    directions: ["backend", "data_engineering"]
+    difficulty: bigtech
+    topic: distributed-system
+    type: scenario
+    tags: ["Distributed Transaction", "Consistency"]
+    prompt: "订单创建后要扣库存、扣余额、发消息，跨服务一致性你会如何设计？"
+    followups:
+      - "2PC、TCC、本地消息表、事务消息、Saga 分别适合什么场景？"
+      - "补偿失败或消息重复投递怎么办？"
+      - "强一致和最终一致的业务边界如何划分？"
+    rubric:
+      - "能说明不同分布式事务方案的流程和成本。"
+      - "能考虑幂等、重试、补偿、对账和人工兜底。"
+      - "能按业务资金、库存、通知等链路分级一致性要求。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/distributed-transaction.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: dist-consistent-hashing
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: distributed-system
+    type: fundamentals
+    tags: ["Consistent Hashing", "Sharding"]
+    prompt: "一致性哈希解决了什么问题？虚拟节点为什么能缓解数据倾斜？"
+    followups:
+      - "普通取模扩容为什么会导致大量数据迁移？"
+      - "节点宕机或扩容时，一致性哈希如何减少影响范围？"
+      - "热点 key 问题是否能仅靠一致性哈希解决？"
+    rubric:
+      - "能说明哈希环、顺时针查找和局部迁移。"
+      - "能解释虚拟节点提升均匀性和负载均衡。"
+      - "能指出热点流量仍需缓存拆分、副本或限流等方案。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/protocol/consistent-hashing.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: dist-raft-leader-election
+    directions: ["backend", "data_engineering"]
+    difficulty: bigtech
+    topic: distributed-system
+    type: fundamentals
+    tags: ["Raft", "Consensus"]
+    prompt: "Raft 算法通过哪些机制完成 Leader 选举和日志复制？为什么它比 Paxos 更容易工程理解？"
+    followups:
+      - "任期 term 的作用是什么？"
+      - "日志多数派复制后为什么可以提交？"
+      - "Leader 宕机时可能出现哪些短暂不可用窗口？"
+    rubric:
+      - "能说明 Leader、Follower、Candidate 三种角色和选举流程。"
+      - "能解释任期、多数派、日志匹配和提交规则。"
+      - "能把共识机制和配置中心、注册中心、元数据存储等场景关联。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/protocol/raft-algorithm.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mq-use-cases-tradeoffs
+    directions: ["backend"]
+    difficulty: campus
+    topic: message-queue
+    type: fundamentals
+    tags: ["MQ", "Async", "Peak Shaving"]
+    prompt: "消息队列通常用来解决哪些问题？引入 MQ 后系统会新增哪些复杂度？"
+    followups:
+      - "异步处理、解耦、削峰分别适合什么业务？"
+      - "消息队列为什么不应该被滥用成同步调用替代品？"
+      - "引入 MQ 后如何处理可观测性和故障排查？"
+    rubric:
+      - "能说明异步、解耦、削峰、广播通知等收益。"
+      - "能指出消息丢失、重复、顺序、积压、延迟一致性等成本。"
+      - "能结合项目说明为什么需要 MQ，而不是只背概念。"
+    source: "JavaGuide"
+    source_path: "docs/high-performance/message-queue/message-queue.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mq-reliability-idempotency
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: message-queue
+    type: scenario
+    tags: ["MQ", "Reliability", "Idempotency"]
+    prompt: "如果订单消息不能丢、不能重复扣款，你会如何设计消息可靠投递和消费幂等？"
+    followups:
+      - "生产者、Broker、消费者三个阶段分别如何防止消息丢失？"
+      - "消费者重复消费为什么几乎不可避免？"
+      - "死信队列和人工补偿在什么情况下需要介入？"
+    rubric:
+      - "能按发送确认、持久化、多副本、消费确认拆解可靠性。"
+      - "能给出唯一业务键、去重表、状态机、乐观锁等幂等方案。"
+      - "能考虑重试退避、死信、告警、对账和补偿。"
+    source: "JavaGuide"
+    source_path: "docs/high-performance/message-queue/message-queue.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mq-ordering-backlog
+    directions: ["backend", "data_engineering"]
+    difficulty: bigtech
+    topic: message-queue
+    type: scenario
+    tags: ["MQ", "Ordering", "Backlog"]
+    prompt: "业务要求同一订单的状态消息按顺序处理，同时线上出现消息积压，你会如何设计和排查？"
+    followups:
+      - "全局有序和局部有序的成本差异是什么？"
+      - "如何把同一业务 key 路由到同一分区或队列？"
+      - "消息积压时如何判断是生产过快、消费太慢还是下游瓶颈？"
+    rubric:
+      - "能说明按业务 key 分区实现局部顺序。"
+      - "能指出全局顺序会显著牺牲吞吐。"
+      - "能给出扩容消费者、限流生产者、批量消费、下游优化等处理手段。"
+    source: "JavaGuide"
+    source_path: "docs/high-performance/message-queue/message-queue.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: spring-transaction-failure
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: spring
+    type: scenario
+    tags: ["Spring", "Transaction", "AOP"]
+    prompt: "Spring 声明式事务在哪些情况下可能不生效？你会如何排查一个 @Transactional 没回滚的问题？"
+    followups:
+      - "同类内部方法调用为什么可能绕过代理？"
+      - "默认哪些异常会触发回滚？"
+      - "事务传播行为会如何影响嵌套调用？"
+    rubric:
+      - "能说明 Spring 事务基于代理增强，存在自调用、非 public 方法等边界。"
+      - "能指出默认 RuntimeException/Error 回滚，以及 rollbackFor 配置。"
+      - "能结合传播行为、数据源、异常捕获、代理类型做排查。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/framework/spring/spring-transaction.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: spring-ioc-aop
+    directions: ["backend"]
+    difficulty: campus
+    topic: spring
+    type: fundamentals
+    tags: ["Spring", "IoC", "AOP"]
+    prompt: "Spring IoC 和 AOP 分别解决什么问题？请结合一个业务接口里的事务、日志或鉴权举例。"
+    followups:
+      - "Bean 的生命周期大致有哪些关键阶段？"
+      - "AOP 为什么适合横切关注点？"
+      - "代理对象和目标对象混用会带来什么问题？"
+    rubric:
+      - "能说明 IoC 负责对象创建、依赖注入和生命周期管理。"
+      - "能说明 AOP 通过代理把横切逻辑从业务代码中分离。"
+      - "能结合事务、日志、权限等场景说明实际价值。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/framework/spring/ioc-and-aop.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"

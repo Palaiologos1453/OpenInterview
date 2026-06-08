@@ -1,0 +1,29 @@
+questions:
+  - id: backend-index-btree
+    directions: ["backend", "data_engineering"]
+    difficulty: campus
+    topic: database
+    type: fundamentals
+    prompt: "请解释 B+ 树索引为什么适合数据库范围查询，并说明索引失效的常见情况。"
+    followups:
+      - "如果查询条件里有函数或隐式类型转换，会发生什么？"
+      - "联合索引的最左前缀原则如何理解？"
+    rubric:
+      - "能讲清 B+ 树多叉、矮树高、叶子链表。"
+      - "能说明范围查询、回表、覆盖索引。"
+      - "能举出索引失效场景。"
+
+  - id: backend-cache-consistency
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: cache
+    type: scenario
+    prompt: "Redis 缓存和数据库之间可能有哪些一致性问题？如果是校招项目，你会怎么设计更新策略？"
+    followups:
+      - "先删缓存还是先更新数据库？为什么？"
+      - "延迟双删解决什么问题，又有什么局限？"
+    rubric:
+      - "能说明缓存穿透、击穿、雪崩和脏数据。"
+      - "能讨论删除缓存、更新数据库、消息队列、重试。"
+      - "能结合业务一致性要求做取舍。"
+

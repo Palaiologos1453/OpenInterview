@@ -1,0 +1,294 @@
+import base64
+import io
+from pathlib import Path
+import tempfile
+import unittest
+import wave
+
+from fastapi.testclient import TestClient
+
+from openinterview_api.main import app
+from openinterview_api.schemas import ProviderSettings
+from openinterview_api.storage import Storage
+
+
+client = TestClient(app)
+
+
+class OpenInterviewAPITest(unittest.TestCase):
+    def test_catalog_includes_voice_profiles(self):
+        response = client.get("/v1/catalog")
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("voice_profiles", response.json())
+        self.assertNotIn("coding", {item["id"] for item in response.json()["modes"]})
+        mode_names = {item["id"]: item["name"] for item in response.json()["modes"]}
+        self.assertEqual(mode_names["fundamentals"], "单纯八股")
+        self.assertEqual(mode_names["project_deep_dive"], "简历拷打")
+
+    def test_health_does_not_expose_code_runner(self):
+        response = client.get("/health")
+        self.assertEqual(response.status_code, 200)
+        self.assertNotIn("enable_code_runner", response.json())
+
+    def test_resume_analyze(self):
+        response = client.post(
+            "/v1/resume/analyze",
+            json={"text": "项目：Redis 缓存平台。使用 Java、MySQL、Redis，优化接口延迟降低 30%。"},
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertIn("Java", payload["tech_stack"])
+        self.assertTrue(payload["highlights"])
+
+    def test_start_requires_real_llm_config_by_default(self):
+        response = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "comprehensive",
+            },
+        )
+        self.assertEqual(response.status_code, 400)
+
+    def test_start_allows_explicit_mock_for_development(self):
+        response = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "comprehensive",
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+
+    def test_llm_connection_test_allows_mock(self):
+        response = client.post(
+            "/v1/providers/llm/test",
+            json={
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                }
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ok"])
+        self.assertFalse(response.json()["real_llm"])
+
+    def test_questions_exclude_coding_items(self):
+        response = client.get("/v1/questions")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["questions"])
+        self.assertTrue(all(item.get("type") != "coding" for item in response.json()["questions"]))
+
+    def test_provider_defaults_are_local_text_first(self):
+        settings = ProviderSettings()
+        self.assertEqual(settings.llm.provider, "openai_compatible")
+        self.assertEqual(settings.asr.provider, "browser")
+        self.assertEqual(settings.tts.provider, "browser")
+
+    def test_storage_persists_question_meta(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            storage = Storage(Path(temp_dir) / "test.sqlite")
+            storage.create_interview(
+                "s1",
+                {
+                    "direction_id": "backend",
+                    "difficulty_id": "campus",
+                    "provider_config": {"llm": {"provider": "mock"}},
+                },
+            )
+            storage.save_turn(
+                "s1",
+                turn_index=1,
+                question="Q",
+                answer="A",
+                feedback="F",
+                tags=["Java"],
+                score=80,
+                question_meta={"id": "q1", "topic": "java"},
+            )
+
+            turns = storage.get_interview_turns("s1")
+
+        self.assertEqual(turns[0]["question_meta"]["id"], "q1")
+
+    def test_storage_exports_and_clears_interviews(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            storage = Storage(Path(temp_dir) / "test.sqlite")
+            storage.create_interview(
+                "s1",
+                {
+                    "direction_id": "backend",
+                    "difficulty_id": "campus",
+                    "provider_config": {"llm": {"provider": "mock"}},
+                },
+            )
+            storage.save_turn(
+                "s1",
+                turn_index=1,
+                question="Q",
+                answer="A",
+                feedback="F",
+                tags=["Java"],
+                score=80,
+                question_meta={"id": "q1"},
+            )
+
+            exported = storage.export_interviews()
+            deleted = storage.clear_interviews()
+
+            self.assertEqual(exported["schema_version"], 2)
+            self.assertEqual(len(exported["interviews"]), 1)
+            self.assertEqual(len(exported["turns"]), 1)
+            self.assertEqual(deleted, 1)
+            self.assertEqual(storage.list_interviews(), [])
+
+    def test_vad_accepts_wav(self):
+        audio = _silence_wav_base64()
+        response = client.post(
+            "/v1/vad/detect",
+            json={"audio_base64": audio, "filename": "silence.wav"},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("segments", response.json())
+
+    def test_readiness_smoke_lightweight(self):
+        response = client.get("/v1/readiness/smoke")
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["ok"])
+        self.assertFalse(payload["include_voice"])
+        self.assertIn("vad", payload["checks"])
+
+    def test_realtime_state_machine(self):
+        created = client.post("/v1/realtime/sessions", json={})
+        self.assertEqual(created.status_code, 200)
+        session_id = created.json()["id"]
+        event = client.post(
+            f"/v1/realtime/sessions/{session_id}/events",
+            json={"type": "tts_start", "payload": {"audio_id": "a1"}},
+        )
+        self.assertEqual(event.status_code, 200)
+        self.assertEqual(event.json()["state"], "speaking")
+        cancel = client.post(
+            f"/v1/realtime/sessions/{session_id}/events",
+            json={"type": "cancel", "payload": {}},
+        )
+        self.assertEqual(cancel.status_code, 200)
+        self.assertEqual(cancel.json()["state"], "cancelled")
+
+    def test_realtime_audio_turn_skips_silence(self):
+        interview = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "comprehensive",
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "sensevoice"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(interview.status_code, 200)
+        realtime = client.post(
+            "/v1/realtime/sessions",
+            json={"interview_id": interview.json()["session_id"]},
+        )
+        self.assertEqual(realtime.status_code, 200)
+
+        response = client.post(
+            f"/v1/realtime/sessions/{realtime.json()['id']}/audio-turn",
+            json={
+                "audio_base64": _silence_wav_base64(),
+                "filename": "silence.wav",
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "sensevoice"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["skipped"])
+        self.assertEqual(payload["reason"], "no_speech")
+        self.assertEqual(payload["transcript"], "")
+        self.assertIsNone(payload["turn"])
+
+    def test_realtime_duplex_websocket_skips_silence(self):
+        interview = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "comprehensive",
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "sensevoice"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(interview.status_code, 200)
+        realtime = client.post(
+            "/v1/realtime/sessions",
+            json={"interview_id": interview.json()["session_id"]},
+        )
+        self.assertEqual(realtime.status_code, 200)
+
+        with client.websocket_connect(
+            f"/v1/realtime/sessions/{realtime.json()['id']}/duplex"
+        ) as websocket:
+            self.assertEqual(websocket.receive_json()["type"], "ready")
+            websocket.send_json(
+                {
+                    "type": "start",
+                    "provider_config": {
+                        "llm": {"provider": "mock"},
+                        "asr": {"provider": "sensevoice"},
+                        "tts": {"provider": "browser"},
+                    },
+                    "mime_type": "audio/wav",
+                    "partial_interval_chunks": 1,
+                }
+            )
+            self.assertEqual(websocket.receive_json()["type"], "listening")
+            websocket.send_json({"type": "audio", "data": _silence_wav_base64()})
+            self.assertEqual(websocket.receive_json()["type"], "asr_partial")
+            websocket.send_json({"type": "commit"})
+            seen = []
+            for _ in range(5):
+                payload = websocket.receive_json()
+                seen.append(payload["type"])
+                if payload["type"] == "done":
+                    self.assertTrue(payload["skipped"])
+                    self.assertEqual(payload["reason"], "no_speech")
+                    break
+            self.assertIn("vad_start", seen)
+            self.assertIn("vad_final", seen)
+            self.assertIn("done", seen)
+
+
+def _silence_wav_base64() -> str:
+    buffer = io.BytesIO()
+    with wave.open(buffer, "wb") as wav:
+        wav.setnchannels(1)
+        wav.setsampwidth(2)
+        wav.setframerate(16000)
+        wav.writeframes(b"\x00\x00" * 16000)
+    return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+if __name__ == "__main__":
+    unittest.main()

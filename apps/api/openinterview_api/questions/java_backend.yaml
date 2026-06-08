@@ -1,0 +1,240 @@
+questions:
+  - id: java-string-immutability
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-basis
+    type: fundamentals
+    tags: ["Java", "String", "JVM"]
+    prompt: "为什么 Java 的 String 设计成不可变对象？请从线程安全、哈希缓存、字符串常量池和安全性几个角度说明。"
+    followups:
+      - "StringBuilder 和 StringBuffer 的差异是什么？什么时候会选 StringBuffer？"
+      - "字符串拼接在循环里为什么不建议直接使用 +？"
+      - "String.intern() 适合在什么场景使用，又可能带来什么风险？"
+    rubric:
+      - "能说明不可变对象天然线程安全，适合作为 Map key 和共享常量。"
+      - "能讲清 hash 缓存、常量池复用和安全边界的关系。"
+      - "能区分 String、StringBuilder、StringBuffer 的性能和线程安全取舍。"
+    source: "JavaGuide"
+    source_path: "docs/java/basis/java-basic-questions-02.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-equals-hashcode-contract
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-basis
+    type: fundamentals
+    tags: ["Java", "Object", "HashMap"]
+    prompt: "重写 equals() 时为什么通常必须一起重写 hashCode()？请结合 HashMap 查找过程说明。"
+    followups:
+      - "== 和 equals() 的语义差异是什么？"
+      - "如果两个对象 equals() 为 true，但 hashCode() 不同，会发生什么？"
+      - "业务对象作为 HashMap key 时还要注意哪些可变字段问题？"
+    rubric:
+      - "能说清 equals 表示逻辑相等，hashCode 用于哈希桶定位。"
+      - "能解释相等对象必须有相同 hashCode，否则集合查找可能失败。"
+      - "能指出可变字段参与 hashCode 会导致 key 丢失等问题。"
+    source: "JavaGuide"
+    source_path: "docs/java/basis/java-basic-questions-02.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-exception-boundary
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-basis
+    type: scenario
+    tags: ["Java", "Exception", "API"]
+    prompt: "如果你在后端接口里设计异常处理，会如何区分业务异常、参数异常和系统异常？"
+    followups:
+      - "Checked Exception 和 Unchecked Exception 的区别是什么？"
+      - "为什么不建议把所有异常都 catch 后只返回失败？"
+      - "全局异常处理器里应该记录哪些日志字段？"
+    rubric:
+      - "能区分可预期业务失败、调用方错误和服务端未知错误。"
+      - "能说明异常不能吞掉，需要保留上下文、堆栈和 trace 信息。"
+      - "能结合 HTTP 状态码、错误码和用户提示做分层设计。"
+    source: "JavaGuide"
+    source_path: "docs/java/basis/java-basic-questions-03.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-generics-erasure
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-basis
+    type: fundamentals
+    tags: ["Java", "Generics"]
+    prompt: "Java 泛型擦除是什么？它为什么会影响运行时类型判断和方法重载？"
+    followups:
+      - "List<String> 和 List<Integer> 在运行时有什么共同点？"
+      - "为什么不能直接创建泛型数组？"
+      - "上界通配符和下界通配符分别适合什么读写场景？"
+    rubric:
+      - "能说明泛型主要在编译期提供类型检查，运行期类型参数会被擦除。"
+      - "能举出 instanceof、重载签名、泛型数组等受影响场景。"
+      - "能用 PECS 思路解释 extends 和 super 的使用边界。"
+    source: "JavaGuide"
+    source_path: "docs/java/basis/generics-and-wildcards.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-reflection-proxy-framework
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-basis
+    type: scenario
+    tags: ["Java", "Reflection", "Proxy", "Spring"]
+    prompt: "反射和动态代理在后端框架里通常解决什么问题？请结合依赖注入、AOP 或 RPC 举例。"
+    followups:
+      - "JDK 动态代理和 CGLIB 动态代理有什么区别？"
+      - "反射为什么会带来性能和安全风险？"
+      - "如果一个类没有接口，Spring AOP 通常会怎么代理？"
+    rubric:
+      - "能说明反射用于运行时获取类型信息和调用成员。"
+      - "能说明动态代理用于增强调用过程，如事务、日志、鉴权、远程调用。"
+      - "能区分 JDK 代理基于接口，CGLIB 通常基于子类增强。"
+    source: "JavaGuide"
+    source_path: "docs/java/basis/java-basic-questions-03.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-hashmap-resize
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-collection
+    type: fundamentals
+    tags: ["Java", "HashMap", "Collection"]
+    prompt: "HashMap 的 put 和扩容过程大致是怎样的？为什么负载因子不能设置得过大或过小？"
+    followups:
+      - "JDK 8 中链表什么时候会转成红黑树？"
+      - "HashMap 为什么不是线程安全的？"
+      - "初始化容量应该如何根据预估数据量设置？"
+    rubric:
+      - "能讲清哈希定位、冲突处理、链表或红黑树存储。"
+      - "能说明扩容会重新分布元素，成本较高。"
+      - "能解释负载因子在空间占用和冲突概率之间取舍。"
+    source: "JavaGuide"
+    source_path: "docs/java/collection/hashmap-source-code.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-concurrenthashmap-consistency
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: java-collection
+    type: fundamentals
+    tags: ["Java", "ConcurrentHashMap", "Concurrency"]
+    prompt: "ConcurrentHashMap 如何在并发读写场景下兼顾线程安全和性能？"
+    followups:
+      - "它和 Hashtable、Collections.synchronizedMap 的主要差异是什么？"
+      - "为什么不建议在 ConcurrentHashMap 上再加大粒度外部锁？"
+      - "size() 在并发修改时为什么不能当成强一致判断？"
+    rubric:
+      - "能说明分段或桶级并发控制思想，以及读操作尽量无锁的目标。"
+      - "能比较全表锁和细粒度锁的吞吐差异。"
+      - "能指出并发容器提供线程安全，但不自动保证复合业务操作原子性。"
+    source: "JavaGuide"
+    source_path: "docs/java/collection/concurrent-hash-map-source-code.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-thread-process-memory
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-concurrency
+    type: fundamentals
+    tags: ["Java", "Thread", "OS"]
+    prompt: "线程和进程的区别是什么？从 JVM 运行时内存角度看，哪些区域是线程私有的，哪些是共享的？"
+    followups:
+      - "为什么程序计数器需要线程私有？"
+      - "虚拟机栈里保存的主要是什么？"
+      - "线程共享堆内存会带来什么并发风险？"
+    rubric:
+      - "能说明进程是资源分配单位，线程是更小的执行调度单位。"
+      - "能指出程序计数器、虚拟机栈、本地方法栈线程私有。"
+      - "能指出堆和方法区共享，并关联线程安全问题。"
+    source: "JavaGuide"
+    source_path: "docs/java/concurrent/java-concurrent-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-threadpool-parameters
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: java-concurrency
+    type: scenario
+    tags: ["Java", "ThreadPool", "Concurrency"]
+    prompt: "线上接口需要异步处理耗时任务时，你会如何设计线程池参数和拒绝策略？"
+    followups:
+      - "核心线程数、最大线程数、队列长度分别影响什么？"
+      - "CPU 密集型和 IO 密集型任务的线程数设置有什么差异？"
+      - "为什么不建议直接使用 Executors.newFixedThreadPool？"
+    rubric:
+      - "能解释核心参数、任务队列、拒绝策略和线程回收的作用。"
+      - "能按任务类型、下游容量和 SLA 估算线程数。"
+      - "能指出无界队列、过大线程数和缺少监控的风险。"
+    source: "JavaGuide"
+    source_path: "docs/java/concurrent/java-thread-pool-summary.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-lock-synchronized-reentrantlock
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-concurrency
+    type: fundamentals
+    tags: ["Java", "Lock", "AQS"]
+    prompt: "synchronized 和 ReentrantLock 有哪些差异？如果要支持可中断等待和公平锁，你会怎么选？"
+    followups:
+      - "ReentrantLock 为什么要在 finally 里 unlock？"
+      - "公平锁一定比非公平锁好吗？"
+      - "AQS 在 Java 锁实现里扮演什么角色？"
+    rubric:
+      - "能比较语法层面、可中断、超时等待、公平性和条件队列。"
+      - "能说明公平性会牺牲吞吐，不是所有场景都适合。"
+      - "能提到 AQS 通过状态和等待队列支撑同步器实现。"
+    source: "JavaGuide"
+    source_path: "docs/java/concurrent/reentrantlock.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-jmm-volatile
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: java-concurrency
+    type: fundamentals
+    tags: ["Java", "JMM", "volatile"]
+    prompt: "volatile 能解决什么并发问题？为什么它不能替代锁完成复合操作的原子性保护？"
+    followups:
+      - "可见性、有序性和原子性分别是什么意思？"
+      - "volatile 写和读之间的 happens-before 关系如何理解？"
+      - "i++ 使用 volatile 修饰后是否线程安全？为什么？"
+    rubric:
+      - "能说明 volatile 提供可见性和一定的有序性约束。"
+      - "能指出 volatile 不保证 read-modify-write 复合操作原子性。"
+      - "能结合 happens-before 或内存屏障解释底层语义。"
+    source: "JavaGuide"
+    source_path: "docs/java/concurrent/jmm.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-jvm-memory-gc
+    directions: ["backend"]
+    difficulty: campus
+    topic: jvm
+    type: fundamentals
+    tags: ["Java", "JVM", "GC"]
+    prompt: "请说明 JVM 运行时内存区域，并讲讲对象从创建到被 GC 回收通常会经历哪些关键判断。"
+    followups:
+      - "堆、方法区、虚拟机栈分别容易出现什么错误？"
+      - "可达性分析和引用计数有什么差异？"
+      - "新生代和老年代的 GC 目标有什么不同？"
+    rubric:
+      - "能说明堆、栈、方法区、程序计数器、本地方法栈等区域职责。"
+      - "能讲清可达性分析、GC Roots 和引用关系。"
+      - "能区分 Minor GC、Major GC、Full GC 的触发和影响。"
+    source: "JavaGuide"
+    source_path: "docs/java/jvm/memory-area.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
