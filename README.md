@@ -20,6 +20,7 @@ cd OpenInterview
 脚本会自动做这些事：
 
 - 找可用的本地端口，避免 `8000` 或 `5173` 被占用。
+- 检查 Python 版本、pip、端口和启动健康状态。
 - 创建/复用 `apps/api/.venv`。
 - 安装 API 依赖。
 - 启动 FastAPI 后端和静态前端。
@@ -35,16 +36,21 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 .\scripts\start-local.ps1 -UseVoicePython
 ```
 
+启动失败时脚本会打印常见修复建议和日志路径。大多数问题集中在 Python 未安装、版本低于 3.10、PowerShell 执行策略、依赖安装失败或端口被占用。
+
 ## 首次使用
 
 1. 打开脚本打印的前端地址。
 2. 在左侧“模型配置（本机保存）”里填写 LLM：
+   - Provider 模板：可选 OpenAI、DeepSeek、阿里云百炼 DashScope、SiliconFlow、Moonshot/Kimi、Ollama
    - Provider：`openai_compatible`
    - API Base：例如 `https://api.openai.com/v1`，或其他兼容 `/v1/chat/completions` 的地址
    - Model：你的模型名
    - API Key：你的 key
 3. 点击“测试 LLM”，确认模型能返回。
 4. 选择难度和模式，开始面试。方向当前固定为 Java 后端。
+
+LLM 测试失败时会显示错误类型和修复建议，例如 Key 错、模型不存在、Base URL 不匹配、额度不足、超时或返回格式不兼容。
 
 ASR/TTS 默认走浏览器能力，文本面试不依赖本地语音。建议第一次先只跑文本。
 
@@ -55,7 +61,18 @@ ASR/TTS 默认走浏览器能力，文本面试不依赖本地语音。建议第
 - `简历拷打`：自动拆项目卡片，围绕个人贡献、虚假/模糊表述、指标来源、技术选型、故障风险和复盘连续追问。
 - `系统设计专项`：训练需求澄清、模块拆分、容量估算、架构取舍和验证方案。
 
-报告会生成复练题、推荐回答结构、示例答案和题目学习卡。学习卡包含参考答案、常见错误、面试官追问点、低分回答 vs 高分回答、关联知识点，方便把一次模拟沉淀成后续复习清单。
+报告会生成复练题、推荐回答结构、示例答案和题目学习卡。学习卡包含参考答案、常见错误、面试官追问点、低分回答 vs 高分回答、关联知识点。逐题复盘还会展示命中评分点、缺失评分点、评分证据和重答建议，方便把一次模拟沉淀成后续复习清单。
+
+## 简历导入
+
+支持直接粘贴文本，也支持本地导入：
+
+- `.txt`
+- `.md`
+- `.docx`
+- `.pdf`
+
+文件只会发送到本机 API 做文本提取，不会上传公网服务。扫描版图片 PDF 可能无法提取文字，建议先复制成文本。
 
 ## 历史和报告
 
@@ -141,6 +158,7 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 - `POST /v1/providers/llm/test`
 - `GET /v1/questions`
 - `POST /v1/resume/analyze`
+- `POST /v1/resume/extract`
 - `POST /v1/interviews`
 - `POST /v1/interviews/{session_id}/turn`
 - `GET /v1/interviews/{session_id}/report`

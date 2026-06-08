@@ -34,6 +34,51 @@ const defaultProviderConfig = {
   }
 };
 
+const llmTemplates = {
+  openai: {
+    provider: "openai_compatible",
+    api_base: "https://api.openai.com/v1",
+    model: "gpt-4o-mini",
+    note: "OpenAI 官方 Chat Completions 兼容接口。"
+  },
+  deepseek: {
+    provider: "openai_compatible",
+    api_base: "https://api.deepseek.com",
+    model: "deepseek-chat",
+    note: "DeepSeek 官方 OpenAI 兼容接口，后端会自动拼接 /v1/chat/completions。"
+  },
+  dashscope: {
+    provider: "openai_compatible",
+    api_base: "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    model: "qwen-plus",
+    note: "阿里云百炼 OpenAI 兼容模式。"
+  },
+  siliconflow: {
+    provider: "openai_compatible",
+    api_base: "https://api.siliconflow.cn/v1",
+    model: "Qwen/Qwen2.5-7B-Instruct",
+    note: "SiliconFlow OpenAI 兼容接口，模型名可按控制台替换。"
+  },
+  moonshot: {
+    provider: "openai_compatible",
+    api_base: "https://api.moonshot.cn/v1",
+    model: "moonshot-v1-8k",
+    note: "Moonshot/Kimi OpenAI 兼容接口。"
+  },
+  ollama: {
+    provider: "ollama",
+    api_base: "http://127.0.0.1:11434",
+    model: "qwen2.5:7b",
+    note: "本地 Ollama，需先运行 ollama serve 并拉取模型。"
+  },
+  mock: {
+    provider: "mock",
+    api_base: "",
+    model: "",
+    note: "仅用于无 Key 演示流程，不是真实智能面试官。"
+  }
+};
+
 const fallbackCatalog = {
   directions: [{ id: "backend", name: "后端开发", summary: "数据库、缓存、并发、分布式基础。" }],
   difficulties: [{ id: "campus", name: "普通校招", summary: "基础、项目、算法均衡。" }],
@@ -74,6 +119,7 @@ const elements = {
   resume: $("#resume"),
   voiceOutput: $("#voice-output"),
   llmProvider: $("#llm-provider"),
+  llmTemplate: $("#llm-template"),
   llmApiBase: $("#llm-api-base"),
   llmModel: $("#llm-model"),
   llmApiKey: $("#llm-api-key"),
@@ -94,6 +140,7 @@ const elements = {
   runtimeStatus: $("#runtime-status"),
   setupChecklist: $("#setup-checklist"),
   resumePanel: $("#resume-panel"),
+  resumeFile: $("#resume-file"),
   sessionTitle: $("#session-title"),
   conversation: $("#conversation"),
   answerForm: $("#answer-form"),
@@ -102,6 +149,7 @@ const elements = {
   listenButton: $("#listen-button"),
   reportButton: $("#report-button"),
   historyButton: $("#history-button"),
+  importResumeButton: $("#import-resume-button"),
   analyzeResumeButton: $("#analyze-resume-button"),
   report: $("#report")
 };
@@ -142,6 +190,8 @@ function wireEvents() {
   elements.saveProviderConfig.addEventListener("click", saveProviderConfig);
   elements.testLlmConfig.addEventListener("click", safeHandler(testLlmConfig));
   elements.clearProviderConfig.addEventListener("click", clearProviderConfig);
+  elements.llmTemplate.addEventListener("change", applyLlmTemplate);
+  elements.importResumeButton.addEventListener("click", safeHandler(importResumeFile));
   elements.analyzeResumeButton.addEventListener("click", safeHandler(analyzeResume));
   elements.historyButton.addEventListener("click", safeHandler(loadHistory));
   providerInputs().forEach((input) => {
@@ -237,6 +287,32 @@ async function analyzeResume() {
     ${renderResumeQuestionList("技术选型追问", result.tech_choice_questions)}
     ${renderResumeQuestionList("故障复盘追问", result.incident_questions)}
   `;
+}
+
+async function importResumeFile() {
+  ensureBackend();
+  const file = elements.resumeFile.files?.[0];
+  if (!file) {
+    throw new Error("请先选择 .txt、.md、.pdf 或 .docx 简历文件。");
+  }
+  const body = new FormData();
+  body.append("file", file);
+  elements.importResumeButton.disabled = true;
+  setStatus(`正在本地解析简历文件：${file.name}`);
+  try {
+    const response = await authedFetch(`${API_BASE}/v1/resume/extract`, {
+      method: "POST",
+      body
+    });
+    if (!response.ok) throw new Error(await response.text());
+    const payload = await response.json();
+    elements.resume.value = payload.text;
+    renderSetupChecklist();
+    setStatus(`已导入 ${payload.filename}，提取 ${payload.chars} 个字符。`);
+    await analyzeResume();
+  } finally {
+    elements.importResumeButton.disabled = false;
+  }
 }
 
 async function loadHistory() {
@@ -441,13 +517,29 @@ async function testLlmConfig() {
   try {
     const result = await postJson(`${API_BASE}/v1/providers/llm/test`, { provider_config });
     if (!result.ok) {
-      throw new Error(result.message || "LLM 连接测试失败。");
+      const diagnostic = result.diagnostic;
+      const hint = diagnostic?.hint ? `建议：${diagnostic.hint}` : "";
+      const category = diagnostic?.category ? `类型：${diagnostic.category}。` : "";
+      throw new Error(`${result.message || "LLM 连接测试失败。"} ${category}${hint}`);
     }
     setStatus(`${result.message}${result.sample ? ` 返回：${result.sample}` : ""}`);
   } finally {
     elements.testLlmConfig.disabled = false;
     renderSetupChecklist();
   }
+}
+
+function applyLlmTemplate() {
+  const template = llmTemplates[elements.llmTemplate.value];
+  if (!template) return;
+  elements.llmProvider.value = template.provider;
+  elements.llmApiBase.value = template.api_base;
+  elements.llmModel.value = template.model;
+  if (template.provider === "mock" || template.provider === "ollama") {
+    elements.llmApiKey.value = "";
+  }
+  renderSetupChecklist();
+  setStatus(`已应用 LLM 模板：${template.note}`);
 }
 
 function llmMissingFields(llm) {
@@ -1136,6 +1228,7 @@ function renderTurnReview(turns) {
       ${turns.map((turn, index) => {
         const meta = turn.question_meta || {};
         const gaps = turn.rubric_gaps || [];
+        const hits = turn.rubric_hits || [];
         const title = meta.topic || meta.id || `第 ${index + 1} 题`;
         return `
           <div class="turn-review-item">
@@ -1144,7 +1237,10 @@ function renderTurnReview(turns) {
               <span>${escapeHtml(String(turn.score || 0))} 分</span>
             </div>
             <p>${escapeHtml(shortText(turn.question, 120))}</p>
+            ${hits.length ? `<div class="tags">${hits.slice(0, 3).map((hit) => `<span class="tag hit-tag">${escapeHtml(hit)}</span>`).join("")}</div>` : ""}
             ${gaps.length ? `<div class="tags">${gaps.slice(0, 3).map((gap) => `<span class="tag">${escapeHtml(gap)}</span>`).join("")}</div>` : ""}
+            ${renderGuideList("评分证据", turn.score_evidence)}
+            ${renderGuideList("重答建议", turn.rewrite_advice)}
           </div>
         `;
       }).join("")}

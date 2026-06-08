@@ -392,6 +392,12 @@ textarea:focus {
   font-size: 12px;
 }
 
+.hit-tag {
+  border-color: #b7d7c1;
+  color: var(--accent);
+  background: #f2f8f4;
+}
+
 .answer-box {
   border: 1px solid var(--line);
   border-radius: 8px;

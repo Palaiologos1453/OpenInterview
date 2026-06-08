@@ -19,6 +19,7 @@ OpenInterview 默认是本地个人工具。当前公开入口先聚焦 Java 后
 脚本会自动：
 
 - 选择空闲本地端口
+- 检查 Python 3.10+、pip、端口和服务健康状态
 - 创建 `apps/api/.venv`
 - 安装 API 依赖
 - 启动 API 和 Web
@@ -34,12 +35,15 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 
 左侧展开“模型配置（本机保存）”，填写：
 
+- Provider 模板：先选你使用的服务商，例如 DeepSeek、DashScope、SiliconFlow、Moonshot/Kimi、OpenAI 或 Ollama
 - Provider：`openai_compatible`
 - API Base：兼容 OpenAI `/v1/chat/completions` 的地址
 - Model：模型名
 - API Key：你的 key
 
 点击“测试 LLM”。成功后再开始面试。
+
+测试失败时看状态栏里的“建议”。常见原因是 Key 错、模型名不存在、Base URL 少了 `/v1` 或兼容模式路径、账号额度不足、网络超时。
 
 ## 4. 开始练习
 
@@ -51,7 +55,7 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 
 报告里会给出逐题复盘、复练题、推荐回答结构、示例答案和题目学习卡。学习卡包含参考答案、常见错误、面试官追问点、低分回答 vs 高分回答、关联知识点。
 
-`简历拷打` 会先拆项目卡片，再追问个人贡献、模糊表述、指标来源、技术选型依据、故障和复盘。简历里越能写清背景、职责、指标和上线问题，追问越贴近真实面试。
+`简历拷打` 会先拆项目卡片，再追问个人贡献、模糊表述、指标来源、技术选型依据、故障和复盘。你可以直接粘贴文本，也可以导入 `.txt`、`.md`、`.docx`、`.pdf` 简历文件。文件只在本机 API 做文本提取，不上传公网。
 
 ## 5. 管理历史
 
@@ -79,3 +83,13 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 ### 本地语音启动失败
 
 先保持 ASR/TTS 为 `browser` 或 `disabled`，完成文本面试。SenseVoice/CosyVoice 属于重型可选增强，不是首次使用必需项。
+
+### PowerShell 脚本无法运行
+
+在 PowerShell 里执行：
+
+```powershell
+Set-ExecutionPolicy -Scope CurrentUser RemoteSigned
+```
+
+然后重新运行 `.\scripts\start-local.ps1`。

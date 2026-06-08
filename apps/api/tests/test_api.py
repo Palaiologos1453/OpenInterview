@@ -4,6 +4,7 @@ from pathlib import Path
 import tempfile
 import unittest
 import wave
+import zipfile
 
 from fastapi.testclient import TestClient
 
@@ -93,6 +94,50 @@ class OpenInterviewAPITest(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertTrue(response.json()["ok"])
         self.assertFalse(response.json()["real_llm"])
+        self.assertIn("diagnostic", response.json())
+
+    def test_llm_connection_test_returns_diagnostic_for_bad_config(self):
+        response = client.post(
+            "/v1/providers/llm/test",
+            json={
+                "provider_config": {
+                    "llm": {
+                        "provider": "openai_compatible",
+                        "api_base": "http://127.0.0.1:9/v1",
+                        "model": "missing-model",
+                        "api_key": "bad-key",
+                        "timeout_seconds": 5,
+                    },
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                }
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload["ok"])
+        self.assertIn("hint", payload["diagnostic"])
+
+    def test_resume_extract_txt_and_docx(self):
+        txt = client.post(
+            "/v1/resume/extract",
+            files={"file": ("resume.txt", "项目：订单系统，负责 Java 和 Redis。".encode("utf-8"), "text/plain")},
+        )
+        self.assertEqual(txt.status_code, 200)
+        self.assertIn("订单系统", txt.json()["text"])
+
+        docx = client.post(
+            "/v1/resume/extract",
+            files={
+                "file": (
+                    "resume.docx",
+                    _minimal_docx_bytes("项目：支付系统，负责 Spring Boot 和 MySQL。"),
+                    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                )
+            },
+        )
+        self.assertEqual(docx.status_code, 200)
+        self.assertIn("支付系统", docx.json()["text"])
 
     def test_questions_exclude_coding_items(self):
         response = client.get("/v1/questions")
@@ -306,6 +351,18 @@ def _silence_wav_base64() -> str:
         wav.setframerate(16000)
         wav.writeframes(b"\x00\x00" * 16000)
     return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def _minimal_docx_bytes(text: str) -> bytes:
+    buffer = io.BytesIO()
+    document_xml = f'''<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">
+  <w:body><w:p><w:r><w:t>{text}</w:t></w:r></w:p></w:body>
+</w:document>'''
+    with zipfile.ZipFile(buffer, "w") as archive:
+        archive.writestr("[Content_Types].xml", "<?xml version=\"1.0\" encoding=\"UTF-8\"?><Types/>")
+        archive.writestr("word/document.xml", document_xml)
+    return buffer.getvalue()
 
 
 if __name__ == "__main__":

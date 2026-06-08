@@ -238,3 +238,83 @@ questions:
     source_path: "docs/java/jvm/memory-area.md"
     source_license: "Apache-2.0"
     source_usage: "adapted"
+
+  - id: java-jvm-class-loading-parent-delegation
+    directions: ["backend"]
+    difficulty: campus
+    topic: jvm
+    type: fundamentals
+    tags: ["Java", "JVM", "ClassLoader"]
+    prompt: "JVM 类加载过程包括哪些阶段？双亲委派模型解决了什么问题，又有哪些场景会打破它？"
+    followups:
+      - "加载、验证、准备、解析、初始化分别做什么？"
+      - "为什么 Java 核心类库不希望被应用类覆盖？"
+      - "Tomcat、SPI、热部署为什么可能需要自定义类加载器？"
+    rubric:
+      - "能按加载、链接、初始化讲清类加载主流程。"
+      - "能说明双亲委派保证核心类库安全和类唯一性。"
+      - "能举出容器隔离、插件化、SPI 等破坏或调整委派的工程场景。"
+    source: "JavaGuide"
+    source_path: "docs/java/jvm/class-loading-process.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-jvm-gc-collector-selection
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: jvm
+    type: scenario
+    tags: ["Java", "JVM", "GC", "Performance"]
+    prompt: "线上 Java 服务出现频繁 Full GC 和接口毛刺，你会如何定位 GC 问题并选择调优方向？"
+    followups:
+      - "你会先看哪些 JVM 指标和 GC 日志字段？"
+      - "吞吐优先和低延迟优先的 GC 选择有什么不同？"
+      - "如何判断是内存泄漏、对象分配过快还是参数设置不合理？"
+    rubric:
+      - "能从 GC 日志、堆使用、对象分配、停顿时间和线程栈定位。"
+      - "能比较 Serial、Parallel、CMS、G1、ZGC 等收集器目标差异。"
+      - "能提出 dump 分析、压测复现、参数调整和代码分配优化。"
+    source: "JavaGuide"
+    source_path: "docs/java/jvm/jvm-garbage-collection.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-jvm-oom-troubleshooting
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: jvm
+    type: scenario
+    tags: ["Java", "JVM", "OOM", "Troubleshooting"]
+    prompt: "线上服务报 OutOfMemoryError 时，你会如何区分堆溢出、栈溢出、元空间溢出和直接内存问题？"
+    followups:
+      - "heap dump 和 thread dump 分别能看什么？"
+      - "Metaspace OOM 常见诱因是什么？"
+      - "如何避免排查过程二次影响线上服务？"
+    rubric:
+      - "能按错误类型区分 Java heap、StackOverflow、Metaspace、Direct buffer 等。"
+      - "能说明 dump、监控、GC 日志、对象引用链和类加载数量的排查价值。"
+      - "能提出限流、摘流、保留现场、灰度修复和长期监控方案。"
+    source: "JavaGuide"
+    source_path: "docs/java/jvm/jdk-monitoring-and-troubleshooting-tools.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-collection-arraylist-linkedlist
+    directions: ["backend"]
+    difficulty: internship
+    topic: java-collection
+    type: fundamentals
+    tags: ["Java", "Collection", "ArrayList", "LinkedList"]
+    prompt: "ArrayList 和 LinkedList 的底层结构、扩容成本和适用场景有什么差异？"
+    followups:
+      - "为什么随机访问 ArrayList 更快？"
+      - "LinkedList 插入删除一定比 ArrayList 快吗？"
+      - "ArrayList 扩容时为什么要关注初始容量？"
+    rubric:
+      - "能说明 ArrayList 基于动态数组，LinkedList 基于链表节点。"
+      - "能区分随机访问、尾部追加、中间插入删除的真实成本。"
+      - "能结合缓存局部性、内存占用和扩容拷贝做取舍。"
+    source: "JavaGuide"
+    source_path: "docs/java/collection/java-collection-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"

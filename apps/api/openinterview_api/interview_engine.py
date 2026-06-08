@@ -197,7 +197,10 @@ class CampusInterviewEngine:
                     "tags": turn.tags,
                     "score": turn.score,
                     "question_meta": turn.question_meta,
+                    "rubric_hits": self._rubric_coverage(turn.answer, turn.question_meta)[0],
                     "rubric_gaps": self._rubric_coverage(turn.answer, turn.question_meta)[1],
+                    "score_evidence": self._score_evidence(turn),
+                    "rewrite_advice": self._rewrite_advice(turn),
                 }
                 for turn in session.history
             ],
@@ -794,6 +797,51 @@ class CampusInterviewEngine:
             topic = (turn.question_meta or {}).get("topic") or "本题"
             improvements.append(f"{topic}：补充{gaps[0]}。")
         return improvements
+
+    def _score_evidence(self, turn: Turn) -> list[str]:
+        evidence: list[str] = []
+        meta = turn.question_meta or {}
+        hits, gaps = self._rubric_coverage(turn.answer, meta)
+        if hits:
+            evidence.append(f"已覆盖评分点：{self._join_items(hits[:3])}。")
+        if gaps:
+            evidence.append(f"缺失评分点：{self._join_items(gaps[:3])}。")
+        if len(turn.answer) < 80 and meta.get("phase") != "closing":
+            evidence.append("回答篇幅偏短，真实面试中难以支撑连续追问。")
+        if meta.get("phase") == "project" and "结果" not in turn.answer:
+            evidence.append("项目回答缺少结果、指标或验证方式。")
+        if not any(word in turn.answer for word in ["取舍", "对比", "为什么", "边界", "风险"]):
+            evidence.append("缺少方案取舍或边界条件说明。")
+        if not evidence:
+            evidence.append("回答覆盖了基础结构，后续重点是补更具体的工程细节。")
+        return evidence[:5]
+
+    def _rewrite_advice(self, turn: Turn) -> list[str]:
+        meta = turn.question_meta or {}
+        phase = meta.get("phase")
+        gaps = self._rubric_coverage(turn.answer, meta)[1]
+        focus = gaps[0] if gaps else "关键细节"
+        if phase == "project":
+            return [
+                "用一句话说明业务目标和你负责的模块。",
+                "把团队成果拆成你自己的设计、编码、联调、上线动作。",
+                f"补充“{focus}”，并给出指标来源、基线和上线后对比。",
+                "最后说明一次故障、风险兜底或复盘改进。",
+            ]
+        if phase == "system_design":
+            return [
+                "先澄清规模、读写比例、延迟和一致性要求。",
+                "按模块、数据流、存储、缓存、队列拆解方案。",
+                f"补充“{focus}”，说明容量估算、风险和验证方式。",
+            ]
+        if phase == "closing":
+            return ["反问聚焦团队技术栈、培养机制、代码质量或岗位职责。"]
+        return [
+            "先给定义或结论，避免直接堆术语。",
+            "解释底层机制和为什么这样设计。",
+            f"补充“{focus}”，给出适用场景、边界条件和常见误区。",
+            "落到 Java 后端项目里说明如何验证或排查。",
+        ]
 
     def _join_items(self, items: list[str]) -> str:
         return "、".join(str(item) for item in items if item)

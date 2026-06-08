@@ -179,6 +179,86 @@ questions:
     source_license: "Apache-2.0"
     source_usage: "adapted"
 
+  - id: springboot-auto-configuration
+    directions: ["backend"]
+    difficulty: campus
+    topic: spring
+    type: fundamentals
+    tags: ["Spring Boot", "Auto Configuration", "Starter"]
+    prompt: "Spring Boot 自动配置大致是如何工作的？starter、条件注解和配置属性分别起什么作用？"
+    followups:
+      - "@ConditionalOnClass 和 @ConditionalOnMissingBean 常见于什么场景？"
+      - "为什么引入一个 starter 后 Bean 就可能自动生效？"
+      - "自动配置失效时你会从哪些日志和配置入口排查？"
+    rubric:
+      - "能说明 starter 提供依赖和自动配置入口。"
+      - "能解释条件注解决定配置类或 Bean 是否生效。"
+      - "能结合配置属性、Bean 覆盖、依赖缺失和调试日志排查。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/framework/spring/spring-boot-auto-assembly-principles.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: spring-bean-lifecycle-circular-dependency
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: spring
+    type: fundamentals
+    tags: ["Spring", "Bean", "Circular Dependency"]
+    prompt: "Spring Bean 生命周期有哪些关键阶段？三级缓存为什么能解决部分循环依赖，哪些循环依赖解决不了？"
+    followups:
+      - "实例化、属性填充、初始化、销毁分别发生什么？"
+      - "构造器循环依赖为什么更难解决？"
+      - "AOP 代理对象提前暴露会带来什么复杂度？"
+    rubric:
+      - "能按 Bean 创建和初始化流程讲清关键扩展点。"
+      - "能说明单例 Bean 属性注入循环依赖和三级缓存的关系。"
+      - "能指出构造器注入、多例 Bean、代理对象场景的边界。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/framework/spring/spring-knowledge-and-questions-summary.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: springmvc-request-flow
+    directions: ["backend"]
+    difficulty: campus
+    topic: spring
+    type: fundamentals
+    tags: ["Spring MVC", "HTTP", "DispatcherServlet"]
+    prompt: "一次 HTTP 请求进入 Spring MVC 后，从 DispatcherServlet 到 Controller 返回响应的大致流程是什么？"
+    followups:
+      - "HandlerMapping 和 HandlerAdapter 分别做什么？"
+      - "参数解析、消息转换和异常处理分别在哪些阶段发生？"
+      - "拦截器和过滤器的边界是什么？"
+    rubric:
+      - "能讲清 DispatcherServlet、HandlerMapping、HandlerAdapter、Controller、View/MessageConverter 流程。"
+      - "能说明参数绑定、序列化、异常处理和拦截器位置。"
+      - "能结合接口日志、鉴权、traceId 等工程场景解释扩展点。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/framework/spring/spring-knowledge-and-questions-summary.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mybatis-cache-and-n-plus-one
+    directions: ["backend"]
+    difficulty: campus
+    topic: mybatis
+    type: scenario
+    tags: ["MyBatis", "SQL", "Cache"]
+    prompt: "MyBatis 一级缓存、二级缓存分别是什么？如果接口出现 N+1 查询，你会如何发现和优化？"
+    followups:
+      - "一级缓存为什么默认只在 SqlSession 级别生效？"
+      - "二级缓存为什么在复杂业务里要谨慎开启？"
+      - "如何通过日志、慢 SQL 和批量查询定位 N+1？"
+    rubric:
+      - "能区分一级缓存和二级缓存的作用域、失效和风险。"
+      - "能说明 N+1 查询的表现和典型诱因。"
+      - "能提出 join、批量查询、分页、缓存和接口聚合改造方案。"
+    source: "JavaGuide"
+    source_path: "docs/system-design/framework/mybatis/mybatis-interview.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
   - id: java-io-model-bio-nio-aio
     directions: ["backend", "sre"]
     difficulty: campus

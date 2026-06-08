@@ -5,7 +5,7 @@ from pathlib import Path
 import tempfile
 from uuid import uuid4
 
-from fastapi import FastAPI, HTTPException, Request, WebSocket
+from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 
@@ -17,8 +17,10 @@ from .catalog import get_catalog
 from .interview_engine import CampusInterviewEngine, InterviewConfig, InterviewSession, Turn
 from .security import hash_token, new_api_token
 from .services.question_bank import default_question_bank
+from .services.provider_diagnostics import diagnose_llm_error
 from .services.readiness import readiness_report, readiness_smoke_report
 from .services.resume import analyze_resume
+from .services.resume_file import extract_resume_text
 from .services.realtime import RealtimeRegistry
 from .storage import Storage
 from .settings import cors_origins, production_mode, require_auth
@@ -32,6 +34,7 @@ from .schemas import (
     InterviewStartResponse,
     LLMConnectionTestRequest,
     ReportResponse,
+    ResumeExtractResponse,
     ResumeAnalyzeRequest,
     TTSRequest,
     TurnRequest,
@@ -113,10 +116,12 @@ def test_llm_connection(request: LLMConnectionTestRequest) -> dict:
             temperature=llm_temperature(config),
         )
     except Exception as exc:
+        diagnostic = diagnose_llm_error(exc, (config.get("llm") or {}).get("provider") or "unknown")
         return {
             "ok": False,
             "provider": (config.get("llm") or {}).get("provider") or "unknown",
             "message": str(exc),
+            "diagnostic": diagnostic,
         }
 
     provider = (config.get("llm") or {}).get("provider") or "mock"
@@ -126,6 +131,7 @@ def test_llm_connection(request: LLMConnectionTestRequest) -> dict:
         "real_llm": is_real_llm(config),
         "message": "LLM 连接成功。" if is_real_llm(config) else "Mock LLM 可用，仅适合本地开发验证。",
         "sample": text[:120],
+        "diagnostic": None,
     }
 
 
@@ -322,6 +328,15 @@ def get_question(question_id: str) -> dict:
 @app.post("/v1/resume/analyze")
 def resume_analyze(request: ResumeAnalyzeRequest) -> dict:
     return analyze_resume(request.text).as_dict()
+
+
+@app.post("/v1/resume/extract", response_model=ResumeExtractResponse)
+async def resume_extract(file: UploadFile = File(...)) -> dict:
+    content = await file.read()
+    try:
+        return extract_resume_text(file.filename or "resume", content)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
 
 
 @app.get("/v1/interviews")

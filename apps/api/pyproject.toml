@@ -12,7 +12,9 @@ dependencies = [
   "fastapi>=0.110",
   "uvicorn[standard]>=0.27",
   "pydantic>=2.0",
-  "PyYAML>=6.0"
+  "PyYAML>=6.0",
+  "python-multipart>=0.0.9",
+  "pypdf>=4.0"
 ]
 
 [project.optional-dependencies]

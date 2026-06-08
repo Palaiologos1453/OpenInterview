@@ -258,3 +258,83 @@ questions:
     source_path: "docs/distributed-system/distributed-lock-implementations.md"
     source_license: "Apache-2.0"
     source_usage: "adapted"
+
+  - id: db-mysql-log-redo-undo-binlog
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: mysql
+    type: fundamentals
+    tags: ["MySQL", "Redo Log", "Undo Log", "Binlog"]
+    prompt: "MySQL redo log、undo log 和 binlog 分别解决什么问题？两阶段提交为什么重要？"
+    followups:
+      - "redo log 为什么能提升崩溃恢复能力？"
+      - "undo log 和 MVCC 有什么关系？"
+      - "binlog 常用于哪些复制、审计或恢复场景？"
+    rubric:
+      - "能区分 redo 的崩溃恢复、undo 的回滚/MVCC、binlog 的逻辑复制。"
+      - "能说明 redo 和 binlog 两阶段提交保证主从复制与事务一致。"
+      - "能结合误删恢复、主从同步、长事务和日志膨胀说明工程影响。"
+    source: "JavaGuide"
+    source_path: "docs/database/mysql/mysql-logs.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: db-mysql-sharding-routing-hotspot
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: mysql
+    type: scenario
+    tags: ["MySQL", "Sharding", "Hotspot"]
+    prompt: "订单表数据量持续增长，你会如何设计分库分表？如何处理路由、扩容、热点和跨分片查询？"
+    followups:
+      - "按用户 ID、订单 ID、时间分片各有什么优缺点？"
+      - "分片后全局唯一 ID、分页和统计查询怎么做？"
+      - "后续扩容迁移如何降低业务影响？"
+    rubric:
+      - "能按查询模式选择分片键，而不是只按数据量拍脑袋。"
+      - "能说明路由、全局 ID、跨分片查询、事务和扩容迁移的成本。"
+      - "能提出冷热分离、归档、双写校验、灰度迁移等工程方案。"
+    source: "JavaGuide"
+    source_path: "docs/high-performance/read-and-write-separation-and-library-subtable.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cache-redis-cluster-consistency
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: redis
+    type: fundamentals
+    tags: ["Redis", "Cluster", "High Availability"]
+    prompt: "Redis 主从、哨兵和 Cluster 分别解决什么问题？发生故障转移时可能有哪些一致性风险？"
+    followups:
+      - "主从复制是同步还是异步？复制延迟会影响什么？"
+      - "哨兵如何判断主节点故障并完成切换？"
+      - "Cluster 的 hash slot 迁移和客户端路由需要注意什么？"
+    rubric:
+      - "能区分读扩展、高可用自动切换和分片扩容三类目标。"
+      - "能指出异步复制、脑裂、切换窗口和客户端重试风险。"
+      - "能结合监控、降级、幂等和数据校验说明兜底方案。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/redis-cluster.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cache-redis-bigkey-hotkey
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: redis
+    type: scenario
+    tags: ["Redis", "Big Key", "Hot Key"]
+    prompt: "Redis 出现 big key 或 hot key 会造成什么问题？你会如何发现、拆分和治理？"
+    followups:
+      - "big key 对网络、内存和事件循环有什么影响？"
+      - "hot key 为什么可能打满单分片或单实例？"
+      - "删除大 key 为什么要避免阻塞主线程？"
+    rubric:
+      - "能说明大 key、热 key 对延迟、内存、复制和集群倾斜的影响。"
+      - "能提出扫描分析、监控、拆 key、本地缓存、多副本和限流方案。"
+      - "能指出异步删除、渐进迁移和容量预估的工程细节。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/redis-common-blocking-problems-summary.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"

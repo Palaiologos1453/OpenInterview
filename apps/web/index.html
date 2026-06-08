@@ -27,8 +27,10 @@
             简历 / 项目经历
             <textarea id="resume" rows="7" placeholder="粘贴简历片段，系统会抽取技术栈、项目和风险点"></textarea>
           </label>
+          <label>导入简历文件<input id="resume-file" type="file" accept=".txt,.md,.pdf,.docx" /></label>
 
           <div class="inline-actions">
+            <button id="import-resume-button" class="secondary" type="button">导入文件</button>
             <button id="analyze-resume-button" class="secondary" type="button">分析简历</button>
             <button id="start-button" type="submit">开始面试</button>
           </div>
@@ -40,6 +42,18 @@
             </p>
             <div class="provider-grid">
               <h3>LLM</h3>
+              <label>Provider 模板
+                <select id="llm-template">
+                  <option value="">手动填写</option>
+                  <option value="openai">OpenAI</option>
+                  <option value="deepseek">DeepSeek</option>
+                  <option value="dashscope">阿里云百炼 DashScope</option>
+                  <option value="siliconflow">SiliconFlow</option>
+                  <option value="moonshot">Moonshot / Kimi</option>
+                  <option value="ollama">Ollama 本地</option>
+                  <option value="mock">Mock 演示</option>
+                </select>
+              </label>
               <label>Provider
                 <select id="llm-provider">
                   <option value="mock">Mock</option>

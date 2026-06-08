@@ -118,6 +118,13 @@ class ResumeAnalyzeRequest(BaseModel):
     text: str = Field(default="")
 
 
+class ResumeExtractResponse(BaseModel):
+    filename: str
+    type: str
+    text: str
+    chars: int
+
+
 class UserCreateRequest(BaseModel):
     display_name: str = Field(default="Local User", min_length=1, max_length=80)
 
