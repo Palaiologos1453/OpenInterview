@@ -160,7 +160,7 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 
 ## 本地语音增强
 
-本地语音不是核心路径。只有当你希望离线 ASR/TTS 时，才需要下载和配置模型。
+本地语音不是核心路径。只有当你希望离线 ASR/TTS 时，才需要下载和配置模型。普通用户优先使用页面里的“语音配置向导”：浏览器语音不需要填写任何模型；云端语音只填 URL、Model、Key；本地模型只填 VAD、SenseVoice、CosyVoice 模型目录和 CosyVoice runtime 路径。
 
 当前适配的本地模型路径：
 
@@ -182,13 +182,15 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 .\scripts\setup-voice.ps1 -DownloadModels
 ```
 
-模型路径可以通过 `configs/voice-models.local.yaml` 或环境变量覆盖；音色可以通过 `configs/voice-profiles.local.yaml` 自定义。详细步骤见 [Voice Setup](docs/voice-setup.md)。
+页面向导保存的本地模型路径会写入 `configs/voice-models.local.yaml`，也可以通过环境变量覆盖；音色可以通过 `configs/voice-profiles.local.yaml` 自定义。详细步骤见 [Voice Setup](docs/voice-setup.md)。
 
 ## API 摘要
 
 - `GET /health`
 - `GET /v1/catalog`
 - `GET /v1/readiness`
+- `GET /v1/voice/config`
+- `POST /v1/voice/config`
 - `POST /v1/providers/llm/test`
 - `GET /v1/questions`
 - `POST /v1/resume/analyze`

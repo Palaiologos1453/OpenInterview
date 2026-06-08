@@ -67,8 +67,36 @@
               <label>API Key<input id="llm-api-key" type="password" autocomplete="off" /></label>
               <label>Temperature<input id="llm-temperature" type="number" min="0" max="2" step="0.1" /></label>
 
-              <h3>ASR</h3>
-              <label>Provider
+              <h3>语音配置向导</h3>
+              <label>语音模式
+                <select id="voice-mode">
+                  <option value="browser">浏览器语音：不需要模型</option>
+                  <option value="api">云端 API：填写 URL / Key / Model</option>
+                  <option value="local">本地模型：填写模型目录</option>
+                  <option value="disabled">关闭语音</option>
+                </select>
+              </label>
+              <p id="voice-mode-help" class="voice-mode-help"></p>
+
+              <div id="local-voice-paths" class="voice-local-paths" hidden>
+                <label>Silero VAD ONNX 路径<input id="local-vad-model" type="text" placeholder="models/vad/silero-vad/silero_vad.onnx" /></label>
+                <label>SenseVoice 模型目录<input id="local-asr-model-dir" type="text" placeholder="models/asr/SenseVoiceSmall" /></label>
+                <label>CosyVoice 模型目录<input id="local-tts-model-dir" type="text" placeholder="models/tts/Fun-CosyVoice3-0.5B" /></label>
+                <label>CosyVoice runtime 路径<input id="local-cosyvoice-path" type="text" placeholder="D:\CosyVoice 或 third_party/CosyVoice" /></label>
+              </div>
+
+              <h3 class="voice-api-field" hidden>ASR API</h3>
+              <label class="voice-api-field" hidden>ASR API Base<input id="asr-api-base" type="text" placeholder="兼容 /v1/audio/transcriptions" /></label>
+              <label class="voice-api-field" hidden>ASR Model<input id="asr-model" type="text" placeholder="例如 gpt-4o-mini-transcribe" /></label>
+              <label class="voice-api-field" hidden>ASR API Key<input id="asr-api-key" type="password" autocomplete="off" /></label>
+
+              <h3 class="voice-api-field" hidden>TTS API</h3>
+              <label class="voice-api-field" hidden>TTS API Base<input id="tts-api-base" type="text" placeholder="兼容 /v1/audio/speech" /></label>
+              <label class="voice-api-field" hidden>TTS Model<input id="tts-model" type="text" placeholder="例如 gpt-4o-mini-tts" /></label>
+              <label class="voice-api-field" hidden>TTS Voice<input id="tts-voice" type="text" placeholder="例如 alloy" /></label>
+              <label class="voice-api-field" hidden>TTS API Key<input id="tts-api-key" type="password" autocomplete="off" /></label>
+
+              <label class="voice-provider-field" hidden>ASR Provider
                 <select id="asr-provider">
                   <option value="browser">Browser</option>
                   <option value="sensevoice">Local SenseVoice</option>
@@ -76,12 +104,7 @@
                   <option value="disabled">Disabled</option>
                 </select>
               </label>
-              <label>Model / Path<input id="asr-model" type="text" placeholder="浏览器语音可留空" /></label>
-              <label>API Base<input id="asr-api-base" type="text" placeholder="API ASR 时填写" /></label>
-              <label>API Key<input id="asr-api-key" type="password" autocomplete="off" /></label>
-
-              <h3>TTS</h3>
-              <label>Provider
+              <label class="voice-provider-field" hidden>TTS Provider
                 <select id="tts-provider">
                   <option value="browser">Browser</option>
                   <option value="cosyvoice">Local CosyVoice</option>
@@ -89,13 +112,10 @@
                   <option value="disabled">Disabled</option>
                 </select>
               </label>
-              <label>Model / Path<input id="tts-model" type="text" placeholder="浏览器播报可留空" /></label>
-              <label>API Base<input id="tts-api-base" type="text" placeholder="API TTS 时填写" /></label>
-              <label>Voice<input id="tts-voice" type="text" /></label>
-              <label>API Key<input id="tts-api-key" type="password" autocomplete="off" /></label>
 
               <div class="provider-actions">
                 <button id="save-provider-config" class="secondary" type="button">保存配置</button>
+                <button id="save-local-voice-config" class="secondary voice-local-button" type="button" hidden>保存本地语音路径</button>
                 <button id="test-llm-config" class="secondary" type="button">测试 LLM</button>
                 <button id="clear-provider-config" class="secondary" type="button">清空配置</button>
                 <button id="test-asr-config" class="secondary" type="button">测试 ASR</button>

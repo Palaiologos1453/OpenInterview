@@ -150,6 +150,18 @@ button.secondary:hover {
   font-size: 13px;
 }
 
+.voice-mode-help {
+  margin: -2px 0 2px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.voice-local-paths {
+  display: grid;
+  gap: 10px;
+}
+
 .provider-actions {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));

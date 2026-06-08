@@ -12,3 +12,4 @@ asr:
 tts:
   default:
     local_dir: models/tts/Fun-CosyVoice3-0.5B
+    runtime_path: D:/CosyVoice

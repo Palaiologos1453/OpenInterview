@@ -26,14 +26,9 @@ def ensure_portable_ffmpeg_on_path() -> Path | None:
 
 
 def cosyvoice_path() -> Path | None:
-    value = os.environ.get("OPENINTERVIEW_COSYVOICE_PATH")
-    if value:
-        return Path(value)
-    default = Path("D:/CosyVoice")
-    if default.exists():
-        return default
-    local = project_root() / "third_party" / "CosyVoice"
-    return local if local.exists() else None
+    from .services.voice_config import cosyvoice_runtime_path
+
+    return cosyvoice_runtime_path()
 
 
 def data_dir() -> Path:

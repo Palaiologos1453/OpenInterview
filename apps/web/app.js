@@ -110,10 +110,12 @@ const state = {
   pcmChannels: 1,
   currentAudio: null,
   recordedChunks: [],
+  voiceConfig: null,
   providerConfig: loadProviderConfig()
 };
 
 const $ = (selector) => document.querySelector(selector);
+const $$ = (selector) => Array.from(document.querySelectorAll(selector));
 const elements = {
   direction: $("#direction"),
   difficulty: $("#difficulty"),
@@ -129,6 +131,14 @@ const elements = {
   llmModel: $("#llm-model"),
   llmApiKey: $("#llm-api-key"),
   llmTemperature: $("#llm-temperature"),
+  voiceMode: $("#voice-mode"),
+  voiceModeHelp: $("#voice-mode-help"),
+  localVoicePaths: $("#local-voice-paths"),
+  localVadModel: $("#local-vad-model"),
+  localAsrModelDir: $("#local-asr-model-dir"),
+  localTtsModelDir: $("#local-tts-model-dir"),
+  localCosyvoicePath: $("#local-cosyvoice-path"),
+  voiceApiFields: $$(".voice-api-field"),
   asrProvider: $("#asr-provider"),
   asrApiBase: $("#asr-api-base"),
   asrModel: $("#asr-model"),
@@ -139,6 +149,7 @@ const elements = {
   ttsVoice: $("#tts-voice"),
   ttsApiKey: $("#tts-api-key"),
   saveProviderConfig: $("#save-provider-config"),
+  saveLocalVoiceConfig: $("#save-local-voice-config"),
   testLlmConfig: $("#test-llm-config"),
   testAsrConfig: $("#test-asr-config"),
   testTtsConfig: $("#test-tts-config"),
@@ -174,6 +185,7 @@ async function init() {
       await ensureLocalAuth();
     }
     state.catalog = await fetchJson(`${API_BASE}/v1/catalog`, { timeoutMs: 3000 });
+    state.voiceConfig = await fetchJson(`${API_BASE}/v1/voice/config`, { timeoutMs: 3000 });
     state.backendReady = true;
     setStatus(`已连接本地后端：${API_BASE}。填写兼容 OpenAI 的 URL、模型名和 Key 后即可开始文本面试；语音为可选能力。`);
   } catch (error) {
@@ -187,6 +199,7 @@ async function init() {
   fillSelect(elements.mode, state.catalog.modes);
   fillSelect(elements.interviewerStyle, state.catalog.interviewer_styles || fallbackCatalog.interviewer_styles);
   fillSelect(elements.voiceProfile, state.catalog.voice_profiles || [], "id", "name");
+  fillLocalVoiceForm(state.voiceConfig);
   fillProviderForm(state.providerConfig);
   wireEvents();
   renderSetupChecklist();
@@ -200,13 +213,24 @@ function wireEvents() {
   elements.coverageButton.addEventListener("click", safeHandler(loadQuestionCoverage));
   elements.reviewItemsButton.addEventListener("click", safeHandler(loadReviewItems));
   elements.listenButton.addEventListener("click", safeHandler(handleVoiceInput));
-  elements.saveProviderConfig.addEventListener("click", saveProviderConfig);
+  elements.saveProviderConfig.addEventListener("click", safeHandler(saveProviderConfig));
+  elements.saveLocalVoiceConfig.addEventListener("click", safeHandler(() => saveLocalVoiceConfig()));
   elements.testLlmConfig.addEventListener("click", safeHandler(testLlmConfig));
   elements.testAsrConfig.addEventListener("click", safeHandler(testAsrConfig));
   elements.testTtsConfig.addEventListener("click", safeHandler(testTtsConfig));
   elements.testVoiceConfig.addEventListener("click", safeHandler(testVoiceConfig));
   elements.clearProviderConfig.addEventListener("click", clearProviderConfig);
   elements.llmTemplate.addEventListener("change", applyLlmTemplate);
+  elements.voiceMode.addEventListener("change", () => {
+    applyVoiceMode(elements.voiceMode.value);
+    renderSetupChecklist();
+  });
+  [elements.localVadModel, elements.localAsrModelDir, elements.localTtsModelDir, elements.localCosyvoicePath].forEach((input) => {
+    input.addEventListener("input", () => {
+      if (elements.voiceMode.value === "local") syncLocalPathsToProviderFields();
+      renderSetupChecklist();
+    });
+  });
   elements.importResumeButton.addEventListener("click", safeHandler(importResumeFile));
   elements.analyzeResumeButton.addEventListener("click", safeHandler(analyzeResume));
   elements.historyButton.addEventListener("click", safeHandler(loadHistory));
@@ -590,6 +614,13 @@ function readConfig() {
 }
 
 function readProviderConfig() {
+  const voiceMode = elements.voiceMode?.value || detectVoiceMode({
+    asr: { provider: elements.asrProvider.value },
+    tts: { provider: elements.ttsProvider.value }
+  });
+  const localVoice = readLocalVoiceForm();
+  const asrModel = voiceMode === "local" ? localVoice.asr_model_dir : elements.asrModel.value.trim();
+  const ttsModel = voiceMode === "local" ? localVoice.tts_model_dir : elements.ttsModel.value.trim();
   return {
     llm: {
       provider: elements.llmProvider.value,
@@ -602,7 +633,7 @@ function readProviderConfig() {
     asr: {
       provider: elements.asrProvider.value,
       api_base: elements.asrApiBase.value.trim(),
-      model: elements.asrModel.value.trim(),
+      model: asrModel,
       api_key: elements.asrApiKey.value.trim(),
       language: "zh-CN",
       timeout_seconds: 60,
@@ -611,7 +642,7 @@ function readProviderConfig() {
     tts: {
       provider: elements.ttsProvider.value,
       api_base: elements.ttsApiBase.value.trim(),
-      model: elements.ttsModel.value.trim(),
+      model: ttsModel,
       api_key: elements.ttsApiKey.value.trim(),
       voice: elements.ttsVoice.value.trim(),
       response_format: elements.ttsProvider.value === "cosyvoice" ? "wav" : "mp3",
@@ -632,6 +663,13 @@ function validateProviderConfig(config) {
 async function refreshReadiness() {
   try {
     state.readiness = await fetchJson(`${API_BASE}/v1/readiness`, { timeoutMs: 5000 });
+    if (state.readiness?.voice_config) {
+      state.voiceConfig = {
+        ...(state.voiceConfig || {}),
+        ...state.readiness.voice_config
+      };
+      fillLocalVoiceForm(state.voiceConfig);
+    }
   } catch {
     state.readiness = null;
   }
@@ -664,12 +702,20 @@ async function testLlmConfig() {
 
 async function testAsrConfig() {
   ensureBackend();
+  if (elements.voiceMode.value === "local") {
+    syncLocalPathsToProviderFields();
+  }
   const config = readProviderConfig();
   if (config.asr.provider === "disabled") {
     throw new Error("ASR 已关闭。需要语音输入时请先选择 Browser、Local SenseVoice 或 API ASR。");
   }
   elements.testAsrConfig.disabled = true;
   try {
+    if (config.asr.provider === "sensevoice") {
+      const missing = localVoiceMissingFields(["asr_model_dir"]);
+      if (missing.length) throw new Error(`本地 ASR 配置缺少 ${missing.join("、")}。`);
+      await saveLocalVoiceConfig({ quiet: true });
+    }
     if (config.asr.provider === "browser") {
       assertBrowserAsrSupported();
       await assertMicrophoneAvailable();
@@ -696,12 +742,20 @@ async function testAsrConfig() {
 
 async function testTtsConfig() {
   ensureBackend();
+  if (elements.voiceMode.value === "local") {
+    syncLocalPathsToProviderFields();
+  }
   const config = readProviderConfig();
   if (config.tts.provider === "disabled") {
     throw new Error("TTS 已关闭。需要语音播报时请先选择 Browser、Local CosyVoice 或 API TTS。");
   }
   elements.testTtsConfig.disabled = true;
   try {
+    if (config.tts.provider === "cosyvoice") {
+      const missing = localVoiceMissingFields(["tts_model_dir", "cosyvoice_path"]);
+      if (missing.length) throw new Error(`本地 TTS 配置缺少 ${missing.join("、")}。`);
+      await saveLocalVoiceConfig({ quiet: true });
+    }
     if (config.tts.provider === "browser") {
       speakWithBrowser("OpenInterview 语音播报测试。");
       setStatus("浏览器 TTS 已触发。如果没有声音，请检查系统音量或浏览器自动播放权限。");
@@ -722,6 +776,11 @@ async function testVoiceConfig() {
   elements.testVoiceConfig.disabled = true;
   setStatus("正在执行语音自检。");
   try {
+    if (elements.voiceMode.value === "local") {
+      const missing = localVoiceMissingFields(["vad_model", "asr_model_dir", "tts_model_dir", "cosyvoice_path"]);
+      if (missing.length) throw new Error(`本地语音配置缺少 ${missing.join("、")}。`);
+      await saveLocalVoiceConfig({ quiet: true });
+    }
     const config = readProviderConfig();
     const browserAsr = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
     const browserTts = Boolean(window.speechSynthesis);
@@ -737,6 +796,17 @@ async function testVoiceConfig() {
     elements.testVoiceConfig.disabled = false;
     renderSetupChecklist();
   }
+}
+
+function localVoiceMissingFields(required) {
+  const config = readLocalVoiceForm();
+  const labels = {
+    vad_model: "VAD ONNX 路径",
+    asr_model_dir: "SenseVoice 模型目录",
+    tts_model_dir: "CosyVoice 模型目录",
+    cosyvoice_path: "CosyVoice runtime 路径"
+  };
+  return required.filter((key) => !config[key]).map((key) => labels[key] || key);
 }
 
 function providerMissingFields(settings) {
@@ -803,6 +873,106 @@ function applyLlmTemplate() {
   setStatus(`已应用 LLM 模板：${template.note}`);
 }
 
+function detectVoiceMode(config = readProviderConfig()) {
+  const asrProvider = config.asr.provider;
+  const ttsProvider = config.tts.provider;
+  if (asrProvider === "disabled" && ttsProvider === "disabled") return "disabled";
+  if (asrProvider === "sensevoice" || ttsProvider === "cosyvoice") return "local";
+  if (asrProvider === "openai_compatible" || ttsProvider === "openai_compatible") return "api";
+  return "browser";
+}
+
+function applyVoiceMode(mode, options = {}) {
+  const nextMode = mode || "browser";
+  elements.voiceMode.value = nextMode;
+  if (nextMode === "browser") {
+    elements.asrProvider.value = "browser";
+    elements.ttsProvider.value = "browser";
+  } else if (nextMode === "api") {
+    elements.asrProvider.value = "openai_compatible";
+    elements.ttsProvider.value = "openai_compatible";
+  } else if (nextMode === "local") {
+    elements.asrProvider.value = "sensevoice";
+    elements.ttsProvider.value = "cosyvoice";
+    syncLocalPathsToProviderFields();
+  } else {
+    elements.asrProvider.value = "disabled";
+    elements.ttsProvider.value = "disabled";
+  }
+  updateVoiceModeUi();
+  if (!options.silent) {
+    setStatus(voiceModeStatus(nextMode));
+  }
+}
+
+function updateVoiceModeUi() {
+  const mode = elements.voiceMode.value || "browser";
+  const showApi = mode === "api";
+  const showLocal = mode === "local";
+  elements.voiceApiFields.forEach((node) => {
+    node.hidden = !showApi;
+  });
+  elements.localVoicePaths.hidden = !showLocal;
+  elements.saveLocalVoiceConfig.hidden = !showLocal;
+  elements.voiceModeHelp.textContent = voiceModeHelpText(mode);
+}
+
+function voiceModeHelpText(mode) {
+  if (mode === "api") return "语音 API 的 Key 只保存在当前浏览器，不写入后端配置文件。";
+  if (mode === "local") return "本地路径会写入 configs/voice-models.local.yaml，文件已被 git 忽略。";
+  if (mode === "disabled") return "关闭后仍可正常使用文本面试。";
+  return "最快跑通方式：浏览器负责麦克风识别和播报，不需要下载语音模型。";
+}
+
+function voiceModeStatus(mode) {
+  if (mode === "api") return "已切到云端语音 API。请填写 ASR/TTS 的 URL、模型名和 Key，然后分别测试。";
+  if (mode === "local") return "已切到本地语音模型。填写模型目录后保存本地路径，再执行语音自检。";
+  if (mode === "disabled") return "语音已关闭，文本面试不受影响。";
+  return "已切到浏览器语音。通常无需额外配置，只需允许麦克风权限。";
+}
+
+function fillLocalVoiceForm(config) {
+  if (!config) return;
+  elements.localVadModel.value = config.vad_model || "";
+  elements.localAsrModelDir.value = config.asr_model_dir || "";
+  elements.localTtsModelDir.value = config.tts_model_dir || "";
+  elements.localCosyvoicePath.value = config.cosyvoice_path || "";
+  if (elements.voiceMode.value === "local") syncLocalPathsToProviderFields();
+}
+
+function readLocalVoiceForm() {
+  return {
+    vad_model: elements.localVadModel.value.trim(),
+    asr_model_dir: elements.localAsrModelDir.value.trim(),
+    tts_model_dir: elements.localTtsModelDir.value.trim(),
+    cosyvoice_path: elements.localCosyvoicePath.value.trim()
+  };
+}
+
+function syncLocalPathsToProviderFields() {
+  const local = readLocalVoiceForm();
+  elements.asrModel.value = local.asr_model_dir;
+  elements.ttsModel.value = local.tts_model_dir;
+}
+
+async function saveLocalVoiceConfig({ quiet = false } = {}) {
+  ensureBackend();
+  const config = readLocalVoiceForm();
+  elements.saveLocalVoiceConfig.disabled = true;
+  try {
+    state.voiceConfig = await postJson(`${API_BASE}/v1/voice/config`, config);
+    fillLocalVoiceForm(state.voiceConfig);
+    syncLocalPathsToProviderFields();
+    await refreshReadiness();
+    if (!quiet) {
+      setStatus(`本地语音路径已保存：${state.voiceConfig.editable_models_config || "local config"}。`);
+    }
+  } finally {
+    elements.saveLocalVoiceConfig.disabled = false;
+    renderSetupChecklist();
+  }
+}
+
 function llmMissingFields(llm) {
   if (llm.provider === "mock") return [];
   if (llm.provider === "ollama") return llm.model ? [] : ["Model"];
@@ -832,6 +1002,9 @@ function renderSetupChecklist() {
     ttsChecklistItem(config.tts),
     resumeChecklistItem()
   ];
+  if (elements.voiceMode.value === "local") {
+    items.splice(4, 0, localVoiceChecklistItem());
+  }
   elements.setupChecklist.innerHTML = `
     <div class="checklist-title">首次使用检查</div>
     <div class="checklist-items">
@@ -882,10 +1055,11 @@ function asrChecklistItem(asr) {
   if (asr.provider === "sensevoice") {
     const checks = state.readiness?.checks || {};
     const ok = Boolean(checks.ffmpeg?.ok && checks.asr_model?.ok && checks.funasr?.ok);
+    const modelPath = state.readiness?.voice_config?.asr_model_dir || asr.model || "未填写";
     return {
       label: "语音输入",
       status: ok ? "ok" : "warn",
-      detail: ok ? "Local SenseVoice 依赖已就绪" : "Local SenseVoice 依赖未完全确认"
+      detail: ok ? `Local SenseVoice 已就绪：${modelPath}` : `Local SenseVoice 未就绪：${modelPath}`
     };
   }
   const ready = Boolean(asr.api_base && asr.model && asr.api_key);
@@ -908,10 +1082,11 @@ function ttsChecklistItem(tts) {
     };
   }
   if (tts.provider === "cosyvoice") {
+    const modelPath = state.readiness?.voice_config?.tts_model_dir || tts.model || "未填写";
     return {
       label: "语音播报",
       status: state.readiness?.ready_for_local_voice ? "ok" : "warn",
-      detail: state.readiness?.ready_for_local_voice ? "Local CosyVoice 依赖已就绪" : "Local CosyVoice 依赖未完全确认"
+      detail: state.readiness?.ready_for_local_voice ? `Local CosyVoice 已就绪：${modelPath}` : `Local CosyVoice 未就绪：${modelPath}`
     };
   }
   const ready = Boolean(tts.api_base && tts.model && tts.api_key);
@@ -919,6 +1094,23 @@ function ttsChecklistItem(tts) {
     label: "语音播报",
     status: ready ? "ok" : "warn",
     detail: ready ? "API TTS 已配置" : "API TTS 缺少 URL、模型名或 Key"
+  };
+}
+
+function localVoiceChecklistItem() {
+  const missing = localVoiceMissingFields(["vad_model", "asr_model_dir", "tts_model_dir", "cosyvoice_path"]);
+  if (missing.length) {
+    return {
+      label: "本地语音路径",
+      status: "warn",
+      detail: `缺少 ${missing.join("、")}`
+    };
+  }
+  const configPath = state.readiness?.voice_config?.editable_models_config || state.voiceConfig?.editable_models_config || "configs/voice-models.local.yaml";
+  return {
+    label: "本地语音路径",
+    status: "ok",
+    detail: `将保存到 ${configPath}`
   };
 }
 
@@ -942,6 +1134,11 @@ function providerInputs() {
     elements.llmModel,
     elements.llmApiKey,
     elements.llmTemperature,
+    elements.voiceMode,
+    elements.localVadModel,
+    elements.localAsrModelDir,
+    elements.localTtsModelDir,
+    elements.localCosyvoicePath,
     elements.asrProvider,
     elements.asrApiBase,
     elements.asrModel,
@@ -971,6 +1168,7 @@ function fillProviderForm(config) {
   elements.ttsVoice.value = config.tts.voice || "";
   elements.ttsApiKey.value = config.tts.api_key || "";
   if (config.tts.voice_profile_id) elements.voiceProfile.value = config.tts.voice_profile_id;
+  applyVoiceMode(detectVoiceMode(config), { silent: true });
   renderSetupChecklist();
 }
 
@@ -987,17 +1185,23 @@ function loadProviderConfig() {
   }
 }
 
-function saveProviderConfig() {
+async function saveProviderConfig() {
+  if (elements.voiceMode.value === "local") {
+    syncLocalPathsToProviderFields();
+    await saveLocalVoiceConfig({ quiet: true });
+  }
   state.providerConfig = readProviderConfig();
   localStorage.setItem(PROVIDER_CONFIG_KEY, JSON.stringify(state.providerConfig));
   renderSetupChecklist();
-  setStatus("模型配置已保存到本机浏览器。这个项目默认仅本地个人使用，请不要把页面暴露到公网。");
+  const localNote = elements.voiceMode.value === "local" ? "本地语音路径已写入本机 YAML。" : "";
+  setStatus(`模型配置已保存到本机浏览器。${localNote}这个项目默认仅本地个人使用，请不要把页面暴露到公网。`);
 }
 
 function clearProviderConfig() {
   state.providerConfig = structuredClone(defaultProviderConfig);
   localStorage.removeItem(PROVIDER_CONFIG_KEY);
   fillProviderForm(state.providerConfig);
+  applyVoiceMode("browser", { silent: true });
   renderSetupChecklist();
   setStatus("模型配置已清空。填写 LLM 的 API Base、Model 和 API Key 后即可开始。");
 }

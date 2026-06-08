@@ -12,7 +12,12 @@ from fastapi.testclient import TestClient
 from openinterview_api.main import app
 from openinterview_api.schemas import ProviderSettings
 from openinterview_api.settings import project_root
-from openinterview_api.services.voice_config import asr_model_dir, tts_model_dir, vad_model_path
+from openinterview_api.services.voice_config import (
+    asr_model_dir,
+    cosyvoice_runtime_path,
+    tts_model_dir,
+    vad_model_path,
+)
 from openinterview_api.storage import Storage
 from openinterview_api.voice.voice_profiles import load_voice_profiles
 
@@ -280,6 +285,57 @@ tts:
                 self.assertEqual(vad_model_path(), project_root() / "vad" / "local.onnx")
                 self.assertEqual(asr_model_dir(), project_root() / "asr" / "local")
                 self.assertEqual(tts_model_dir(), project_root() / "tts" / "local")
+        finally:
+            for key, value in previous.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
+
+    def test_voice_config_api_reads_and_writes_local_paths(self):
+        previous = {
+            key: os.environ.get(key)
+            for key in [
+                "OPENINTERVIEW_VOICE_MODELS_CONFIG",
+                "OPENINTERVIEW_VAD_MODEL",
+                "OPENINTERVIEW_ASR_MODEL_DIR",
+                "OPENINTERVIEW_TTS_MODEL_DIR",
+                "OPENINTERVIEW_COSYVOICE_PATH",
+            ]
+        }
+        try:
+            with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+                config_path = Path(temp_dir) / "voice-models.local.yaml"
+                os.environ["OPENINTERVIEW_VOICE_MODELS_CONFIG"] = str(config_path)
+                os.environ.pop("OPENINTERVIEW_VAD_MODEL", None)
+                os.environ.pop("OPENINTERVIEW_ASR_MODEL_DIR", None)
+                os.environ.pop("OPENINTERVIEW_TTS_MODEL_DIR", None)
+                os.environ.pop("OPENINTERVIEW_COSYVOICE_PATH", None)
+
+                saved = client.post(
+                    "/v1/voice/config",
+                    json={
+                        "vad_model": "D:/voice/vad.onnx",
+                        "asr_model_dir": "D:/voice/asr",
+                        "tts_model_dir": "D:/voice/tts",
+                        "cosyvoice_path": "D:/voice/CosyVoice",
+                    },
+                )
+                self.assertEqual(saved.status_code, 200)
+                payload = saved.json()
+                self.assertEqual(payload["vad_model"].replace("\\", "/"), "D:/voice/vad.onnx")
+                self.assertEqual(payload["asr_model_dir"].replace("\\", "/"), "D:/voice/asr")
+                self.assertEqual(payload["tts_model_dir"].replace("\\", "/"), "D:/voice/tts")
+                self.assertEqual(payload["cosyvoice_path"].replace("\\", "/"), "D:/voice/CosyVoice")
+                self.assertTrue(config_path.exists())
+
+                loaded = client.get("/v1/voice/config")
+                self.assertEqual(loaded.status_code, 200)
+                self.assertEqual(loaded.json()["editable_models_config"], str(config_path))
+                self.assertEqual(str(vad_model_path()).replace("\\", "/"), "D:/voice/vad.onnx")
+                self.assertEqual(str(asr_model_dir()).replace("\\", "/"), "D:/voice/asr")
+                self.assertEqual(str(tts_model_dir()).replace("\\", "/"), "D:/voice/tts")
+                self.assertEqual(str(cosyvoice_runtime_path()).replace("\\", "/"), "D:/voice/CosyVoice")
         finally:
             for key, value in previous.items():
                 if value is None:

@@ -24,6 +24,7 @@ from .services.review import report_to_markdown, review_items_from_report
 from .services.resume import analyze_resume
 from .services.resume_file import extract_resume_text
 from .services.realtime import RealtimeRegistry
+from .services.voice_config import save_voice_model_config, voice_config_response
 from .storage import Storage
 from .settings import cors_origins, production_mode, require_auth
 from .tracing import Trace
@@ -43,6 +44,7 @@ from .schemas import (
     TurnResponse,
     UserCreateRequest,
     VADRequest,
+    VoiceModelConfigRequest,
     RealtimeCreateRequest,
     RealtimeEventRequest,
     RealtimeAudioTurnRequest,
@@ -90,6 +92,22 @@ def readiness() -> dict:
 @app.get("/v1/readiness/smoke")
 def readiness_smoke(include_voice: bool = False, voice_check: str | None = None) -> dict:
     return readiness_smoke_report(include_voice=include_voice, voice_check=voice_check)
+
+
+@app.get("/v1/voice/config")
+def get_voice_config() -> dict:
+    return voice_config_response()
+
+
+@app.post("/v1/voice/config")
+def save_voice_config(request: VoiceModelConfigRequest) -> dict:
+    save_voice_model_config(
+        vad_model=request.vad_model,
+        asr_model_dir_value=request.asr_model_dir,
+        tts_model_dir_value=request.tts_model_dir,
+        cosyvoice_path_value=request.cosyvoice_path,
+    )
+    return voice_config_response()
 
 
 @app.get("/v1/catalog")

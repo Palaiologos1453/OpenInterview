@@ -116,6 +116,13 @@ class VADRequest(BaseModel):
     threshold: float = Field(default=0.5, ge=0.1, le=0.95)
 
 
+class VoiceModelConfigRequest(BaseModel):
+    vad_model: str | None = None
+    asr_model_dir: str | None = None
+    tts_model_dir: str | None = None
+    cosyvoice_path: str | None = None
+
+
 class ResumeAnalyzeRequest(BaseModel):
     text: str = Field(default="")
 
