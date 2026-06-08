@@ -1,6 +1,6 @@
 questions:
   - id: backend-index-btree
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: database
     type: fundamentals
@@ -26,4 +26,3 @@ questions:
       - "能说明缓存穿透、击穿、雪崩和脏数据。"
       - "能讨论删除缓存、更新数据库、消息队列、重试。"
       - "能结合业务一致性要求做取舍。"
-

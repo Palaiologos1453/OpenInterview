@@ -1,6 +1,6 @@
 questions:
   - id: mysql-log-binlog-redo-undo
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: mysql
     type: fundamentals
@@ -20,7 +20,7 @@ questions:
     source_usage: "adapted"
 
   - id: mysql-auto-increment-primary-key
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: mysql
     type: fundamentals
@@ -40,7 +40,7 @@ questions:
     source_usage: "adapted"
 
   - id: mysql-sql-execution-flow
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: mysql
     type: fundamentals
@@ -60,7 +60,7 @@ questions:
     source_usage: "adapted"
 
   - id: mysql-time-storage-design
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: mysql
     type: scenario
@@ -80,7 +80,7 @@ questions:
     source_usage: "adapted"
 
   - id: sql-window-function-ranking
-    directions: ["data_engineering", "backend"]
+    directions: ["backend"]
     difficulty: campus
     topic: sql
     type: fundamentals
@@ -100,7 +100,7 @@ questions:
     source_usage: "adapted"
 
   - id: redis-cluster-slot-migration
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: redis
     type: scenario
@@ -120,7 +120,7 @@ questions:
     source_usage: "adapted"
 
   - id: redis-hot-key-big-key
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: redis
     type: scenario
@@ -160,7 +160,7 @@ questions:
     source_usage: "adapted"
 
   - id: redis-memory-fragmentation
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: redis
     type: scenario
@@ -180,7 +180,7 @@ questions:
     source_usage: "adapted"
 
   - id: es-inverted-index-query
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: elasticsearch
     type: fundamentals
@@ -200,7 +200,7 @@ questions:
     source_usage: "adapted"
 
   - id: es-deep-pagination-consistency
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: elasticsearch
     type: scenario
@@ -220,7 +220,7 @@ questions:
     source_usage: "adapted"
 
   - id: mongodb-document-model-index
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: mongodb
     type: scenario
@@ -240,7 +240,7 @@ questions:
     source_usage: "adapted"
 
   - id: mq-kafka-partition-rebalance
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: message-queue
     type: scenario
@@ -260,7 +260,7 @@ questions:
     source_usage: "adapted"
 
   - id: mq-kafka-zero-copy-sequential-write
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: message-queue
     type: fundamentals
@@ -320,7 +320,7 @@ questions:
     source_usage: "adapted"
 
   - id: dist-zookeeper-watch-election
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: distributed-system
     type: fundamentals
@@ -340,7 +340,7 @@ questions:
     source_usage: "adapted"
 
   - id: dist-config-center-dynamic-refresh
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: campus
     topic: distributed-system
     type: scenario
@@ -380,7 +380,7 @@ questions:
     source_usage: "adapted"
 
   - id: gateway-auth-rate-limit-observability
-    directions: ["backend", "sre", "security"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: distributed-system
     type: scenario
@@ -400,7 +400,7 @@ questions:
     source_usage: "adapted"
 
   - id: network-dns-cache-troubleshooting
-    directions: ["backend", "frontend", "sre"]
+    directions: ["backend"]
     difficulty: campus
     topic: computer-network
     type: scenario
@@ -420,7 +420,7 @@ questions:
     source_usage: "adapted"
 
   - id: network-nat-port-exhaustion
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: computer-network
     type: scenario
@@ -440,7 +440,7 @@ questions:
     source_usage: "adapted"
 
   - id: network-http-status-design
-    directions: ["backend", "frontend", "test_dev"]
+    directions: ["backend"]
     difficulty: campus
     topic: computer-network
     type: scenario
@@ -460,7 +460,7 @@ questions:
     source_usage: "adapted"
 
   - id: security-jwt-session-sso
-    directions: ["backend", "security"]
+    directions: ["backend"]
     difficulty: campus
     topic: security
     type: scenario
@@ -480,7 +480,7 @@ questions:
     source_usage: "adapted"
 
   - id: security-password-reset-design
-    directions: ["backend", "security"]
+    directions: ["backend"]
     difficulty: campus
     topic: security
     type: scenario
@@ -500,7 +500,7 @@ questions:
     source_usage: "adapted"
 
   - id: security-data-desensitization
-    directions: ["backend", "security", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: security
     type: scenario

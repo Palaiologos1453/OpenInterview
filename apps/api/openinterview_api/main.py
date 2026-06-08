@@ -654,6 +654,7 @@ def _restore_session(session_id: str) -> InterviewSession | None:
     config = record["config"]
     if config.get("direction_id") != "backend":
         config["direction_id"] = "backend"
+    config.setdefault("interviewer_style_id", "small_company_basic")
     provider_config = config.get("provider_config")
     redacted_provider_config = False
     if isinstance(provider_config, dict):

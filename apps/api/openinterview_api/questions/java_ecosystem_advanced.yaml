@@ -260,7 +260,7 @@ questions:
     source_usage: "adapted"
 
   - id: java-io-model-bio-nio-aio
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: campus
     topic: java-io
     type: fundamentals
@@ -320,7 +320,7 @@ questions:
     source_usage: "adapted"
 
   - id: jvm-memory-leak-troubleshooting
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: jvm
     type: scenario
@@ -380,7 +380,7 @@ questions:
     source_usage: "adapted"
 
   - id: jvm-parameters-heap-metaspace-direct
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: campus
     topic: jvm
     type: scenario
@@ -396,46 +396,6 @@ questions:
       - "能保留 GC 日志、OOM dump 和监控指标，便于故障复盘。"
     source: "JavaGuide"
     source_path: "docs/java/jvm/jvm-parameters-intro.md"
-    source_license: "Apache-2.0"
-    source_usage: "adapted"
-
-  - id: springboot-auto-configuration
-    directions: ["backend"]
-    difficulty: campus
-    topic: spring
-    type: fundamentals
-    tags: ["Spring Boot", "Auto Configuration"]
-    prompt: "Spring Boot 自动装配的核心流程是什么？为什么引入 starter 后少量配置就能启用组件能力？"
-    followups:
-      - "@SpringBootApplication 包含哪些关键注解？"
-      - "自动配置类如何按需生效？"
-      - "Spring Boot 2 和 3 在自动配置加载文件上有什么差异？"
-    rubric:
-      - "能说明 @EnableAutoConfiguration 和 AutoConfigurationImportSelector 的作用。"
-      - "能讲清 starter、自动配置类、条件注解和配置属性的关系。"
-      - "能指出自动装配不是无条件加载，需要类路径、Bean、属性等条件满足。"
-    source: "JavaGuide"
-    source_path: "docs/system-design/framework/spring/spring-boot-auto-assembly-principles.md"
-    source_license: "Apache-2.0"
-    source_usage: "adapted"
-
-  - id: spring-bean-lifecycle-circular-dependency
-    directions: ["backend"]
-    difficulty: bigtech
-    topic: spring
-    type: fundamentals
-    tags: ["Spring", "Bean", "Circular Dependency"]
-    prompt: "Spring Bean 生命周期有哪些关键阶段？单例 Bean 的循环依赖为什么有时能解决，有时又不能？"
-    followups:
-      - "实例化、属性填充、初始化和销毁分别对应哪些扩展点？"
-      - "三级缓存大致解决什么问题？"
-      - "构造器注入循环依赖为什么更难处理？"
-    rubric:
-      - "能说明 Bean 创建、依赖注入、Aware、BeanPostProcessor、初始化和销毁流程。"
-      - "能解释单例属性注入循环依赖与提前暴露引用的关系。"
-      - "能指出构造器循环、原型 Bean、代理对象等场景的边界。"
-    source: "JavaGuide"
-    source_path: "docs/system-design/framework/spring/spring-knowledge-and-questions-summary.md"
     source_license: "Apache-2.0"
     source_usage: "adapted"
 
@@ -460,7 +420,7 @@ questions:
     source_usage: "adapted"
 
   - id: mybatis-n-plus-one-cache
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: mybatis
     type: scenario
@@ -496,5 +456,25 @@ questions:
       - "能考虑水位线、限流、超时、连接关闭和监控告警。"
     source: "JavaGuide"
     source_path: "docs/system-design/framework/netty.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: java-threadpool-isolation-monitoring
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: java-concurrency
+    type: scenario
+    tags: ["Java", "ThreadPool", "Isolation", "Monitoring"]
+    prompt: "一个接口同时提交父任务和子任务到同一个线程池，线上偶发卡死，你会如何从线程池隔离、队列和监控角度排查？"
+    followups:
+      - "为什么不同业务或父子任务不建议共用同一个线程池？"
+      - "线程池需要监控哪些指标，才能提前发现队列堆积？"
+      - "拒绝策略应该如何和降级、告警、调用方返回配合？"
+    rubric:
+      - "能说明线程池共用可能导致资源互相抢占、父子任务等待和线程饥饿。"
+      - "能提出按业务类型、下游依赖和任务耗时做线程池隔离。"
+      - "能覆盖活跃线程数、队列长度、拒绝次数、任务耗时和线程命名等监控点。"
+    source: "JavaGuide"
+    source_path: "docs/java/concurrent/java-thread-pool-best-practices.md"
     source_license: "Apache-2.0"
     source_usage: "adapted"

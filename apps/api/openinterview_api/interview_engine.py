@@ -5,7 +5,7 @@ from statistics import mean
 from uuid import uuid4
 
 from .adapters.llm import build_llm_adapter, is_real_llm, llm_temperature
-from .catalog import RUBRIC, find_difficulty, find_direction, find_mode
+from .catalog import RUBRIC, find_difficulty, find_direction, find_interviewer_style, find_mode
 from .services.question_bank import default_question_bank
 from .services.resume import analyze_resume
 
@@ -59,6 +59,7 @@ class InterviewConfig:
     direction_id: str
     difficulty_id: str
     mode_id: str = "comprehensive"
+    interviewer_style_id: str = "small_company_basic"
     candidate_name: str | None = None
     resume_text: str | None = None
     duration_minutes: int = 30
@@ -98,6 +99,10 @@ class InterviewSession:
     def mode(self) -> dict:
         return find_mode(self.config.mode_id)
 
+    @property
+    def interviewer_style(self) -> dict:
+        return find_interviewer_style(self.config.interviewer_style_id)
+
 
 class CampusInterviewEngine:
     """Deterministic MVP engine.
@@ -110,6 +115,7 @@ class CampusInterviewEngine:
         find_direction(config.direction_id)
         find_difficulty(config.difficulty_id)
         find_mode(config.mode_id)
+        find_interviewer_style(config.interviewer_style_id)
         self._validate_provider_config(config)
 
         session = InterviewSession(config=config)
@@ -179,6 +185,7 @@ class CampusInterviewEngine:
             "session_id": session.session_id,
             "direction": session.direction["name"],
             "difficulty": session.difficulty["name"],
+            "interviewer_style": session.interviewer_style["name"],
             "overall_score": average_score,
             "ai_summary": self._ai_report_summary(session, average_score)
             or self._local_report_summary(session, average_score),
@@ -210,7 +217,8 @@ class CampusInterviewEngine:
         name = session.config.candidate_name or "同学"
         return (
             f"{name}，你好。接下来是 {session.direction['name']} 方向的"
-            f"{session.difficulty['name']}模拟面试。回答时请尽量按背景、方案、取舍、结果来组织。"
+            f"{session.difficulty['name']}模拟面试，面试官风格是“{session.interviewer_style['name']}”。"
+            "回答时请尽量按背景、方案、取舍、结果来组织。"
         )
 
     def _select_question(self, session: InterviewSession, step: int) -> str:
@@ -332,7 +340,7 @@ class CampusInterviewEngine:
         if not candidates:
             return None
 
-        candidates = self._rank_bank_questions(candidates, session)
+        candidates = self._rank_bank_questions(candidates, session, phase)
         phase_offset = self._phase_offset(session, phase, step)
         question = candidates[phase_offset % len(candidates)]
         session.current_question_meta = self._question_meta(question, phase)
@@ -352,16 +360,29 @@ class CampusInterviewEngine:
             "rubric": list(question.get("rubric") or []),
         }
 
-    def _rank_bank_questions(self, questions: list[dict], session: InterviewSession) -> list[dict]:
+    def _rank_bank_questions(self, questions: list[dict], session: InterviewSession, phase: str) -> list[dict]:
         target = self._difficulty_rank(session.config.difficulty_id)
+        style_topics = self._style_topic_priority(session, phase)
 
-        def score(item: dict) -> tuple[int, str]:
+        def score(item: dict) -> tuple[int, int, str]:
             item_rank = self._difficulty_rank(str(item.get("difficulty") or "campus"))
             distance = abs(item_rank - target)
             too_hard_penalty = 1 if item_rank > target else 0
-            return distance + too_hard_penalty, str(item.get("id") or "")
+            topic = str(item.get("topic") or "")
+            style_bonus = 0 if topic in style_topics else 1
+            return distance + too_hard_penalty, style_bonus, str(item.get("id") or "")
 
         return sorted(questions, key=score)
+
+    def _style_topic_priority(self, session: InterviewSession, phase: str) -> list[str]:
+        style = session.config.interviewer_style_id
+        if style == "fundamental_chain":
+            return ["java-basis", "java-collection", "java-concurrency", "jvm", "mysql", "redis", "spring"]
+        if style == "resume_truth_probe":
+            return ["spring", "mysql", "redis", "message-queue", "distributed-system"]
+        if style == "system_design" or phase == "system_design":
+            return ["system-design", "distributed-system", "high-availability", "high-performance", "message-queue"]
+        return ["java-basis", "mysql", "redis", "spring", "java-concurrency"]
 
     def _difficulty_rank(self, difficulty_id: str) -> int:
         ranks = {
@@ -406,6 +427,8 @@ class CampusInterviewEngine:
             for item in previous_meta.get("followups", [])
             if str(item).strip()
         ]
+        followups = self._style_followups(session, previous_meta) + followups
+        followups = list(dict.fromkeys(followups))
         gaps = self._rubric_coverage(previous.answer, previous_meta)[1]
         if not followups or (previous.score >= 72 and not gaps):
             return None
@@ -484,8 +507,32 @@ class CampusInterviewEngine:
             f"如果面试官质疑{focus[2]}或{focus[3]}，你会怎么解释边界条件和风险兜底？",
             "项目中有没有线上故障、压测瓶颈或需求变更？你当时怎么定位、恢复和复盘？",
         ]
-        followups = list(dict.fromkeys(targeted + followups))
+        followups = list(dict.fromkeys(self._style_followups(session, {"phase": "project"}) + targeted + followups))
         return followups[step % len(followups):] + followups[:step % len(followups)]
+
+    def _style_followups(self, session: InterviewSession, question_meta: dict) -> list[str]:
+        style = session.config.interviewer_style_id
+        phase = question_meta.get("phase")
+        topic = question_meta.get("topic") or "这个点"
+        if style == "fundamental_chain":
+            return [
+                f"先别举项目，继续把 {topic} 的底层原理、边界条件和常见误区讲清楚。",
+                "如果换一个相近概念，你怎么区分？请给出反例。",
+            ]
+        if style == "resume_truth_probe":
+            return [
+                "这部分是你本人做的吗？请拆成设计、编码、联调、上线和复盘动作。",
+                "指标从哪里来？统计口径、基线、上线后对比和归因方式分别是什么？",
+                "当时有没有故障或负反馈？请说根因、恢复动作和长期改进。",
+            ]
+        if style == "system_design":
+            return [
+                "先补充约束：用户规模、读写比例、延迟目标、一致性和可用性要求是什么？",
+                "如果流量扩大 10 倍，瓶颈会在哪里？你怎么验证？",
+            ]
+        if phase == "project":
+            return ["按真实一面节奏，补充你自己的职责边界和最终结果。"]
+        return []
 
     def _resume_analysis(self, session: InterviewSession) -> dict:
         resume = (session.config.resume_text or "").strip()
@@ -553,7 +600,8 @@ class CampusInterviewEngine:
             return self._closing_feedback(answer), self._score_closing(answer)
 
         rubric_hits, rubric_gaps = self._rubric_coverage(answer, session.current_question_meta)
-        score = self._score_answer(answer, session.difficulty["pressure"], rubric_hits)
+        pressure = session.difficulty["pressure"] + int(session.interviewer_style.get("pressure_bias") or 0)
+        score = self._score_answer(answer, pressure, rubric_hits)
         positive = "你的回答已经覆盖了一部分关键信息。"
         if len(answer) >= 120:
             positive = "你的回答信息量比较足，适合继续做细节追问。"
@@ -564,8 +612,20 @@ class CampusInterviewEngine:
 
         gap = self._gap_hint(answer, session, rubric_gaps)
         fallback = f"{positive}{gap}"
+        fallback = self._style_feedback_prefix(session, answer) + fallback
         generated = self._ai_feedback(session, answer, score, fallback)
         return generated or fallback, score
+
+    def _style_feedback_prefix(self, session: InterviewSession, answer: str) -> str:
+        del answer
+        style = session.config.interviewer_style_id
+        if style == "fundamental_chain":
+            return "按八股连环追问标准看，"
+        if style == "resume_truth_probe":
+            return "按项目真实性拷打标准看，"
+        if style == "system_design":
+            return "按系统设计面试标准看，"
+        return ""
 
     def _score_answer(self, answer: str, pressure: int, rubric_hits: list[str] | None = None) -> float:
         length_score = min(len(answer) / 160 * 45, 45)
@@ -1219,10 +1279,13 @@ class CampusInterviewEngine:
                     f"方向知识点：{', '.join(session.direction['topics'])}。\n"
                     f"难度：{session.difficulty['name']}，要求：{session.difficulty['expectation']}。\n"
                     f"模式：{session.mode['name']}。\n"
+                    f"面试官风格：{session.interviewer_style['name']}，侧重：{', '.join(session.interviewer_style['focus'])}。\n"
                     f"当前阶段：{phase}，第 {step + 1} 题。\n"
                     f"简历：{resume_hint}\n"
                     f"历史：{history}\n"
-                    "请生成下一道面试题。项目题要能深挖个人贡献；系统设计或场景题要要求候选人说明约束、取舍和验证方式。"
+                    "请生成下一道面试题。问题必须符合面试官风格：中小厂基础型要贴近真实一面；"
+                    "八股连环追问型要强调原理和边界；项目真实性拷打型要追问个人贡献和证据；"
+                    "系统设计型要要求候选人说明约束、容量、取舍和验证方式。"
                 ),
             },
         ]
@@ -1252,6 +1315,7 @@ class CampusInterviewEngine:
                 "content": (
                     f"方向：{session.direction['name']}。\n"
                     f"难度：{session.difficulty['name']}。\n"
+                    f"面试官风格：{session.interviewer_style['name']}，侧重：{', '.join(session.interviewer_style['focus'])}。\n"
                     f"面试题：{session.current_question}\n"
                     f"候选人回答：{answer}\n"
                     f"规则评分：{score}/100。\n"
@@ -1283,6 +1347,7 @@ class CampusInterviewEngine:
                 "content": (
                     f"方向：{session.direction['name']}。\n"
                     f"难度：{session.difficulty['name']}。\n"
+                    f"面试官风格：{session.interviewer_style['name']}。\n"
                     f"平均分：{average_score}/100。\n"
                     f"记录：\n{compact_turns}"
                 ),

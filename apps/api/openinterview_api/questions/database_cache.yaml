@@ -1,6 +1,6 @@
 questions:
   - id: db-mysql-index-bplus-tree
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: mysql
     type: fundamentals
@@ -20,7 +20,7 @@ questions:
     source_usage: "adapted"
 
   - id: db-mysql-index-invalid
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: mysql
     type: scenario
@@ -40,7 +40,7 @@ questions:
     source_usage: "adapted"
 
   - id: db-mysql-transaction-isolation
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: mysql
     type: fundamentals
@@ -60,7 +60,7 @@ questions:
     source_usage: "adapted"
 
   - id: db-mysql-mvcc
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: mysql
     type: fundamentals
@@ -80,7 +80,7 @@ questions:
     source_usage: "adapted"
 
   - id: db-mysql-locks
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: mysql
     type: scenario
@@ -100,7 +100,7 @@ questions:
     source_usage: "adapted"
 
   - id: db-mysql-explain
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: mysql
     type: scenario
@@ -120,7 +120,7 @@ questions:
     source_usage: "adapted"
 
   - id: db-mysql-deep-pagination
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: mysql
     type: scenario
@@ -336,5 +336,45 @@ questions:
       - "能指出异步删除、渐进迁移和容量预估的工程细节。"
     source: "JavaGuide"
     source_path: "docs/database/redis/redis-common-blocking-problems-summary.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: cache-aside-write-delete-consistency
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: redis
+    type: scenario
+    tags: ["Redis", "Cache Aside", "Consistency"]
+    prompt: "旁路缓存模式下，更新数据时为什么常见做法是先更新数据库再删除缓存？这个方案还有哪些不一致窗口？"
+    followups:
+      - "先删缓存再更新数据库在并发读写下为什么容易写回旧值？"
+      - "为什么很多场景选择删除缓存，而不是直接更新缓存？"
+      - "延迟双删、短 TTL、binlog 订阅和互斥重建分别适合什么边界？"
+    rubric:
+      - "能解释 Cache Aside 的读 Miss 回填和写库删缓存流程。"
+      - "能用并发时序说明先删缓存、后写库的旧值回填风险。"
+      - "能结合一致性要求选择 TTL、重试删除、消息补偿、binlog 订阅或锁保护。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/3-commonly-used-cache-read-and-write-strategies.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mysql-large-table-online-change
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: mysql
+    type: scenario
+    tags: ["MySQL", "DDL", "Migration"]
+    prompt: "生产环境千万级大表需要新增字段或回填数据，你会如何设计在线变更、灰度发布和回滚方案？"
+    followups:
+      - "直接 ALTER TABLE 或大事务 UPDATE 可能带来哪些锁表和复制延迟风险？"
+      - "如何分批回填、校验数据并控制对线上 QPS 的影响？"
+      - "应用代码如何兼容新旧字段，保证可回滚？"
+    rubric:
+      - "能说明大表 DDL、长事务和批量更新对锁、binlog、主从延迟的影响。"
+      - "能提出影子字段、在线 DDL 工具、分批回填、限速和监控校验。"
+      - "能设计先兼容读写、再切流、最后清理的发布和回滚步骤。"
+    source: "JavaGuide"
+    source_path: "docs/database/mysql/mysql-high-performance-optimization-specification-recommendations.md"
     source_license: "Apache-2.0"
     source_usage: "adapted"

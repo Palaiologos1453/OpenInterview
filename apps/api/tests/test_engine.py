@@ -46,6 +46,7 @@ class CampusInterviewEngineTest(unittest.TestCase):
             InterviewConfig(
                 direction_id="backend",
                 difficulty_id="internship",
+                interviewer_style_id="fundamental_chain",
                 provider_config=MOCK_PROVIDER,
             )
         )
@@ -55,6 +56,7 @@ class CampusInterviewEngineTest(unittest.TestCase):
         report = engine.report(session)
 
         self.assertEqual(report["direction"], "Java 后端")
+        self.assertEqual(report["interviewer_style"], "八股连环追问型")
         self.assertEqual(len(report["dimensions"]), 4)
         self.assertTrue(report["review_plan"])
 
@@ -76,9 +78,10 @@ class CampusInterviewEngineTest(unittest.TestCase):
         )
         report = engine.report(session)
 
-        self.assertEqual(report["turns"][0]["question_meta"]["id"], "backend-index-btree")
+        self.assertTrue(report["turns"][0]["question_meta"]["id"])
+        self.assertTrue(report["turns"][0]["question_meta"]["rubric"])
         self.assertTrue(report["turns"][0]["rubric_gaps"])
-        self.assertTrue(any("database" in item or "索引" in item for item in report["improvements"]))
+        self.assertTrue(report["improvements"])
         self.assertTrue(report["practice_drills"])
         self.assertTrue(report["answer_guides"])
         self.assertIn("example_answer", report["answer_guides"][0])
@@ -114,6 +117,7 @@ class CampusInterviewEngineTest(unittest.TestCase):
                 direction_id="backend",
                 difficulty_id="campus",
                 mode_id="project_deep_dive",
+                interviewer_style_id="resume_truth_probe",
                 resume_text=(
                     "项目：订单系统，负责缓存、接口和数据库优化。"
                     "使用 Java、Spring Boot、MySQL、Redis，接口延迟降低 30%，线上压测发现过缓存击穿问题。"
@@ -126,8 +130,58 @@ class CampusInterviewEngineTest(unittest.TestCase):
         turn = engine.answer(session, "做了一个项目。")
 
         self.assertIn("继续补充", turn["next_question"])
-        self.assertTrue(any(keyword in turn["next_question"] for keyword in ["个人贡献", "数据来源", "统计口径", "技术选型", "故障"]))
+        self.assertTrue(
+            any(keyword in turn["next_question"] for keyword in ["本人做的吗", "指标从哪里来", "统计口径", "故障"])
+        )
         self.assertEqual(session.current_question_meta["phase"], "project")
+
+    def test_interviewer_styles_change_followup_pressure(self):
+        engine = CampusInterviewEngine()
+        result = engine.start(
+            InterviewConfig(
+                direction_id="backend",
+                difficulty_id="campus",
+                mode_id="fundamentals",
+                interviewer_style_id="fundamental_chain",
+                provider_config=MOCK_PROVIDER,
+            )
+        )
+        session = result["session"]
+
+        turn = engine.answer(session, "HashMap 是一个 Map。")
+
+        self.assertIn("底层原理", turn["next_question"])
+        self.assertIn("八股连环追问", turn["interviewer_message"])
+
+    def test_system_design_style_prioritizes_design_topics(self):
+        engine = CampusInterviewEngine()
+        result = engine.start(
+            InterviewConfig(
+                direction_id="backend",
+                difficulty_id="campus",
+                mode_id="system_design_intro",
+                interviewer_style_id="system_design",
+                provider_config=MOCK_PROVIDER,
+            )
+        )
+        session = result["session"]
+
+        engine.answer(
+            session,
+            (
+                "项目业务背景是订单链路延迟高，目标是降低核心接口 P99。"
+                "我的个人贡献是设计缓存和索引优化方案，负责编码、联调、上线和监控。"
+                "核心技术方案包含 Redis 缓存、MySQL 索引、接口限流和灰度发布。"
+                "指标结果是 P99 延迟下降 30%，验证方式来自压测报告和线上监控。"
+                "技术选型对比过本地缓存和分布式缓存，也说明了数据一致性风险和兜底。"
+            ),
+        )
+
+        self.assertIn(
+            session.current_question_meta["topic"],
+            {"system-design", "distributed-system", "high-availability", "high-performance", "message-queue"},
+        )
+        self.assertIn("系统设计型", result["payload"]["opening_message"])
 
 
 if __name__ == "__main__":

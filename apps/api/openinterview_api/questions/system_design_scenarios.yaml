@@ -40,7 +40,7 @@ questions:
     source_usage: "inspired"
 
   - id: scenario-message-push
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: system-design
     type: scenario
@@ -80,7 +80,7 @@ questions:
     source_usage: "adapted"
 
   - id: scenario-rate-limit
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: campus
     topic: high-availability
     type: scenario
@@ -100,7 +100,7 @@ questions:
     source_usage: "adapted"
 
   - id: scenario-timeout-retry
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: high-availability
     type: scenario
@@ -120,7 +120,7 @@ questions:
     source_usage: "adapted"
 
   - id: scenario-circuit-breaker-fallback
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: high-availability
     type: scenario
@@ -140,7 +140,7 @@ questions:
     source_usage: "adapted"
 
   - id: scenario-performance-test
-    directions: ["backend", "sre", "test_dev"]
+    directions: ["backend"]
     difficulty: campus
     topic: high-availability
     type: scenario
@@ -160,7 +160,7 @@ questions:
     source_usage: "adapted"
 
   - id: scenario-cold-hot-data
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: high-performance
     type: scenario
@@ -180,7 +180,7 @@ questions:
     source_usage: "adapted"
 
   - id: scenario-read-write-splitting-sharding
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: high-performance
     type: scenario

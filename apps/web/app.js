@@ -83,6 +83,7 @@ const fallbackCatalog = {
   directions: [{ id: "backend", name: "后端开发", summary: "数据库、缓存、并发、分布式基础。" }],
   difficulties: [{ id: "campus", name: "普通校招", summary: "基础、项目、算法均衡。" }],
   modes: [{ id: "comprehensive", name: "综合模拟", summary: "完整流程。" }],
+  interviewer_styles: [{ id: "small_company_basic", name: "中小厂基础型", summary: "真实一面节奏。" }],
   voice_profiles: [{ id: "young_engineer", name: "青年工程师" }]
 };
 
@@ -114,6 +115,7 @@ const elements = {
   direction: $("#direction"),
   difficulty: $("#difficulty"),
   mode: $("#mode"),
+  interviewerStyle: $("#interviewer-style"),
   voiceProfile: $("#voice-profile"),
   candidateName: $("#candidate-name"),
   resume: $("#resume"),
@@ -177,6 +179,7 @@ async function init() {
   fillSelect(elements.direction, state.catalog.directions);
   fillSelect(elements.difficulty, state.catalog.difficulties);
   fillSelect(elements.mode, state.catalog.modes);
+  fillSelect(elements.interviewerStyle, state.catalog.interviewer_styles || fallbackCatalog.interviewer_styles);
   fillSelect(elements.voiceProfile, state.catalog.voice_profiles || [], "id", "name");
   fillProviderForm(state.providerConfig);
   wireEvents();
@@ -202,7 +205,7 @@ function wireEvents() {
     input.addEventListener("input", renderSetupChecklist);
     input.addEventListener("change", renderSetupChecklist);
   });
-  [elements.direction, elements.difficulty, elements.mode, elements.voiceProfile].forEach((input) => {
+  [elements.direction, elements.difficulty, elements.mode, elements.interviewerStyle, elements.voiceProfile].forEach((input) => {
     input.addEventListener("change", renderSetupChecklist);
   });
 }
@@ -357,7 +360,8 @@ function renderHistory(interviews) {
         const summary = [
           catalogName("directions", config.direction_id),
           catalogName("difficulties", config.difficulty_id),
-          catalogName("modes", config.mode_id)
+          catalogName("modes", config.mode_id),
+          catalogName("interviewer_styles", config.interviewer_style_id)
         ].filter(Boolean).join(" / ");
         return `
           <article class="history-item">
@@ -566,6 +570,7 @@ function readConfig() {
     direction_id: elements.direction.value,
     difficulty_id: elements.difficulty.value,
     mode_id: elements.mode.value,
+    interviewer_style_id: elements.interviewerStyle.value || "small_company_basic",
     candidate_name: elements.candidateName.value.trim() || null,
     resume_text: elements.resume.value.trim() || null,
     duration_minutes: 30,
@@ -683,7 +688,7 @@ function renderSetupChecklist() {
     {
       label: "面试模式",
       status: "ok",
-      detail: selectedName(elements.mode) || "已选择默认模式"
+      detail: `${selectedName(elements.mode) || "默认模式"} / ${selectedName(elements.interviewerStyle) || "默认风格"}`
     },
     asrChecklistItem(config.asr),
     ttsChecklistItem(config.tts),

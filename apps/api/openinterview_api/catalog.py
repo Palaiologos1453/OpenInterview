@@ -81,6 +81,38 @@ MODES = [
 ]
 
 
+INTERVIEWER_STYLES = [
+    {
+        "id": "small_company_basic",
+        "name": "中小厂基础型",
+        "summary": "偏真实中小厂一面，基础、项目和工程常识均衡，追问压力适中。",
+        "pressure_bias": 0,
+        "focus": ["基础概念", "项目职责", "工程落地", "表达清晰"],
+    },
+    {
+        "id": "fundamental_chain",
+        "name": "八股连环追问型",
+        "summary": "围绕 Java 后端高频八股连续追问，要求讲清原理、边界和常见误区。",
+        "pressure_bias": 1,
+        "focus": ["底层原理", "概念辨析", "边界条件", "常见误区"],
+    },
+    {
+        "id": "resume_truth_probe",
+        "name": "项目真实性拷打型",
+        "summary": "重点验证简历项目真实性，追问个人贡献、指标来源、选型依据、故障复盘。",
+        "pressure_bias": 1,
+        "focus": ["个人贡献", "指标来源", "技术选型", "故障复盘"],
+    },
+    {
+        "id": "system_design",
+        "name": "系统设计型",
+        "summary": "偏场景和架构设计，要求澄清约束、拆模块、做容量估算和风险兜底。",
+        "pressure_bias": 1,
+        "focus": ["需求澄清", "模块拆分", "容量估算", "可用性"],
+    },
+]
+
+
 RUBRIC = [
     {
         "id": "cs_fundamentals",
@@ -110,6 +142,7 @@ def get_catalog() -> dict:
         "directions": deepcopy(DIRECTIONS),
         "difficulties": deepcopy(DIFFICULTIES),
         "modes": deepcopy(MODES),
+        "interviewer_styles": deepcopy(INTERVIEWER_STYLES),
         "rubric": deepcopy(RUBRIC),
     }
 
@@ -124,6 +157,10 @@ def find_difficulty(difficulty_id: str) -> dict:
 
 def find_mode(mode_id: str) -> dict:
     return _find_by_id(MODES, mode_id, "mode")
+
+
+def find_interviewer_style(style_id: str) -> dict:
+    return _find_by_id(INTERVIEWER_STYLES, style_id, "interviewer_style")
 
 
 def _find_by_id(items: list[dict], item_id: str, label: str) -> dict:

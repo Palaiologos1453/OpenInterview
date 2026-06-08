@@ -1,6 +1,6 @@
 questions:
   - id: cs-os-process-thread-switch
-    directions: ["backend", "sre", "embedded"]
+    directions: ["backend"]
     difficulty: campus
     topic: operating-system
     type: fundamentals
@@ -20,7 +20,7 @@ questions:
     source_usage: "adapted"
 
   - id: cs-os-deadlock
-    directions: ["backend", "sre", "embedded"]
+    directions: ["backend"]
     difficulty: campus
     topic: operating-system
     type: scenario
@@ -40,7 +40,7 @@ questions:
     source_usage: "adapted"
 
   - id: cs-os-virtual-memory
-    directions: ["backend", "sre", "embedded"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: operating-system
     type: fundamentals
@@ -60,7 +60,7 @@ questions:
     source_usage: "adapted"
 
   - id: cs-network-tcp-handshake
-    directions: ["backend", "frontend", "sre"]
+    directions: ["backend"]
     difficulty: campus
     topic: computer-network
     type: fundamentals
@@ -80,7 +80,7 @@ questions:
     source_usage: "adapted"
 
   - id: cs-network-time-wait-close-wait
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: computer-network
     type: scenario
@@ -100,7 +100,7 @@ questions:
     source_usage: "adapted"
 
   - id: cs-network-http-https
-    directions: ["backend", "frontend", "security"]
+    directions: ["backend"]
     difficulty: campus
     topic: computer-network
     type: fundamentals
@@ -140,7 +140,7 @@ questions:
     source_usage: "adapted"
 
   - id: cs-network-url-flow
-    directions: ["backend", "frontend"]
+    directions: ["backend"]
     difficulty: campus
     topic: computer-network
     type: fundamentals
@@ -160,7 +160,7 @@ questions:
     source_usage: "adapted"
 
   - id: cs-network-tcp-reliability
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: computer-network
     type: fundamentals
@@ -180,7 +180,7 @@ questions:
     source_usage: "adapted"
 
   - id: cs-network-keepalive
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: campus
     topic: computer-network
     type: scenario

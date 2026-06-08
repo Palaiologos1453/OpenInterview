@@ -20,13 +20,19 @@ class OpenInterviewAPITest(unittest.TestCase):
     def test_catalog_includes_voice_profiles(self):
         response = client.get("/v1/catalog")
         self.assertEqual(response.status_code, 200)
-        self.assertIn("voice_profiles", response.json())
-        self.assertNotIn("coding", {item["id"] for item in response.json()["modes"]})
-        direction_ids = {item["id"] for item in response.json()["directions"]}
+        payload = response.json()
+        self.assertIn("voice_profiles", payload)
+        self.assertNotIn("coding", {item["id"] for item in payload["modes"]})
+        direction_ids = {item["id"] for item in payload["directions"]}
         self.assertEqual(direction_ids, {"backend"})
-        mode_names = {item["id"]: item["name"] for item in response.json()["modes"]}
+        mode_names = {item["id"]: item["name"] for item in payload["modes"]}
         self.assertEqual(mode_names["fundamentals"], "单纯八股")
         self.assertEqual(mode_names["project_deep_dive"], "简历拷打")
+        style_ids = {item["id"] for item in payload["interviewer_styles"]}
+        self.assertEqual(
+            style_ids,
+            {"small_company_basic", "fundamental_chain", "resume_truth_probe", "system_design"},
+        )
 
     def test_health_does_not_expose_code_runner(self):
         response = client.get("/health")
@@ -71,6 +77,7 @@ class OpenInterviewAPITest(unittest.TestCase):
                 "direction_id": "backend",
                 "difficulty_id": "campus",
                 "mode_id": "comprehensive",
+                "interviewer_style_id": "fundamental_chain",
                 "provider_config": {
                     "llm": {"provider": "mock"},
                     "asr": {"provider": "browser"},
@@ -79,6 +86,35 @@ class OpenInterviewAPITest(unittest.TestCase):
             },
         )
         self.assertEqual(response.status_code, 200)
+        self.assertIn("八股连环追问型", response.json()["opening_message"])
+
+    def test_report_response_includes_interviewer_style(self):
+        interview = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "fundamentals",
+                "interviewer_style_id": "system_design",
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(interview.status_code, 200)
+        session_id = interview.json()["session_id"]
+        turn = client.post(
+            f"/v1/interviews/{session_id}/turn",
+            json={"answer": "先澄清约束，再说明容量、模块、数据一致性和监控兜底。"},
+        )
+        self.assertEqual(turn.status_code, 200)
+
+        report = client.get(f"/v1/interviews/{session_id}/report")
+
+        self.assertEqual(report.status_code, 200)
+        self.assertEqual(report.json()["interviewer_style"], "系统设计型")
 
     def test_llm_connection_test_allows_mock(self):
         response = client.post(

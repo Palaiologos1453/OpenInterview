@@ -47,6 +47,7 @@ class InterviewConfigRequest(BaseModel):
     direction_id: str = Field(default="backend")
     difficulty_id: str = Field(default="campus")
     mode_id: str = Field(default="comprehensive")
+    interviewer_style_id: str = Field(default="small_company_basic")
     candidate_name: str | None = None
     resume_text: str | None = None
     duration_minutes: int = Field(default=30, ge=5, le=120)
@@ -80,6 +81,7 @@ class ReportResponse(BaseModel):
     session_id: str
     direction: str
     difficulty: str
+    interviewer_style: str | None = None
     overall_score: float
     ai_summary: str | None = None
     dimensions: list[dict]

@@ -1,6 +1,6 @@
 questions:
   - id: dist-cap-base
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: distributed-system
     type: fundamentals
@@ -40,7 +40,7 @@ questions:
     source_usage: "adapted"
 
   - id: dist-api-gateway
-    directions: ["backend", "sre"]
+    directions: ["backend"]
     difficulty: campus
     topic: distributed-system
     type: scenario
@@ -60,7 +60,7 @@ questions:
     source_usage: "adapted"
 
   - id: dist-id-design
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: distributed-system
     type: scenario
@@ -80,7 +80,7 @@ questions:
     source_usage: "adapted"
 
   - id: dist-transaction-solutions
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: distributed-system
     type: scenario
@@ -100,7 +100,7 @@ questions:
     source_usage: "adapted"
 
   - id: dist-consistent-hashing
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: campus
     topic: distributed-system
     type: fundamentals
@@ -120,7 +120,7 @@ questions:
     source_usage: "adapted"
 
   - id: dist-raft-leader-election
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: distributed-system
     type: fundamentals
@@ -180,7 +180,7 @@ questions:
     source_usage: "adapted"
 
   - id: mq-ordering-backlog
-    directions: ["backend", "data_engineering"]
+    directions: ["backend"]
     difficulty: bigtech
     topic: message-queue
     type: scenario
@@ -236,5 +236,125 @@ questions:
       - "能结合事务、日志、权限等场景说明实际价值。"
     source: "JavaGuide"
     source_path: "docs/system-design/framework/spring/ioc-and-aop.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: microservice-service-discovery-governance
+    directions: ["backend"]
+    difficulty: campus
+    topic: distributed-system
+    type: fundamentals
+    tags: ["Microservices", "Registry", "Service Governance"]
+    prompt: "微服务架构里注册中心、配置中心、网关、负载均衡、限流熔断分别解决什么问题？"
+    followups:
+      - "服务发现的 AP/CP 取舍会影响什么？"
+      - "客户端负载均衡和服务端负载均衡有什么差异？"
+      - "配置中心变更如何避免一次错误配置影响全站？"
+    rubric:
+      - "能拆出注册发现、配置管理、入口治理、服务调用治理和可观测性。"
+      - "能说明服务治理不是只把单体拆成多个服务。"
+      - "能考虑配置灰度、健康检查、故障隔离和回滚。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/rpc/rpc-intro.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: rpc-timeout-retry-idempotency
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: distributed-system
+    type: scenario
+    tags: ["RPC", "Timeout", "Retry", "Idempotency"]
+    prompt: "一次 RPC 调用超时后要不要重试？你会如何设计超时、重试、幂等和熔断策略？"
+    followups:
+      - "读请求和写请求的重试策略有什么区别？"
+      - "重试风暴如何形成，怎么避免？"
+      - "调用方和被调方的超时时间应该如何配合？"
+    rubric:
+      - "能区分连接超时、读超时、业务超时和整体链路超时。"
+      - "能说明重试必须结合幂等、退避、限流和熔断。"
+      - "能考虑下游容量、雪崩保护和 trace 排查。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/rpc/rpc-intro.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mq-transaction-message-outbox
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: message-queue
+    type: scenario
+    tags: ["MQ", "Transaction Message", "Outbox"]
+    prompt: "数据库事务提交后再发 MQ 可能出现什么一致性问题？本地消息表和事务消息分别怎么解决？"
+    followups:
+      - "先写库后发消息失败怎么办？"
+      - "先发消息后写库失败又会怎样？"
+      - "本地消息表如何做扫描、重试、幂等和告警？"
+    rubric:
+      - "能说明业务数据和消息发送不在同一事务里的不一致窗口。"
+      - "能比较本地消息表、事务消息、补偿任务的成本和适用边界。"
+      - "能补充消费幂等、对账、死信和人工兜底。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/distributed-transaction.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: mq-delayed-message-timeout-order
+    directions: ["backend"]
+    difficulty: campus
+    topic: message-queue
+    type: scenario
+    tags: ["MQ", "Delayed Message", "Order"]
+    prompt: "订单超时未支付自动取消，你会用延迟消息、定时任务还是 Redis 过期事件？各有什么风险？"
+    followups:
+      - "延迟消息丢失或延迟过久怎么办？"
+      - "取消订单和支付成功并发到达怎么保证状态正确？"
+      - "为什么最终仍需要补偿扫描？"
+    rubric:
+      - "能比较延迟消息、定时任务、Redis 过期事件的可靠性和复杂度。"
+      - "能用订单状态机、乐观锁和幂等避免并发错乱。"
+      - "能提出补偿扫描、告警和人工处理兜底。"
+    source: "JavaGuide"
+    source_path: "docs/database/redis/redis-delayed-task.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: distributed-rate-limit-design
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: high-availability
+    type: scenario
+    tags: ["Rate Limit", "Redis", "Gateway"]
+    prompt: "如果开放接口被突增流量打满，你会在网关、服务和用户维度如何设计限流？"
+    followups:
+      - "固定窗口、滑动窗口、漏桶、令牌桶分别适合什么场景？"
+      - "单机限流和分布式限流有什么差异？"
+      - "限流后的返回、降级和告警怎么设计？"
+    rubric:
+      - "能说明限流维度、算法选择和系统位置。"
+      - "能比较单机内存、Redis、网关限流的性能和一致性取舍。"
+      - "能考虑用户体验、错误码、白名单、动态配置和监控告警。"
+    source: "JavaGuide"
+    source_path: "docs/high-availability/limit-request.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+
+  - id: distributed-id-business-design
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: distributed-system
+    type: scenario
+    tags: ["Distributed ID", "Order ID", "TraceId"]
+    prompt: "设计订单号、优惠券码和 TraceId 时，分布式 ID 除了全局唯一，还要考虑哪些业务语义和工程约束？"
+    followups:
+      - "订单号为什么不能简单使用连续自增 ID 暴露业务规模？"
+      - "优惠券码为什么要考虑可校验、不可猜和预生成？"
+      - "TraceId 为什么要能在入口机器本地生成并向下游透传？"
+    rubric:
+      - "能按唯一性、趋势递增、可读性、防枚举、容量和生成吞吐拆需求。"
+      - "能区分订单号、券码、短链、TraceId 等场景对 ID 的不同要求。"
+      - "能比较数据库自增、号段、雪花算法、Redis 自增和业务编码的取舍。"
+    source: "JavaGuide"
+    source_path: "docs/distributed-system/distributed-id-design.md"
     source_license: "Apache-2.0"
     source_usage: "adapted"
