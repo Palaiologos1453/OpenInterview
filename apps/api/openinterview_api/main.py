@@ -88,8 +88,8 @@ def readiness() -> dict:
 
 
 @app.get("/v1/readiness/smoke")
-def readiness_smoke(include_voice: bool = False) -> dict:
-    return readiness_smoke_report(include_voice=include_voice)
+def readiness_smoke(include_voice: bool = False, voice_check: str | None = None) -> dict:
+    return readiness_smoke_report(include_voice=include_voice, voice_check=voice_check)
 
 
 @app.get("/v1/catalog")
@@ -314,20 +314,22 @@ def detect_voice_activity(request: VADRequest) -> dict:
 
 @app.get("/v1/questions")
 def list_questions(direction_id: str | None = None) -> dict:
-    if direction_id and direction_id != "backend":
+    if direction_id and direction_id not in _valid_direction_ids():
         return {"questions": []}
-    return {"questions": question_bank.list_questions("backend")}
+    return {"questions": question_bank.list_questions(direction_id or "backend")}
 
 
 @app.get("/v1/questions/coverage")
-def questions_coverage() -> dict:
-    return question_coverage(question_bank.list_questions("backend"))
+def questions_coverage(direction_id: str = "backend") -> dict:
+    if direction_id not in _valid_direction_ids():
+        raise HTTPException(status_code=404, detail=f"Unknown direction: {direction_id}")
+    return question_coverage(question_bank.list_questions(direction_id), direction_id=direction_id)
 
 
 @app.get("/v1/questions/{question_id}")
 def get_question(question_id: str) -> dict:
     question = question_bank.get_question(question_id)
-    if not question or "backend" not in question.get("directions", []):
+    if not question or not set(question.get("directions", [])).intersection(_valid_direction_ids() | {"general"}):
         raise HTTPException(status_code=404, detail=f"Unknown question: {question_id}")
     return question
 
@@ -652,7 +654,7 @@ def _restore_session(session_id: str) -> InterviewSession | None:
     if not record:
         return None
     config = record["config"]
-    if config.get("direction_id") != "backend":
+    if config.get("direction_id") not in _valid_direction_ids():
         config["direction_id"] = "backend"
     config.setdefault("interviewer_style_id", "small_company_basic")
     provider_config = config.get("provider_config")
@@ -686,3 +688,7 @@ def _restore_session(session_id: str) -> InterviewSession | None:
     session.turn_index = len(session.history)
     session.current_question = engine._select_question(session, step=session.turn_index)
     return session
+
+
+def _valid_direction_ids() -> set[str]:
+    return {item["id"] for item in get_catalog()["directions"]}

@@ -183,6 +183,31 @@ class CampusInterviewEngineTest(unittest.TestCase):
         )
         self.assertIn("系统设计型", result["payload"]["opening_message"])
 
+    def test_ai_application_direction_uses_ai_question_bank(self):
+        engine = CampusInterviewEngine()
+        result = engine.start(
+            InterviewConfig(
+                direction_id="ai_application",
+                difficulty_id="campus",
+                mode_id="fundamentals",
+                interviewer_style_id="fundamental_chain",
+                provider_config=MOCK_PROVIDER,
+            )
+        )
+        session = result["session"]
+
+        self.assertIn("AI 应用开发", result["payload"]["opening_message"])
+        self.assertIn(
+            session.current_question_meta["topic"],
+            {"llm-basics", "llm-api", "prompt-engineering", "structured-output", "rag", "agent"},
+        )
+
+        engine.answer(session, "Token、上下文窗口、采样参数会影响成本、延迟和稳定性，需要用评测集和线上指标验证。")
+        report = engine.report(session)
+
+        self.assertEqual(report["direction"], "AI 应用开发")
+        self.assertIn("AI 应用工程场景", report["study_guides"][0]["reference_answer"])
+
 
 if __name__ == "__main__":
     unittest.main()

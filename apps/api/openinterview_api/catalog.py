@@ -22,6 +22,25 @@ DIRECTIONS = [
         ],
         "project_focus": ["个人贡献", "技术选型", "接口设计", "数据一致性", "性能优化", "故障复盘"],
     },
+    {
+        "id": "ai_application",
+        "name": "AI 应用开发",
+        "summary": "面向 LLM 应用、Prompt、RAG、Agent、MCP、模型网关、评测和语音 Agent 的工程化面试。",
+        "topics": [
+            "LLM 基础",
+            "Prompt 工程",
+            "结构化输出",
+            "RAG",
+            "向量数据库",
+            "Agent",
+            "MCP",
+            "模型网关",
+            "评测与观测",
+            "AI 应用架构",
+            "语音 Agent",
+        ],
+        "project_focus": ["业务场景", "模型选型", "Prompt/RAG 方案", "评测指标", "成本与延迟", "安全与隐私", "工程落地"],
+    },
 ]
 
 

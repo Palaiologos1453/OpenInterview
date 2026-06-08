@@ -54,19 +54,22 @@ def readiness_report() -> dict:
     }
 
 
-def readiness_smoke_report(*, include_voice: bool = False) -> dict:
+def readiness_smoke_report(*, include_voice: bool = False, voice_check: str | None = None) -> dict:
     ensure_portable_ffmpeg_on_path()
     started = time.perf_counter()
     checks = {
         "wav_fixture": _smoke_wav_fixture(),
         "vad": _smoke_vad(),
     }
-    if include_voice:
+    target = (voice_check or "").strip().lower()
+    if include_voice and target in {"", "all", "asr"}:
         checks["asr"] = _smoke_asr()
+    if include_voice and target in {"", "all", "tts"}:
         checks["tts"] = _smoke_tts()
     return {
         "ok": all(item["ok"] for item in checks.values()),
         "include_voice": include_voice,
+        "voice_check": target or ("all" if include_voice else None),
         "duration_ms": round((time.perf_counter() - started) * 1000, 2),
         "checks": checks,
     }

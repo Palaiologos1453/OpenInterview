@@ -80,7 +80,10 @@ const llmTemplates = {
 };
 
 const fallbackCatalog = {
-  directions: [{ id: "backend", name: "后端开发", summary: "数据库、缓存、并发、分布式基础。" }],
+  directions: [
+    { id: "backend", name: "Java 后端", summary: "数据库、缓存、并发、分布式基础。" },
+    { id: "ai_application", name: "AI 应用开发", summary: "LLM、Prompt、RAG、Agent、模型网关和语音应用。" }
+  ],
   difficulties: [{ id: "campus", name: "普通校招", summary: "基础、项目、算法均衡。" }],
   modes: [{ id: "comprehensive", name: "综合模拟", summary: "完整流程。" }],
   interviewer_styles: [{ id: "small_company_basic", name: "中小厂基础型", summary: "真实一面节奏。" }],
@@ -137,6 +140,9 @@ const elements = {
   ttsApiKey: $("#tts-api-key"),
   saveProviderConfig: $("#save-provider-config"),
   testLlmConfig: $("#test-llm-config"),
+  testAsrConfig: $("#test-asr-config"),
+  testTtsConfig: $("#test-tts-config"),
+  testVoiceConfig: $("#test-voice-config"),
   clearProviderConfig: $("#clear-provider-config"),
   setupForm: $("#setup-form"),
   runtimeStatus: $("#runtime-status"),
@@ -196,6 +202,9 @@ function wireEvents() {
   elements.listenButton.addEventListener("click", safeHandler(handleVoiceInput));
   elements.saveProviderConfig.addEventListener("click", saveProviderConfig);
   elements.testLlmConfig.addEventListener("click", safeHandler(testLlmConfig));
+  elements.testAsrConfig.addEventListener("click", safeHandler(testAsrConfig));
+  elements.testTtsConfig.addEventListener("click", safeHandler(testTtsConfig));
+  elements.testVoiceConfig.addEventListener("click", safeHandler(testVoiceConfig));
   elements.clearProviderConfig.addEventListener("click", clearProviderConfig);
   elements.llmTemplate.addEventListener("change", applyLlmTemplate);
   elements.importResumeButton.addEventListener("click", safeHandler(importResumeFile));
@@ -402,16 +411,17 @@ function renderHistory(interviews) {
 
 async function loadQuestionCoverage() {
   ensureBackend();
-  const payload = await fetchJson(`${API_BASE}/v1/questions/coverage`);
+  const directionId = elements.direction.value || "backend";
+  const payload = await fetchJson(`${API_BASE}/v1/questions/coverage?direction_id=${encodeURIComponent(directionId)}`);
   renderQuestionCoverage(payload);
-  setStatus(`题库覆盖：后端题 ${payload.total} 道，优先补红色和黄色主题。`);
+  setStatus(`题库覆盖：${selectedName(elements.direction)} ${payload.total} 道，优先补红色和黄色主题。`);
 }
 
 function renderQuestionCoverage(payload) {
   elements.report.hidden = false;
   elements.report.innerHTML = `
     <div class="section-heading">
-      <h3>Java 后端题库覆盖</h3>
+      <h3>${escapeHtml(selectedName(elements.direction) || "当前方向")}题库覆盖</h3>
       <span class="muted-text">${escapeHtml(String(payload.total || 0))} 道题</span>
     </div>
     <div class="coverage-grid">
@@ -652,6 +662,134 @@ async function testLlmConfig() {
   }
 }
 
+async function testAsrConfig() {
+  ensureBackend();
+  const config = readProviderConfig();
+  if (config.asr.provider === "disabled") {
+    throw new Error("ASR 已关闭。需要语音输入时请先选择 Browser、Local SenseVoice 或 API ASR。");
+  }
+  elements.testAsrConfig.disabled = true;
+  try {
+    if (config.asr.provider === "browser") {
+      assertBrowserAsrSupported();
+      await assertMicrophoneAvailable();
+      setStatus("浏览器 ASR 环境可用。真实识别会在点击“语音输入”后开始。");
+      return;
+    }
+    if (config.asr.provider === "sensevoice") {
+      const smoke = await fetchJson(`${API_BASE}/v1/readiness/smoke?include_voice=true&voice_check=asr`, { timeoutMs: 30000 });
+      const asr = smoke.checks?.asr;
+      if (!asr?.ok) throw new Error(asr?.error || "Local SenseVoice 自检失败。");
+      setStatus(`Local SenseVoice 自检通过。${asr.text_chars ? `转写返回 ${asr.text_chars} 个字符。` : ""}`);
+      await refreshReadiness();
+      return;
+    }
+    const missing = providerMissingFields(config.asr);
+    if (missing.length) throw new Error(`API ASR 配置缺少 ${missing.join("、")}。`);
+    await assertMicrophoneAvailable();
+    setStatus("API ASR 配置和麦克风权限正常。实际转写需要点击面试中的“语音输入”录制一段回答。");
+  } finally {
+    elements.testAsrConfig.disabled = false;
+    renderSetupChecklist();
+  }
+}
+
+async function testTtsConfig() {
+  ensureBackend();
+  const config = readProviderConfig();
+  if (config.tts.provider === "disabled") {
+    throw new Error("TTS 已关闭。需要语音播报时请先选择 Browser、Local CosyVoice 或 API TTS。");
+  }
+  elements.testTtsConfig.disabled = true;
+  try {
+    if (config.tts.provider === "browser") {
+      speakWithBrowser("OpenInterview 语音播报测试。");
+      setStatus("浏览器 TTS 已触发。如果没有声音，请检查系统音量或浏览器自动播放权限。");
+      return;
+    }
+    const missing = config.tts.provider === "cosyvoice" ? [] : providerMissingFields(config.tts);
+    if (missing.length) throw new Error(`API TTS 配置缺少 ${missing.join("、")}。`);
+    await speakWithServer("OpenInterview 语音播报测试。", config);
+    setStatus("TTS 测试通过，已播放测试语音。");
+  } finally {
+    elements.testTtsConfig.disabled = false;
+    renderSetupChecklist();
+  }
+}
+
+async function testVoiceConfig() {
+  ensureBackend();
+  elements.testVoiceConfig.disabled = true;
+  setStatus("正在执行语音自检。");
+  try {
+    const config = readProviderConfig();
+    const browserAsr = Boolean(window.SpeechRecognition || window.webkitSpeechRecognition);
+    const browserTts = Boolean(window.speechSynthesis);
+    const microphone = navigator.mediaDevices?.getUserMedia ? "可请求" : "不可用";
+    let localVoice = "未检查";
+    if (config.asr.provider === "sensevoice" || config.tts.provider === "cosyvoice") {
+      const smoke = await fetchJson(`${API_BASE}/v1/readiness/smoke?include_voice=true`, { timeoutMs: 30000 });
+      localVoice = smoke.ok ? "本地语音自检通过" : `本地语音自检失败：${voiceSmokeError(smoke)}`;
+      await refreshReadiness();
+    }
+    setStatus(`语音自检：浏览器 ASR ${browserAsr ? "可用" : "不可用"}；浏览器 TTS ${browserTts ? "可用" : "不可用"}；麦克风 ${microphone}；${localVoice}。`);
+  } finally {
+    elements.testVoiceConfig.disabled = false;
+    renderSetupChecklist();
+  }
+}
+
+function providerMissingFields(settings) {
+  const missing = [];
+  if (!settings.api_base) missing.push("API Base");
+  if (!settings.model) missing.push("Model");
+  if (!settings.api_key) missing.push("API Key");
+  return missing;
+}
+
+function assertBrowserAsrSupported() {
+  if (!(window.SpeechRecognition || window.webkitSpeechRecognition)) {
+    throw new Error("当前浏览器不支持内置 ASR。建议使用 Chrome/Edge，或切换到 Local SenseVoice/API ASR。");
+  }
+}
+
+async function assertMicrophoneAvailable() {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("当前浏览器或页面环境不支持麦克风访问。建议使用 http://127.0.0.1 本地地址打开。");
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (error) {
+    throw new Error(microphoneErrorMessage(error));
+  } finally {
+    stream?.getTracks().forEach((track) => track.stop());
+  }
+}
+
+function microphoneErrorMessage(error) {
+  const name = error?.name || "";
+  if (name === "NotAllowedError" || name === "PermissionDeniedError") {
+    return "麦克风权限被拒绝。请在浏览器地址栏权限设置里允许麦克风，然后重试。";
+  }
+  if (name === "NotFoundError" || name === "DevicesNotFoundError") {
+    return "没有检测到可用麦克风。请连接麦克风或检查系统输入设备。";
+  }
+  if (name === "NotReadableError" || name === "TrackStartError") {
+    return "麦克风被其他应用占用或系统暂时不可读。请关闭占用麦克风的软件后重试。";
+  }
+  if (name === "SecurityError") {
+    return "浏览器安全策略阻止麦克风访问。请使用本地 http://127.0.0.1 或可信来源打开页面。";
+  }
+  return `麦克风启动失败：${error?.message || String(error)}`;
+}
+
+function voiceSmokeError(smoke) {
+  const failed = Object.entries(smoke.checks || {}).find(([, item]) => !item.ok);
+  if (!failed) return "未知错误";
+  return `${failed[0]} ${failed[1].error || "未通过"}`;
+}
+
 function applyLlmTemplate() {
   const template = llmTemplates[elements.llmTemplate.value];
   if (!template) return;
@@ -875,6 +1013,9 @@ async function handleVoiceInput() {
     await toggleDuplexStreaming(config);
     return;
   }
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("当前浏览器不支持录音。请改用文本回答，或使用 Chrome/Edge 打开本地页面。");
+  }
   await toggleServerRecording(config);
 }
 
@@ -891,7 +1032,15 @@ async function toggleDuplexStreaming(config) {
 }
 
 async function startDuplexStreaming(config) {
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw new Error("当前浏览器不支持麦克风录音。请改用普通文本回答。");
+  }
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (error) {
+    throw new Error(microphoneErrorMessage(error));
+  }
   const mimeType = selectRecordingMimeType();
   const socket = new WebSocket(realtimeWebSocketUrl());
   state.mediaStream = stream;
@@ -919,7 +1068,7 @@ async function startDuplexStreaming(config) {
     setStatus("实时收音中。");
   };
   socket.onmessage = (event) => handleDuplexMessage(JSON.parse(event.data));
-  socket.onerror = () => setStatus("实时语音通道异常。");
+  socket.onerror = () => setStatus("实时语音通道异常。可切换到普通录音或文本回答。");
   socket.onclose = () => {
     resetRealtimeUi();
   };
@@ -990,6 +1139,7 @@ function handleDuplexMessage(message) {
     showProviderNotice(turn.provider_notice);
     state.realtimeMode = "speaking";
     elements.listenButton.textContent = "取消";
+    elements.sendButton.disabled = true;
     return;
   }
   if (message.type === "tts_text") {
@@ -1031,7 +1181,7 @@ function handleDuplexMessage(message) {
   }
   if (message.type === "error") {
     resetRealtimeUi();
-    setStatus(`实时语音错误：${message.error}`);
+    setStatus(`实时语音错误：${message.error}。可切换到普通录音或文本回答。`);
   }
 }
 
@@ -1049,11 +1199,25 @@ function playStreamedTts(format) {
   if (!state.ttsChunks.length) return;
   const bytes = base64ChunksToUint8Array(state.ttsChunks);
   const blob = new Blob([bytes], { type: audioMimeType(format) });
-  state.currentAudio = new Audio(URL.createObjectURL(blob));
+  const url = URL.createObjectURL(blob);
+  state.currentAudio = new Audio(url);
   state.currentAudio.onended = () => {
+    URL.revokeObjectURL(url);
     state.currentAudio = null;
+    elements.sendButton.disabled = false;
   };
-  state.currentAudio.play().catch((error) => setStatus(`语音播放失败：${error.message}`));
+  state.currentAudio.onerror = () => {
+    URL.revokeObjectURL(url);
+    state.currentAudio = null;
+    elements.sendButton.disabled = false;
+    setStatus("语音播放失败，请检查浏览器音频权限或音频格式。");
+  };
+  state.currentAudio.play().catch((error) => {
+    URL.revokeObjectURL(url);
+    state.currentAudio = null;
+    elements.sendButton.disabled = false;
+    setStatus(`语音播放失败：${error.message}`);
+  });
 }
 
 function startPcmPlayback(message) {
@@ -1089,17 +1253,30 @@ function queuePcmChunk(base64Data) {
 function startBrowserSpeechRecognition() {
   const Recognition = window.SpeechRecognition || window.webkitSpeechRecognition;
   if (!Recognition) {
-    setStatus("当前浏览器不支持内置语音输入。");
+    setStatus("当前浏览器不支持内置语音输入。建议使用 Chrome/Edge，或切换到文本回答。");
     return;
   }
   const recognition = new Recognition();
   recognition.lang = "zh-CN";
   recognition.interimResults = false;
+  recognition.onstart = () => {
+    elements.listenButton.disabled = true;
+    setStatus("浏览器正在听写。请说出你的回答。");
+  };
   recognition.onresult = (event) => {
     elements.answer.value = [elements.answer.value.trim(), event.results[0][0].transcript].filter(Boolean).join("\n");
   };
-  recognition.onerror = () => setStatus("浏览器语音输入失败，可以继续使用文本回答。");
-  recognition.start();
+  recognition.onerror = (event) => setStatus(`浏览器语音输入失败：${browserRecognitionErrorMessage(event)}。可以继续使用文本回答。`);
+  recognition.onend = () => {
+    elements.listenButton.disabled = !canUseVoiceInput();
+    setStatus(elements.answer.value.trim() ? "浏览器语音输入完成。" : "浏览器语音输入结束，未收到可用文本。");
+  };
+  try {
+    recognition.start();
+  } catch (error) {
+    elements.listenButton.disabled = !canUseVoiceInput();
+    setStatus(`浏览器语音输入启动失败：${error.message}`);
+  }
 }
 
 async function toggleServerRecording(config) {
@@ -1107,7 +1284,12 @@ async function toggleServerRecording(config) {
     state.mediaRecorder.stop();
     return;
   }
-  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (error) {
+    throw new Error(microphoneErrorMessage(error));
+  }
   const mimeType = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "";
   state.recordedChunks = [];
   state.mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
@@ -1128,10 +1310,14 @@ async function toggleServerRecording(config) {
       }
     } catch (error) {
       setStatus(`语音轮次失败：${error.message}`);
+    } finally {
+      elements.sendButton.disabled = false;
+      elements.listenButton.disabled = !canUseVoiceInput();
     }
   };
   state.mediaRecorder.start();
   elements.listenButton.textContent = "停止录音";
+  elements.sendButton.disabled = true;
   setStatus("正在录音。");
 }
 
@@ -1190,10 +1376,14 @@ async function speak(text) {
 }
 
 function speakWithBrowser(text) {
-  if (!window.speechSynthesis) return;
+  if (!window.speechSynthesis) {
+    setStatus("当前浏览器不支持语音播报。");
+    return;
+  }
   window.speechSynthesis.cancel();
   const utterance = new SpeechSynthesisUtterance(text);
   utterance.lang = "zh-CN";
+  utterance.onerror = (event) => setStatus(`浏览器语音播报失败：${event.error || "未知错误"}`);
   window.speechSynthesis.speak(utterance);
 }
 
@@ -1205,7 +1395,21 @@ async function speakWithServer(text, config) {
   });
   if (!response.ok) throw new Error(await response.text());
   const blob = await response.blob();
-  const audio = new Audio(URL.createObjectURL(blob));
+  if (state.currentAudio) {
+    state.currentAudio.pause();
+    state.currentAudio = null;
+  }
+  const url = URL.createObjectURL(blob);
+  const audio = new Audio(url);
+  state.currentAudio = audio;
+  audio.onended = () => {
+    URL.revokeObjectURL(url);
+    if (state.currentAudio === audio) state.currentAudio = null;
+  };
+  audio.onerror = () => {
+    URL.revokeObjectURL(url);
+    if (state.currentAudio === audio) state.currentAudio = null;
+  };
   await audio.play();
 }
 
@@ -1215,6 +1419,15 @@ function canUseVoiceInput() {
     config.asr.provider !== "disabled" &&
       (navigator.mediaDevices || window.SpeechRecognition || window.webkitSpeechRecognition)
   );
+}
+
+function browserRecognitionErrorMessage(event) {
+  const code = event?.error || "";
+  if (code === "not-allowed") return "麦克风权限被拒绝";
+  if (code === "no-speech") return "没有检测到语音";
+  if (code === "audio-capture") return "没有可用麦克风";
+  if (code === "network") return "浏览器语音服务网络不可用";
+  return code || "未知错误";
 }
 
 function renderReport(report) {

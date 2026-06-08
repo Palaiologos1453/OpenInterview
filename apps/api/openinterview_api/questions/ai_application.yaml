@@ -1,0 +1,323 @@
+questions:
+  - id: ai-llm-token-context-window
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: llm-basics
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/llm-operation-mechanism.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "请解释 Token、上下文窗口、Temperature 和 Top P 分别会影响什么。如果线上回答质量不稳定，你会优先调哪些参数？"
+    followups:
+      - "为什么上下文窗口变大不一定代表效果更好？"
+      - "Temperature 调高后，准确性、稳定性和多样性会怎样变化？"
+    rubric:
+      - "能说明 Token、上下文窗口、采样参数和输出稳定性的关系。"
+      - "能指出长上下文的信息位置、噪声和成本问题。"
+      - "能结合业务场景说明参数调优和灰度验证方式。"
+    tags: ["LLM 基础", "上下文窗口", "采样参数", "质量稳定性"]
+
+  - id: ai-llm-api-streaming-retry
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: llm-api
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/llm-api-engineering.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "你要把一个聊天式 AI 功能接入业务系统，LLM API 调用层需要处理哪些工程问题？请重点讲流式响应、超时重试和限流。"
+    followups:
+      - "如果用户端已经收到一半流式内容，此时模型调用失败，服务端怎么处理？"
+      - "重试策略如何避免把成本和延迟放大？"
+    rubric:
+      - "能覆盖请求组装、流式响应、超时、重试、限流和降级。"
+      - "能说明幂等、取消、部分输出和错误回传策略。"
+      - "能用日志、Trace、指标统计验证调用链路稳定性。"
+    tags: ["LLM API", "流式响应", "重试限流", "工程稳定性"]
+
+  - id: ai-prompt-engineering-output-control
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: prompt-engineering
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/agent/prompt-engineering.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "Prompt Engineering 在工程项目里通常要解决哪些问题？请说明角色、任务、约束、示例和输出格式分别起什么作用。"
+    followups:
+      - "为什么不能把所有业务规则都堆进一个超长 Prompt？"
+      - "如果模型经常漏字段或跑题，你会怎么定位是 Prompt 问题还是模型能力问题？"
+    rubric:
+      - "能说明 Prompt 的角色、任务、约束、示例和输出格式。"
+      - "能指出 Prompt 版本管理、复用、可测试性和注入风险。"
+      - "能提出用样例集、回归测试和灰度监控评估 Prompt 改动。"
+    tags: ["Prompt 工程", "输出控制", "Prompt 版本", "回归测试"]
+
+  - id: ai-structured-output-function-calling
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: structured-output
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/structured-output-function-calling.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "结构化输出为什么不能只靠 Prompt 约束？请比较 JSON Schema、Function Calling、Tool Calling 和服务端校验的职责。"
+    followups:
+      - "模型返回了不合法 JSON 时，服务端应该直接重试、修复还是拒绝？"
+      - "Tool Calling 和 MCP 在工程边界上有什么不同？"
+    rubric:
+      - "能区分格式约束、工具调用意图和服务端参数校验。"
+      - "能说明非法输出、缺字段、越权参数和重试修复策略。"
+      - "能结合业务接口设计安全边界和审计记录。"
+    tags: ["结构化输出", "Function Calling", "Tool Calling", "参数校验"]
+
+  - id: ai-rag-pipeline-design
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: rag
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/rag/rag-basis.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "请设计一个企业知识库问答 RAG 链路，从文档进入系统到最终回答用户，中间有哪些核心步骤和风险点？"
+    followups:
+      - "如果用户说回答答非所问，你会从召回、排序、上下文还是生成阶段排查？"
+      - "哪些场景不适合直接上 RAG？"
+    rubric:
+      - "能覆盖文档解析、切分、Embedding、检索、Rerank、上下文组装和生成。"
+      - "能说明召回不足、排序错误、上下文污染和幻觉风险。"
+      - "能提出离线评测、线上反馈和人工审核闭环。"
+    tags: ["RAG", "知识库问答", "检索生成", "质量闭环"]
+
+  - id: ai-rag-document-processing
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: rag-document
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/rag/rag-document-processing.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "RAG 文档处理为什么不是简单按固定长度切块？请说明解析、清洗、结构化、Chunking 和元数据的作用。"
+    followups:
+      - "FAQ、产品手册、代码文档和合同类文档的切分策略有什么不同？"
+      - "文档更新后如何避免旧 Chunk 和新 Chunk 混用？"
+    rubric:
+      - "能说明文档解析、清洗、去重、层级结构和元数据。"
+      - "能比较固定长度、语义切分、标题层级切分和滑窗策略。"
+      - "能覆盖版本控制、增量更新、回滚和可追溯性。"
+    tags: ["RAG", "文档处理", "Chunking", "元数据"]
+
+  - id: ai-rag-vector-store-index
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: vector-store
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/rag/rag-vector-store.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "向量数据库在 RAG 里解决什么问题？请比较 HNSW、IVFFLAT 这类索引在召回、延迟、内存和更新成本上的取舍。"
+    followups:
+      - "为什么相似度高不等于答案一定正确？"
+      - "如果数据规模从十万条到千万条，索引和分片会怎么调整？"
+    rubric:
+      - "能说明向量检索、近似最近邻、召回率和延迟的关系。"
+      - "能比较索引构建成本、内存占用、增量更新和过滤能力。"
+      - "能指出向量召回需要结合关键词、Rerank 和业务过滤。"
+    tags: ["向量数据库", "HNSW", "IVFFLAT", "检索优化"]
+
+  - id: ai-rag-evaluation-optimization
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: rag-evaluation
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/rag/rag-optimization.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "一个 RAG 系统上线后用户反馈命中率低、答案不稳定，你会怎样建立评测集并定位优化方向？"
+    followups:
+      - "怎么分别评估检索召回、Rerank、答案忠实度和最终可用性？"
+      - "Hybrid Search、Query Rewrite、Rerank 和上下文压缩分别适合解决什么问题？"
+    rubric:
+      - "能提出 Golden Set、人工标注、线上反馈和 Trace 回放。"
+      - "能区分召回率、排序质量、忠实度、答案完整性和延迟成本。"
+      - "能给出针对检索、排序、上下文和生成阶段的优化策略。"
+    tags: ["RAG 评测", "检索优化", "Rerank", "Trace 回放"]
+
+  - id: ai-agent-tool-calling-permission
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: agent
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/agent/agent-basis.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "请解释 Agent Loop 的基本过程，并设计一个能调用外部 API 的 Agent。你会怎样控制工具权限和失败重试？"
+    followups:
+      - "Agent 和固定 Workflow 的边界在哪里？什么时候不该用 Agent？"
+      - "如果工具返回错误数据，Agent 继续推理可能带来什么风险？"
+    rubric:
+      - "能讲清观察、规划、行动、工具返回和停止条件。"
+      - "能说明工具注册、参数校验、权限最小化、人工确认和审计。"
+      - "能覆盖循环上限、失败重试、降级和成本控制。"
+    tags: ["Agent", "Tool Calling", "权限控制", "失败重试"]
+
+  - id: ai-agent-memory-context
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: agent-memory
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/agent/agent-memory.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "Agent 的短期记忆、长期记忆和 RAG 有什么区别？如果要做一个客服 Agent，你会怎样设计记忆写入和遗忘机制？"
+    followups:
+      - "哪些用户信息不能直接写入长期记忆？"
+      - "记忆检索错了会怎样影响模型回答？怎么评估？"
+    rubric:
+      - "能区分会话上下文、长期用户画像、知识库检索和结构化状态。"
+      - "能说明记忆写入触发、去重、合成、过期、删除和隐私边界。"
+      - "能提出记忆命中率、错误注入、人工审核和用户可控机制。"
+    tags: ["Agent Memory", "Context Engineering", "隐私", "长期记忆"]
+
+  - id: ai-context-engineering-token-budget
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: context-engineering
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/agent/context-engineering.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "Context Engineering 和 Prompt Engineering 有什么区别？在一个长任务 Agent 里，你会怎样管理上下文和 Token 预算？"
+    followups:
+      - "Compaction、结构化笔记和按需检索分别解决什么问题？"
+      - "上下文里放太多历史为什么可能让回答变差？"
+    rubric:
+      - "能区分静态指令编排和动态上下文管理。"
+      - "能说明 Token 预算、上下文压缩、按需加载、历史摘要和状态持久化。"
+      - "能提出用 Trace 和任务成功率评估上下文策略。"
+    tags: ["Context Engineering", "Token 预算", "上下文压缩", "长任务"]
+
+  - id: ai-mcp-server-security
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: mcp
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/agent/mcp.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "MCP 解决了什么问题？如果你要为公司内部系统做一个 MCP Server，需要重点考虑哪些安全和工程边界？"
+    followups:
+      - "MCP 和普通 Function Calling 相比，多了哪些协议和运维问题？"
+      - "怎样防止模型通过工具越权读取或写入敏感数据？"
+    rubric:
+      - "能说明 MCP 的工具暴露、资源访问和统一连接边界。"
+      - "能覆盖鉴权、授权、参数校验、审计、速率限制和敏感数据脱敏。"
+      - "能提出工具版本管理、兼容性、观测和故障隔离策略。"
+    tags: ["MCP", "工具协议", "安全边界", "审计"]
+
+  - id: ai-workflow-graph-loop-selection
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: workflow
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/agent/workflow-graph-loop.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "AI Workflow、Graph 和 Agent Loop 适合解决什么类型的问题？请用一个审批或内容生成场景说明你会怎么选型。"
+    followups:
+      - "哪些节点应该固定成 Workflow，哪些地方可以让 Agent 自主决策？"
+      - "流程中怎么做状态持久化、重试和人工介入？"
+    rubric:
+      - "能区分固定流程、图状态编排和自主循环的适用边界。"
+      - "能说明节点、边、状态、条件分支、重试和人工确认。"
+      - "能结合可控性、成本、稳定性和调试难度做取舍。"
+    tags: ["AI Workflow", "Graph", "Agent Loop", "流程编排"]
+
+  - id: ai-llm-gateway-routing-fallback
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: llm-gateway
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/system-design/llm-gateway.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "请设计一个公司内部 LLM Gateway，要求支持多模型路由、限流、fallback、成本统计和调用审计。核心模块怎么拆？"
+    followups:
+      - "模型 A 超时后切到模型 B，会带来哪些输出一致性和成本问题？"
+      - "如何按用户、应用、模型维度做配额和成本归因？"
+    rubric:
+      - "能拆出鉴权、路由、配额、限流、缓存、重试、降级和审计模块。"
+      - "能说明多模型 fallback 的兼容性、质量波动和成本风险。"
+      - "能提出日志、Trace、Token 统计、告警和灰度策略。"
+    tags: ["模型网关", "多模型路由", "fallback", "成本治理"]
+
+  - id: ai-observability-trace-evaluation
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: llm-evaluation
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/llm-evaluation.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "生产级 AI 应用为什么需要评测和可观测？请设计一套能定位 Prompt、RAG、工具调用和模型质量问题的指标体系。"
+    followups:
+      - "LLM-as-Judge 可以用在哪些环节？它本身有什么风险？"
+      - "线上问题如何通过 Trace 回放复现和回归？"
+    rubric:
+      - "能覆盖离线 Golden Set、线上反馈、LLM-as-Judge 和人工抽检。"
+      - "能区分质量、延迟、成本、错误率、工具成功率和用户满意度指标。"
+      - "能说明 Trace 采集、脱敏、回放、对比实验和灰度发布。"
+    tags: ["AI 评测", "可观测", "Trace 回放", "LLM-as-Judge"]
+
+  - id: ai-application-architecture
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: ai-architecture
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/system-design/ai-application-architecture.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "把一个 Prompt Demo 做成生产级 AI 应用，需要补哪些后端能力？请从架构、数据、网关、评测、安全和运维角度拆解。"
+    followups:
+      - "Prompt、模型、知识库和工具配置应该如何版本化？"
+      - "如何避免 Demo 可以跑，但上线后不可观测、不可回滚、成本失控？"
+    rubric:
+      - "能拆出业务服务、Prompt 管理、模型网关、RAG、工具、评测和观测。"
+      - "能说明版本化、灰度、回滚、权限、数据安全和成本控制。"
+      - "能结合真实业务指标验证 AI 功能是否值得上线。"
+    tags: ["AI 应用架构", "生产化", "版本管理", "工程落地"]
+
+  - id: ai-voice-agent-latency-turn-taking
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: voice-agent
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/system-design/ai-voice.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "请设计一个实时语音面试 Agent，从 VAD、ASR、LLM 到 TTS 的链路如何降低延迟并支持打断？"
+    followups:
+      - "端点检测太敏感或太迟钝分别会造成什么体验问题？"
+      - "如果 ASR 中间结果错了，LLM 是否应该提前生成？如何兜底？"
+    rubric:
+      - "能覆盖 VAD、ASR、LLM、TTS、流式传输、播放队列和打断处理。"
+      - "能说明首包延迟、端点检测、半双工/全双工、回声和噪声问题。"
+      - "能提出延迟、准确率、取消率、重听率和用户体验指标。"
+    tags: ["语音 Agent", "VAD", "ASR", "TTS", "低延迟"]

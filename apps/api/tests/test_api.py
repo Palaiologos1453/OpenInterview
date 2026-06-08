@@ -24,7 +24,7 @@ class OpenInterviewAPITest(unittest.TestCase):
         self.assertIn("voice_profiles", payload)
         self.assertNotIn("coding", {item["id"] for item in payload["modes"]})
         direction_ids = {item["id"] for item in payload["directions"]}
-        self.assertEqual(direction_ids, {"backend"})
+        self.assertEqual(direction_ids, {"backend", "ai_application"})
         mode_names = {item["id"]: item["name"] for item in payload["modes"]}
         self.assertEqual(mode_names["fundamentals"], "单纯八股")
         self.assertEqual(mode_names["project_deep_dive"], "简历拷打")
@@ -181,11 +181,20 @@ class OpenInterviewAPITest(unittest.TestCase):
         self.assertTrue(response.json()["questions"])
         self.assertTrue(all(item.get("type") != "coding" for item in response.json()["questions"]))
         self.assertTrue(all("backend" in item.get("directions", []) for item in response.json()["questions"]))
+        ai_questions = client.get("/v1/questions?direction_id=ai_application")
+        self.assertEqual(ai_questions.status_code, 200)
+        self.assertTrue(ai_questions.json()["questions"])
+        self.assertTrue(
+            all("ai_application" in item.get("directions", []) for item in ai_questions.json()["questions"])
+        )
         hidden = client.get("/v1/questions?direction_id=frontend")
         self.assertEqual(hidden.status_code, 200)
         self.assertEqual(hidden.json()["questions"], [])
         frontend_question = client.get("/v1/questions/frontend-url-render")
         self.assertEqual(frontend_question.status_code, 404)
+        ai_question = client.get("/v1/questions/ai-rag-pipeline-design")
+        self.assertEqual(ai_question.status_code, 200)
+        self.assertEqual(ai_question.json()["topic"], "rag")
 
     def test_question_coverage(self):
         response = client.get("/v1/questions/coverage")
@@ -193,6 +202,13 @@ class OpenInterviewAPITest(unittest.TestCase):
         payload = response.json()
         self.assertGreater(payload["total"], 50)
         self.assertTrue(any(item["topic"] == "java-basis" for item in payload["topics"]))
+
+        ai_response = client.get("/v1/questions/coverage?direction_id=ai_application")
+        self.assertEqual(ai_response.status_code, 200)
+        ai_payload = ai_response.json()
+        self.assertEqual(ai_payload["direction_id"], "ai_application")
+        self.assertGreaterEqual(ai_payload["total"], 16)
+        self.assertTrue(any(item["topic"] == "rag" for item in ai_payload["topics"]))
 
     def test_provider_defaults_are_local_text_first(self):
         settings = ProviderSettings()

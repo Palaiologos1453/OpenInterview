@@ -25,6 +25,11 @@ QUESTION_BANK = {
             "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
             "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
         ],
+        "ai_application": [
+            "请解释 Token、上下文窗口和采样参数会怎样影响 LLM 应用的质量、成本和稳定性。",
+            "设计一个 RAG 问答链路时，文档切分、召回、Rerank 和上下文组装分别解决什么问题？",
+            "Agent 调用工具时，为什么需要参数校验、权限控制、审计和人工确认？",
+        ],
     },
     "system_design": [
         "如果让你设计一个校招刷题记录系统，你会如何拆分模块、设计核心表，并保证查询效率？",
@@ -355,6 +360,7 @@ class CampusInterviewEngine:
             "topic": question.get("topic"),
             "type": question.get("type"),
             "difficulty": question.get("difficulty"),
+            "directions": list(question.get("directions") or []),
             "tags": list(question.get("tags") or []),
             "followups": list(question.get("followups") or []),
             "rubric": list(question.get("rubric") or []),
@@ -375,6 +381,22 @@ class CampusInterviewEngine:
         return sorted(questions, key=score)
 
     def _style_topic_priority(self, session: InterviewSession, phase: str) -> list[str]:
+        if session.config.direction_id == "ai_application":
+            style = session.config.interviewer_style_id
+            if style == "fundamental_chain":
+                return [
+                    "llm-basics",
+                    "llm-api",
+                    "prompt-engineering",
+                    "structured-output",
+                    "rag",
+                    "agent",
+                ]
+            if style == "resume_truth_probe":
+                return ["ai-architecture", "rag", "llm-gateway", "llm-evaluation", "voice-agent"]
+            if style == "system_design" or phase == "system_design":
+                return ["ai-architecture", "llm-gateway", "rag-evaluation", "voice-agent", "mcp"]
+            return ["llm-basics", "prompt-engineering", "rag", "agent", "llm-gateway"]
         style = session.config.interviewer_style_id
         if style == "fundamental_chain":
             return ["java-basis", "java-collection", "java-concurrency", "jvm", "mysql", "redis", "spring"]
@@ -900,7 +922,7 @@ class CampusInterviewEngine:
             "先给定义或结论，避免直接堆术语。",
             "解释底层机制和为什么这样设计。",
             f"补充“{focus}”，给出适用场景、边界条件和常见误区。",
-            "落到 Java 后端项目里说明如何验证或排查。",
+            f"落到{self._role_context(meta)}里说明如何验证或排查。",
         ]
 
     def _join_items(self, items: list[str]) -> str:
@@ -1157,7 +1179,7 @@ class CampusInterviewEngine:
         return (
             f"参考结构：先给出 {topic} 的直接结论或定义，再解释底层机制和关键约束。"
             f"围绕“{rubric_text}”补齐适用场景、优缺点、边界条件和常见误区。"
-            "最后落到 Java 后端工程里，说明如何通过日志、指标、测试、压测或代码设计验证。"
+            f"最后落到{self._role_context(meta)}里，说明如何通过日志、指标、测试、压测或代码设计验证。"
         )
 
     def _common_mistakes(self, question_meta: dict, focus: str) -> list[str]:
@@ -1184,7 +1206,7 @@ class CampusInterviewEngine:
         return [
             "只背概念定义，不解释机制和适用边界。",
             f"没有展开“{focus}”。",
-            "没有结合 Java 后端场景说明工程落地和验证方式。",
+            f"没有结合{self._role_context(question_meta)}说明工程落地和验证方式。",
             "把相近概念混用，缺少对比和反例。",
         ]
 
@@ -1242,8 +1264,34 @@ class CampusInterviewEngine:
         return (
             f"{topic} 我会先给结论，再解释机制。"
             f"重点补“{focus}”，包括适用场景、边界条件、和相近方案对比。"
-            "最后结合 Java 后端场景说明排查或验证方法，比如日志、指标、单测、压测或线上监控。"
+            f"最后结合{self._role_context(question_meta)}说明排查或验证方法，比如日志、指标、单测、压测或线上监控。"
         )
+
+    def _role_context(self, question_meta: dict) -> str:
+        topic = str(question_meta.get("topic") or "")
+        directions = set(question_meta.get("directions") or [])
+        ai_topics = {
+            "llm-basics",
+            "llm-api",
+            "prompt-engineering",
+            "structured-output",
+            "rag",
+            "rag-document",
+            "vector-store",
+            "rag-evaluation",
+            "agent",
+            "agent-memory",
+            "context-engineering",
+            "mcp",
+            "workflow",
+            "llm-gateway",
+            "llm-evaluation",
+            "ai-architecture",
+            "voice-agent",
+        }
+        if "ai_application" in directions or topic in ai_topics:
+            return "AI 应用工程场景"
+        return "Java 后端工程场景"
 
     def _review_plan(self, session: InterviewSession) -> list[str]:
         drills = self._practice_drills(session)
