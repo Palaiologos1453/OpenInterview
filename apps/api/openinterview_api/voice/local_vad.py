@@ -4,8 +4,6 @@ from dataclasses import dataclass
 from pathlib import Path
 import wave
 
-import numpy as np
-
 from ..settings import default_vad_model
 
 
@@ -20,14 +18,15 @@ class SileroVAD:
     def __init__(self, model_path: Path | None = None, threshold: float = 0.5):
         self.model_path = model_path or default_vad_model()
         self.threshold = threshold
-        if not self.model_path.exists():
-            raise FileNotFoundError(f"Silero VAD model not found: {self.model_path}")
 
     def detect_file(self, audio_path: Path) -> dict:
+        if not self.model_path.exists():
+            return _energy_vad(audio_path, self.threshold, reason=f"Silero VAD model not found: {self.model_path}")
         try:
+            import numpy as np
             import onnxruntime as ort
         except ImportError as exc:
-            raise RuntimeError("onnxruntime is required for local VAD.") from exc
+            return _energy_vad(audio_path, self.threshold, reason=f"Silero VAD dependency missing: {exc}")
 
         samples, sample_rate = _read_wav_mono(audio_path)
         if sample_rate != 16000:
@@ -61,6 +60,7 @@ class SileroVAD:
 
         merged = _merge_segments(speech_windows)
         return {
+            "provider": "silero",
             "sample_rate": sample_rate,
             "duration_ms": int(len(samples) / sample_rate * 1000),
             "speech_ms": sum(item.end_ms - item.start_ms for item in merged),
@@ -68,7 +68,9 @@ class SileroVAD:
         }
 
 
-def _read_wav_mono(path: Path) -> tuple[np.ndarray, int]:
+def _read_wav_mono(path: Path) -> tuple[object, int]:
+    import numpy as np
+
     with wave.open(str(path), "rb") as wav:
         channels = wav.getnchannels()
         sample_rate = wav.getframerate()
@@ -83,6 +85,59 @@ def _read_wav_mono(path: Path) -> tuple[np.ndarray, int]:
     return samples, sample_rate
 
 
+def _energy_vad(path: Path, threshold: float, *, reason: str) -> dict:
+    with wave.open(str(path), "rb") as wav:
+        channels = wav.getnchannels()
+        sample_rate = wav.getframerate()
+        sample_width = wav.getsampwidth()
+        frames = wav.readframes(wav.getnframes())
+    if sample_width != 2:
+        raise ValueError("Fallback VAD expects 16-bit PCM WAV input.")
+
+    sample_count = len(frames) // 2
+    if sample_count <= 0:
+        return {
+            "provider": "energy_fallback",
+            "fallback_reason": reason,
+            "sample_rate": sample_rate,
+            "duration_ms": 0,
+            "speech_ms": 0,
+            "segments": [],
+        }
+
+    values = [int.from_bytes(frames[index:index + 2], "little", signed=True) for index in range(0, len(frames), 2)]
+    if channels > 1:
+        mono = []
+        for index in range(0, len(values), channels):
+            chunk = values[index:index + channels]
+            if chunk:
+                mono.append(sum(chunk) / len(chunk))
+        values = mono
+
+    window_size = max(sample_rate // 20, 1)
+    speech_windows: list[VADSegment] = []
+    energy_threshold = max(500.0, 5000.0 * threshold)
+    for offset in range(0, len(values), window_size):
+        window = values[offset:offset + window_size]
+        if not window:
+            continue
+        mean_abs = sum(abs(item) for item in window) / len(window)
+        if mean_abs >= energy_threshold:
+            start_ms = int(offset / sample_rate * 1000)
+            end_ms = int(min(offset + window_size, len(values)) / sample_rate * 1000)
+            speech_windows.append(VADSegment(start_ms, end_ms, min(mean_abs / 32768.0, 1.0)))
+
+    merged = _merge_segments(speech_windows)
+    return {
+        "provider": "energy_fallback",
+        "fallback_reason": reason,
+        "sample_rate": sample_rate,
+        "duration_ms": int(len(values) / sample_rate * 1000),
+        "speech_ms": sum(item.end_ms - item.start_ms for item in merged),
+        "segments": [item.__dict__ for item in merged],
+    }
+
+
 def _merge_segments(windows: list[VADSegment], max_gap_ms: int = 250) -> list[VADSegment]:
     if not windows:
         return []
@@ -95,4 +150,3 @@ def _merge_segments(windows: list[VADSegment], max_gap_ms: int = 250) -> list[VA
         else:
             merged.append(window)
     return merged
-
