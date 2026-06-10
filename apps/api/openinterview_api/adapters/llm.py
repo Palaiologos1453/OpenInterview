@@ -103,6 +103,11 @@ def is_real_llm(config: dict | None) -> bool:
     return provider not in {"", "mock", "disabled"}
 
 
+def llm_allows_fallback(config: dict | None) -> bool:
+    settings = (config or {}).get("llm", config or {})
+    return bool(settings.get("allow_fallback"))
+
+
 def llm_temperature(config: dict | None) -> float:
     settings = (config or {}).get("llm", config or {})
     return float(settings.get("temperature") or 0.4)

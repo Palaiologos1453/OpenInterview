@@ -10,6 +10,7 @@ class LLMProviderSettings(BaseModel):
     api_key: str | None = None
     temperature: float = Field(default=0.4, ge=0, le=2)
     timeout_seconds: int = Field(default=45, ge=5, le=180)
+    allow_fallback: bool = Field(default=False)
 
 
 class ASRProviderSettings(BaseModel):

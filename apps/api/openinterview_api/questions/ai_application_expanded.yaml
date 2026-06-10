@@ -1,0 +1,646 @@
+questions:
+  - id: ai-llm-operation-prefill-decode-latency
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: llm-basics
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/llm-operation-mechanism.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "请解释大模型推理里的 prefill 和 decode 阶段。为什么输入很长和输出很长会造成不同类型的延迟？"
+    followups:
+      - "首 Token 延迟和总生成耗时分别受哪些因素影响？"
+      - "如果要优化客服机器人的首响，你会先压缩输入还是限制输出？"
+    rubric:
+      - "能区分提示词处理、KV Cache 和逐 Token 生成。"
+      - "能说明上下文长度、输出长度、并发批处理和模型大小对延迟的影响。"
+      - "能提出压缩上下文、流式输出、缓存和模型路由等优化手段。"
+    tags: ["LLM 推理", "prefill", "decode", "延迟优化"]
+
+  - id: ai-llm-context-position-noise
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: llm-basics
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/llm-operation-mechanism.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "长上下文模型接入后，为什么仍可能出现关键信息找不到或答案变差？你会怎样做上下文质量治理？"
+    followups:
+      - "上下文里混入重复、过期、低相关内容会带来什么问题？"
+      - "如何验证模型真的使用了你放进去的证据？"
+    rubric:
+      - "能指出长上下文存在位置敏感、噪声干扰和成本上升问题。"
+      - "能提出去重、排序、摘要、引用证据和上下文窗口预算策略。"
+      - "能用离线评测、引用命中率和错误案例回放验证效果。"
+    tags: ["长上下文", "上下文噪声", "证据引用", "质量治理"]
+
+  - id: ai-llm-api-compatibility-adapter
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: llm-api
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/llm-api-engineering.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "公司要同时接入多个 OpenAI-compatible 服务商，你会如何设计统一适配层，处理模型名、错误码、超时和返回格式差异？"
+    followups:
+      - "不同服务商 streaming chunk 格式不一致怎么办？"
+      - "适配层里哪些字段必须进入调用日志？"
+    rubric:
+      - "能抽象统一请求、响应、错误、用量和流式事件模型。"
+      - "能说明 provider 配置、模型能力元数据、超时和重试策略。"
+      - "能覆盖日志脱敏、traceId、Token 统计和兼容性测试。"
+    tags: ["LLM API", "适配层", "多服务商", "兼容性"]
+
+  - id: ai-llm-api-cancel-timeout-budget
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: llm-api
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/llm-api-engineering.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "用户关闭页面或点击停止生成时，后端 LLM 调用层应该如何取消请求，并避免继续消耗 Token 和连接资源？"
+    followups:
+      - "HTTP streaming、WebSocket 和队列任务的取消边界有什么不同？"
+      - "如果服务商不支持取消，你还能做哪些资源保护？"
+    rubric:
+      - "能覆盖客户端断连感知、Abort、连接关闭和后台任务取消。"
+      - "能说明超时预算、最大输出 Token、并发限制和清理回调。"
+      - "能用取消率、超时率、长连接数量和成本指标监控效果。"
+    tags: ["取消生成", "超时预算", "流式响应", "成本控制"]
+
+  - id: ai-prompt-version-regression
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: prompt-engineering
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/agent/prompt-engineering.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "业务 Prompt 频繁迭代时，你会如何做版本管理、灰度发布和回归测试，避免新 Prompt 修一个问题又引入新问题？"
+    followups:
+      - "Prompt 版本应该和模型版本、知识库版本怎样关联？"
+      - "人工改 Prompt 后如何快速发现线上质量回退？"
+    rubric:
+      - "能说明 Prompt 模板、变量、示例和输出格式都需要版本化。"
+      - "能提出 Golden Set、A/B 实验、灰度和回滚策略。"
+      - "能结合质量、延迟、成本和投诉样本做发布门禁。"
+    tags: ["Prompt 版本", "回归测试", "灰度发布", "质量回退"]
+
+  - id: ai-prompt-injection-defense
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: prompt-engineering
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/agent/prompt-engineering.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "RAG 或 Agent 场景里，用户或文档可能包含 Prompt Injection。你会如何识别和降低越权执行风险？"
+    followups:
+      - "为什么只在系统 Prompt 里写不要越权并不可靠？"
+      - "工具调用前为什么还需要服务端权限校验？"
+    rubric:
+      - "能区分用户指令、系统策略、检索内容和工具参数的可信等级。"
+      - "能提出内容隔离、敏感工具确认、参数白名单和权限校验。"
+      - "能通过审计、红队样例和异常工具调用告警验证防护。"
+    tags: ["Prompt Injection", "安全", "工具权限", "RAG"]
+
+  - id: ai-structured-output-schema-evolution
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: structured-output
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/structured-output-function-calling.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "模型需要输出简历解析 JSON，但字段会随业务迭代变化。你会如何设计 Schema 演进、兼容和校验？"
+    followups:
+      - "新增必填字段时，老 Prompt 和老模型调用如何兼容？"
+      - "模型输出字段类型不匹配时，服务端应该如何处理？"
+    rubric:
+      - "能说明 JSON Schema、默认值、版本号和向后兼容策略。"
+      - "能区分可修复格式错误、语义错误和必须拒绝的错误。"
+      - "能提出重试、修复、人工审核和坏样本回归测试。"
+    tags: ["结构化输出", "Schema 演进", "校验", "兼容性"]
+
+  - id: ai-structured-output-tool-argument-validation
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: structured-output
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/structured-output-function-calling.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "模型通过 Tool Calling 生成了工具参数。服务端为什么不能直接执行？请设计一层参数校验和风险控制。"
+    followups:
+      - "哪些参数应该由服务端补全，而不是交给模型决定？"
+      - "删除、转账、发通知这类高风险工具如何确认？"
+    rubric:
+      - "能说明模型输出只是意图，不能替代服务端鉴权和业务校验。"
+      - "能覆盖类型校验、枚举白名单、资源归属、幂等和审计。"
+      - "能按风险等级设计人工确认、沙箱执行和回滚补偿。"
+    tags: ["Tool Calling", "参数校验", "权限", "审计"]
+
+  - id: ai-rag-hybrid-search-query-rewrite
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: rag
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/rag/rag-optimization.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "RAG 问答对专业术语、缩写和口语化问题召回很差，你会如何使用 Query Rewrite、Hybrid Search 和 Rerank 优化？"
+    followups:
+      - "Query Rewrite 可能改坏用户意图怎么办？"
+      - "关键词召回和向量召回分别更适合什么问题？"
+    rubric:
+      - "能说明改写、扩展、关键词召回、向量召回和重排的职责。"
+      - "能针对术语、别名、长问题和多意图问题设计策略。"
+      - "能用召回率、排序指标、答案命中和人工样例评估。"
+    tags: ["RAG", "Hybrid Search", "Query Rewrite", "Rerank"]
+
+  - id: ai-rag-answer-citation-faithfulness
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: rag
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/rag/rag-basis.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "企业知识库要求答案必须可追溯。你会如何设计引用、证据片段和忠实度校验，降低幻觉？"
+    followups:
+      - "模型回答正确但引用错了，算不算质量问题？"
+      - "没有检索到证据时，系统应该怎么回答？"
+    rubric:
+      - "能要求答案绑定证据片段、文档版本和来源链接。"
+      - "能区分答案正确性、引用准确性和证据充分性。"
+      - "能设计无答案拒答、引用校验、抽检和 Trace 回放。"
+    tags: ["RAG", "引用", "忠实度", "幻觉控制"]
+
+  - id: ai-rag-document-table-image-handling
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: rag-document
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/rag/rag-document-processing.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "知识库里有 PDF 表格、图片和多级标题文档。你会如何做解析和切分，避免表格断裂、标题丢失和上下文错配？"
+    followups:
+      - "表格转 Markdown、HTML 或结构化 JSON 各有什么取舍？"
+      - "图片 OCR 结果如何和原文片段建立引用关系？"
+    rubric:
+      - "能覆盖版面解析、标题层级、表格结构、图片 OCR 和元数据保留。"
+      - "能说明按语义结构切分比固定长度切分更稳定的原因。"
+      - "能提出解析质量评估、人工抽检和失败兜底。"
+    tags: ["文档解析", "表格", "OCR", "Chunking"]
+
+  - id: ai-rag-document-incremental-update
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: rag-document
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/rag/rag-knowledge-update.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "知识库文档每天更新，你会如何做增量索引、版本切换和回滚，避免新旧知识混用？"
+    followups:
+      - "删除文档后，向量库里的旧 Chunk 如何清理？"
+      - "索引重建期间如何保证线上查询稳定？"
+    rubric:
+      - "能说明文档版本、Chunk ID、增删改检测和索引任务状态。"
+      - "能设计双索引切换、增量更新、失败重试和回滚。"
+      - "能用更新时间、版本命中、旧知识命中率监控一致性。"
+    tags: ["知识更新", "增量索引", "版本切换", "回滚"]
+
+  - id: ai-vector-store-embedding-version-migration
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: vector-store
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/rag/rag-vector-store.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "Embedding 模型升级后，向量维度和语义空间都变了。你会如何迁移向量库并验证检索质量？"
+    followups:
+      - "新旧 Embedding 能混在同一个索引里吗？为什么？"
+      - "迁移期间如何做灰度和回滚？"
+    rubric:
+      - "能说明 Embedding 版本、维度、距离函数和索引兼容问题。"
+      - "能设计双写、离线重建、灰度查询和质量对比。"
+      - "能用召回率、延迟、成本和线上反馈判断是否切换。"
+    tags: ["向量库", "Embedding", "迁移", "灰度"]
+
+  - id: ai-vector-store-metadata-filter
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: vector-store
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/rag/rag-vector-store.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "多租户知识库共用向量数据库时，如何设计元数据过滤、权限隔离和索引分片？"
+    followups:
+      - "先做向量召回再过滤，和先过滤再召回有什么差异？"
+      - "租户数据量差异很大时，索引如何规划？"
+    rubric:
+      - "能覆盖 tenant、文档权限、版本、类别等元数据过滤。"
+      - "能说明过滤时机对召回率、延迟和安全隔离的影响。"
+      - "能提出分库分索引、冷热分层、审计和越权测试。"
+    tags: ["向量库", "多租户", "权限过滤", "分片"]
+
+  - id: ai-rag-evaluation-golden-set
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: rag-evaluation
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/rag/rag-optimization.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "RAG 评测集应该如何构建？请说明问题来源、标准答案、证据文档和负样本各自的作用。"
+    followups:
+      - "只用线上用户点赞点踩够不够？"
+      - "如何覆盖无答案、过期知识和权限受限问题？"
+    rubric:
+      - "能说明 Golden Set 来自真实问题、专家标注和典型失败样本。"
+      - "能同时评估检索、排序、引用和最终答案。"
+      - "能设计持续更新、分层抽样和回归门禁。"
+    tags: ["RAG 评测", "Golden Set", "负样本", "回归"]
+
+  - id: ai-rag-evaluation-online-feedback-loop
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: rag-evaluation
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/llm-evaluation.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "RAG 上线后如何把用户反馈、人工标注和 Trace 回放形成持续优化闭环？"
+    followups:
+      - "用户反馈很主观，如何避免误导优化方向？"
+      - "哪些线上样本应该优先进入回归集？"
+    rubric:
+      - "能采集问题、召回片段、答案、引用、用户动作和人工结论。"
+      - "能区分产品满意度、事实错误、召回失败和权限问题。"
+      - "能形成样本分流、人工标注、实验对比和回归发布流程。"
+    tags: ["线上反馈", "Trace 回放", "人工标注", "持续优化"]
+
+  - id: ai-agent-loop-stop-condition
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: agent
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/agent/agent-basis.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "Agent Loop 如果没有可靠停止条件，可能会无限调用工具或成本失控。你会如何设计停止条件和保护阈值？"
+    followups:
+      - "达到循环上限时，应该直接失败还是返回部分结果？"
+      - "怎样识别 Agent 在重复执行无效动作？"
+    rubric:
+      - "能说明最大步数、最大耗时、成本预算和目标完成判定。"
+      - "能设计重复动作检测、失败次数阈值和人工介入。"
+      - "能通过任务成功率、平均步数、工具失败率和成本监控。"
+    tags: ["Agent Loop", "停止条件", "成本控制", "保护阈值"]
+
+  - id: ai-agent-tool-result-trust
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: agent
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/agent/agent-basis.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "Agent 调用外部工具后，工具结果可能过期、部分失败或被污染。你会如何让 Agent 正确处理工具结果可信度？"
+    followups:
+      - "工具返回 200 但业务结果为空，Agent 应该怎么判断？"
+      - "多个工具结果冲突时如何处理？"
+    rubric:
+      - "能为工具结果保留状态码、时间、来源、置信度和错误信息。"
+      - "能设计结果校验、重试、交叉验证和降级回复。"
+      - "能避免模型把异常结果当成事实继续推理。"
+    tags: ["Agent", "工具结果", "可信度", "异常处理"]
+
+  - id: ai-agent-memory-write-policy
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: agent-memory
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/agent/agent-memory.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "客服 Agent 想记住用户偏好。哪些信息适合写入长期记忆，哪些不应该写？写入前需要哪些判断？"
+    followups:
+      - "用户临时抱怨和稳定偏好如何区分？"
+      - "记忆写错后用户如何查看、修改和删除？"
+    rubric:
+      - "能区分稳定偏好、业务状态、临时上下文和敏感隐私。"
+      - "能设计写入触发、确认、去重、过期和用户可控机制。"
+      - "能考虑隐私合规、误写纠正和记忆命中评估。"
+    tags: ["Agent Memory", "长期记忆", "隐私", "用户可控"]
+
+  - id: ai-agent-memory-retrieval-ranking
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: agent-memory
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/agent/agent-memory.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "长期记忆越来越多后，Agent 如何检索和排序最相关的记忆，避免把旧偏好或错误记忆带入回答？"
+    followups:
+      - "记忆的时间衰减和置信度如何参与排序？"
+      - "检索不到记忆时应该如何回退？"
+    rubric:
+      - "能结合向量检索、关键词、时间、置信度和业务类型排序。"
+      - "能设计过期、合并、去重和错误记忆清理。"
+      - "能用命中率、误用率、用户纠错率评估记忆质量。"
+    tags: ["记忆检索", "排序", "时间衰减", "纠错"]
+
+  - id: ai-context-engineering-compaction
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: context-engineering
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/agent/context-engineering.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "长任务 Agent 为什么需要上下文压缩？请比较摘要、结构化状态和按需检索三种上下文管理方式。"
+    followups:
+      - "摘要丢失关键信息怎么办？"
+      - "结构化状态适合记录哪些内容？"
+    rubric:
+      - "能说明上下文不能无限堆叠，需要控制 Token、噪声和成本。"
+      - "能比较摘要、状态、检索在信息保真和可控性上的取舍。"
+      - "能设计压缩触发、关键信息保留和回归评测。"
+    tags: ["Context Engineering", "上下文压缩", "结构化状态", "按需检索"]
+
+  - id: ai-context-engineering-contamination
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: context-engineering
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/agent/context-engineering.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "多轮 Agent 任务中，错误中间结论可能污染后续上下文。你会如何隔离草稿、事实、用户指令和工具结果？"
+    followups:
+      - "模型自我总结的内容能否直接当事实？"
+      - "如何让后续步骤知道哪些信息已经被验证？"
+    rubric:
+      - "能区分事实、假设、草稿、工具结果和最终结论。"
+      - "能设计验证标记、来源引用、状态机和上下文分层。"
+      - "能通过错误注入和 Trace 回放评估污染风险。"
+    tags: ["上下文污染", "事实验证", "状态管理", "Agent"]
+
+  - id: ai-mcp-resource-tool-boundary
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: mcp
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/agent/mcp.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "MCP Server 暴露 Resource 和 Tool 时，如何划分只读资源、可执行动作和需要审批的高风险能力？"
+    followups:
+      - "只读资源为什么也需要权限控制？"
+      - "工具参数 Schema 和业务鉴权分别解决什么问题？"
+    rubric:
+      - "能区分资源读取、工具执行、提示模板和客户端能力协商。"
+      - "能按风险等级设计鉴权、授权、审批和审计。"
+      - "能关注参数校验、越权访问和敏感数据脱敏。"
+    tags: ["MCP", "Resource", "Tool", "权限"]
+
+  - id: ai-mcp-server-version-observability
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: mcp
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/agent/mcp.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "公司内部多个 Agent 依赖同一个 MCP Server。你会如何做工具版本管理、兼容发布和可观测？"
+    followups:
+      - "工具参数改名或语义变化时，老客户端怎么办？"
+      - "如何定位是模型选择错工具，还是 MCP Server 执行失败？"
+    rubric:
+      - "能设计工具版本、能力描述、兼容期和废弃策略。"
+      - "能记录调用方、工具名、参数摘要、耗时、错误和结果状态。"
+      - "能通过灰度、回滚、告警和 Trace 关联定位问题。"
+    tags: ["MCP", "版本管理", "可观测", "兼容发布"]
+
+  - id: ai-workflow-state-recovery
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: workflow
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/agent/workflow-graph-loop.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "一个 AI 审批 Workflow 执行到一半服务重启了。你会如何设计状态持久化、幂等和恢复执行？"
+    followups:
+      - "节点重试时如何避免重复发送消息或重复扣费？"
+      - "人工审批节点的状态如何保存？"
+    rubric:
+      - "能说明工作流实例、节点状态、输入输出和执行日志持久化。"
+      - "能设计幂等键、补偿、重试次数和人工节点恢复。"
+      - "能关注可观测、超时扫描和异常工单。"
+    tags: ["AI Workflow", "状态恢复", "幂等", "人工审批"]
+
+  - id: ai-workflow-human-in-loop
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: workflow
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/agent/workflow-graph-loop.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "内容生成系统需要在高风险结果发布前加入人工审核。你会如何设计 Human-in-the-loop 节点和回写学习闭环？"
+    followups:
+      - "哪些结果应该自动放行，哪些必须人工审核？"
+      - "人工修改后的结果如何反哺 Prompt 或评测集？"
+    rubric:
+      - "能按风险、置信度、业务规则和用户等级决定审核策略。"
+      - "能设计审核队列、超时、驳回、修改和审计记录。"
+      - "能把审核样本沉淀为评测集、规则和 Prompt 改进依据。"
+    tags: ["Human-in-the-loop", "审核", "风险控制", "评测闭环"]
+
+  - id: ai-llm-gateway-quota-budget
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: llm-gateway
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/system-design/llm-gateway.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "LLM Gateway 如何按用户、应用和模型做限额、预算和成本统计？如果某个应用突然成本暴涨，你如何止损？"
+    followups:
+      - "按请求数限流和按 Token 限流有什么差异？"
+      - "成本统计延迟时，如何避免预算被打穿？"
+    rubric:
+      - "能设计应用、用户、模型、Token 和金额维度的配额。"
+      - "能说明预扣、后结算、熔断、降级模型和告警。"
+      - "能提供成本报表、调用审计和异常检测。"
+    tags: ["LLM Gateway", "配额", "成本", "限流"]
+
+  - id: ai-llm-gateway-model-routing
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: llm-gateway
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/system-design/llm-gateway.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "一个请求应该路由到大模型、小模型还是本地模型？请设计基于任务类型、成本、延迟和质量的模型路由策略。"
+    followups:
+      - "路由策略如何灰度和回滚？"
+      - "不同模型输出风格不一致时，业务层如何感知和处理？"
+    rubric:
+      - "能按任务复杂度、SLA、预算、上下文长度和敏感性路由。"
+      - "能设计规则路由、实验路由、fallback 和结果质量回收。"
+      - "能关注一致性、审计、模型能力元数据和监控指标。"
+    tags: ["模型路由", "多模型", "成本质量取舍", "灰度"]
+
+  - id: ai-evaluation-llm-as-judge-risk
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: llm-evaluation
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/llm-evaluation.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "LLM-as-Judge 能解决哪些评测问题？它本身有哪些偏差和失效风险，如何校准？"
+    followups:
+      - "为什么不能只看 Judge 给出的总分？"
+      - "如何用人工标注样本校准 Judge？"
+    rubric:
+      - "能说明 Judge 适合开放式答案、摘要质量和风格评估。"
+      - "能指出偏见、提示敏感、模型同源偏差和不可解释问题。"
+      - "能用人工基准、一致性检查、分维度评分和抽检校准。"
+    tags: ["LLM-as-Judge", "评测", "偏差", "校准"]
+
+  - id: ai-evaluation-production-metrics
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: llm-evaluation
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/llm-basis/llm-evaluation.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "AI 应用上线后，你会建立哪些线上质量、稳定性和成本指标？如何把指标和报警关联到具体 Prompt、模型和知识库版本？"
+    followups:
+      - "用户满意度下降时，如何判断是模型、RAG 还是业务流问题？"
+      - "哪些指标应该按版本维度切分？"
+    rubric:
+      - "能覆盖成功率、错误率、延迟、Token、成本、满意度和人工介入率。"
+      - "能按模型、Prompt、知识库、工具和应用版本打标签。"
+      - "能设计 Trace、报警、看板和回放定位流程。"
+    tags: ["线上评测", "指标", "版本标签", "Trace"]
+
+  - id: ai-architecture-config-versioning
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: ai-architecture
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/system-design/ai-application-architecture.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "生产级 AI 应用里，Prompt、模型、工具、知识库和安全策略都可能变化。你会如何做配置中心和版本发布？"
+    followups:
+      - "一次线上回答应该能追溯到哪些配置版本？"
+      - "配置回滚时如何避免进行中的会话状态混乱？"
+    rubric:
+      - "能说明模型、Prompt、检索、工具和策略都需要版本化。"
+      - "能设计灰度、回滚、审计、配置快照和会话绑定。"
+      - "能用 Trace 关联配置版本和质量指标。"
+    tags: ["AI 架构", "配置中心", "版本发布", "回滚"]
+
+  - id: ai-architecture-data-privacy
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: ai-architecture
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/system-design/ai-application-architecture.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "企业内部 AI 应用会处理用户数据、业务文档和调用日志。你会如何设计脱敏、权限、留存和审计？"
+    followups:
+      - "哪些数据不应该进入 Prompt 或训练样本？"
+      - "Trace 日志既要排查问题又要保护隐私，怎么取舍？"
+    rubric:
+      - "能覆盖数据分级、最小化采集、脱敏、权限和加密存储。"
+      - "能说明 Prompt、RAG 文档、工具参数和日志的隐私风险。"
+      - "能设计留存周期、访问审计、删除机制和合规检查。"
+    tags: ["数据隐私", "脱敏", "审计", "AI 安全"]
+
+  - id: ai-voice-agent-barge-in
+    directions: ["ai_application"]
+    difficulty: campus
+    topic: voice-agent
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/system-design/ai-voice.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "实时语音 Agent 播报时，用户突然打断。你会如何实现 barge-in，取消 TTS、停止 LLM 生成并保留上下文？"
+    followups:
+      - "如何区分用户打断和环境噪声？"
+      - "取消正在生成的回答后，会话状态如何记录？"
+    rubric:
+      - "能覆盖播放队列、VAD 检测、TTS 取消、LLM abort 和状态更新。"
+      - "能说明噪声、回声、误触发和半双工/全双工取舍。"
+      - "能用打断成功率、误打断率和响应延迟评估体验。"
+    tags: ["语音 Agent", "barge-in", "打断", "TTS"]
+
+  - id: ai-voice-agent-asr-partial-final
+    directions: ["ai_application"]
+    difficulty: bigtech
+    topic: voice-agent
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/ai/system-design/ai-voice.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "语音 Agent 为了降低延迟，想基于 ASR partial result 提前让 LLM 思考。这样做有哪些风险，如何设计确认和修正机制？"
+    followups:
+      - "partial 结果和 final 结果冲突时，已生成内容怎么办？"
+      - "端点检测过早会怎样影响语义完整性？"
+    rubric:
+      - "能说明 partial ASR 可降低延迟但可能引入错误上下文。"
+      - "能设计 provisional 状态、final 校正、取消重算和用户确认。"
+      - "能监控首响、修正率、误答率和用户重说率。"
+    tags: ["ASR", "partial result", "低延迟", "修正机制"]

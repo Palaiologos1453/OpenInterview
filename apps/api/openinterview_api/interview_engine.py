@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from statistics import mean
 from uuid import uuid4
 
-from .adapters.llm import build_llm_adapter, is_real_llm, llm_temperature
+from .adapters.llm import build_llm_adapter, is_real_llm, llm_allows_fallback, llm_temperature
 from .catalog import RUBRIC, find_difficulty, find_direction, find_interviewer_style, find_mode
 from .services.question_bank import default_question_bank
 from .services.resume import analyze_resume
@@ -1404,6 +1404,8 @@ class CampusInterviewEngine:
         return self._call_llm(session, messages)
 
     def _call_llm(self, session: InterviewSession, messages: list[dict[str, str]]) -> str | None:
+        real_llm = is_real_llm(session.config.provider_config)
+        allow_fallback = llm_allows_fallback(session.config.provider_config)
         try:
             adapter = build_llm_adapter(session.config.provider_config)
             text = adapter.complete(
@@ -1411,13 +1413,15 @@ class CampusInterviewEngine:
                 temperature=llm_temperature(session.config.provider_config),
             )
         except Exception as exc:
-            if is_real_llm(session.config.provider_config):
+            if real_llm and not allow_fallback:
                 raise RuntimeError(f"LLM provider failed: {exc}") from exc
             session.provider_notice = f"LLM provider failed, fallback to mock logic: {exc}"
             return None
 
         cleaned = text.strip()
         if not cleaned:
+            if real_llm and not allow_fallback:
+                raise RuntimeError("LLM provider returned empty text.")
             session.provider_notice = "LLM provider returned empty text, fallback to mock logic."
             return None
 

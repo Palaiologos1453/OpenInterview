@@ -11,7 +11,8 @@ const defaultProviderConfig = {
     model: "",
     api_key: "",
     temperature: 0.4,
-    timeout_seconds: 45
+    timeout_seconds: 45,
+    allow_fallback: false
   },
   asr: {
     provider: "browser",
@@ -131,6 +132,7 @@ const elements = {
   llmModel: $("#llm-model"),
   llmApiKey: $("#llm-api-key"),
   llmTemperature: $("#llm-temperature"),
+  llmAllowFallback: $("#llm-allow-fallback"),
   voiceMode: $("#voice-mode"),
   voiceModeHelp: $("#voice-mode-help"),
   localVoicePaths: $("#local-voice-paths"),
@@ -628,7 +630,8 @@ function readProviderConfig() {
       model: elements.llmModel.value.trim(),
       api_key: elements.llmApiKey.value.trim(),
       temperature: Number(elements.llmTemperature.value || 0.4),
-      timeout_seconds: 45
+      timeout_seconds: 45,
+      allow_fallback: elements.llmAllowFallback.checked
     },
     asr: {
       provider: elements.asrProvider.value,
@@ -1035,8 +1038,12 @@ function llmChecklistItem(llm) {
   const missing = llmMissingFields(llm);
   return {
     label: "LLM 面试官",
-    status: missing.length ? "bad" : "ok",
-    detail: missing.length ? `缺少 ${missing.join("、")}` : `${llm.model} 已配置`
+    status: missing.length ? "bad" : llm.allow_fallback ? "warn" : "ok",
+    detail: missing.length
+      ? `缺少 ${missing.join("、")}`
+      : llm.allow_fallback
+        ? `${llm.model} 已配置，但真实调用失败时会回退到 Mock`
+        : `${llm.model} 已配置，失败时不会静默回退`
   };
 }
 
@@ -1134,6 +1141,7 @@ function providerInputs() {
     elements.llmModel,
     elements.llmApiKey,
     elements.llmTemperature,
+    elements.llmAllowFallback,
     elements.voiceMode,
     elements.localVadModel,
     elements.localAsrModelDir,
@@ -1158,6 +1166,7 @@ function fillProviderForm(config) {
   elements.llmModel.value = config.llm.model || "";
   elements.llmApiKey.value = config.llm.api_key || "";
   elements.llmTemperature.value = config.llm.temperature;
+  elements.llmAllowFallback.checked = Boolean(config.llm.allow_fallback);
   elements.asrProvider.value = config.asr.provider;
   elements.asrApiBase.value = config.asr.api_base || "";
   elements.asrModel.value = config.asr.model || "";

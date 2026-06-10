@@ -72,8 +72,8 @@ def question_coverage(questions: list[dict], direction_id: str = "backend") -> d
                 "count": count,
                 "with_followups": quality["with_followups"],
                 "with_rubric": quality["with_rubric"],
-                "status": _coverage_status(count),
-                "next_action": _next_action(topic, count, quality),
+                "status": _coverage_status(count, direction_id, topic, ordered_topics),
+                "next_action": _next_action(topic, count, quality, direction_id, ordered_topics),
             }
         )
 
@@ -87,23 +87,44 @@ def question_coverage(questions: list[dict], direction_id: str = "backend") -> d
     }
 
 
-def _coverage_status(count: int) -> str:
-    if count >= 10:
+def _coverage_target(direction_id: str, topic: str, ordered_topics: list[str]) -> tuple[int, int]:
+    if ordered_topics and topic not in ordered_topics:
+        return 1, 3
+    if direction_id == "ai_application":
+        return 3, 5
+    return 5, 10
+
+
+def _coverage_status(
+    count: int,
+    direction_id: str,
+    topic: str,
+    ordered_topics: list[str],
+) -> str:
+    warn_threshold, ok_threshold = _coverage_target(direction_id, topic, ordered_topics)
+    if count >= ok_threshold:
         return "ok"
-    if count >= 5:
+    if count >= warn_threshold:
         return "warn"
     return "bad"
 
 
-def _next_action(topic: str, count: int, quality: dict) -> str:
-    if count < 5:
-        return f"{topic} 题量不足，优先补到 5 道以上。"
+def _next_action(
+    topic: str,
+    count: int,
+    quality: dict,
+    direction_id: str,
+    ordered_topics: list[str],
+) -> str:
+    warn_threshold, ok_threshold = _coverage_target(direction_id, topic, ordered_topics)
+    if count < warn_threshold:
+        return f"{topic} 题量不足，优先补到 {warn_threshold} 道以上。"
     if quality.get("with_followups", 0) < count:
         return f"{topic} 还有题目缺追问。"
     if quality.get("with_rubric", 0) < count:
         return f"{topic} 还有题目缺评分点。"
-    if count < 10:
-        return f"{topic} 可继续补场景题，目标 10 道。"
+    if count < ok_threshold:
+        return f"{topic} 可继续补场景题，目标 {ok_threshold} 道。"
     return "覆盖较好，后续按用户反馈微调。"
 
 

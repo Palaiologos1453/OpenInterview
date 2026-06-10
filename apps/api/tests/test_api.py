@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import wave
 import zipfile
 
@@ -216,14 +217,82 @@ class OpenInterviewAPITest(unittest.TestCase):
         self.assertEqual(ai_response.status_code, 200)
         ai_payload = ai_response.json()
         self.assertEqual(ai_payload["direction_id"], "ai_application")
-        self.assertGreaterEqual(ai_payload["total"], 16)
+        self.assertGreaterEqual(ai_payload["total"], 50)
         self.assertTrue(any(item["topic"] == "rag" for item in ai_payload["topics"]))
+        self.assertFalse(any(item["status"] == "bad" for item in ai_payload["topics"]))
+
+        backend_payload = response.json()
+        backend_status = {item["topic"]: item["status"] for item in backend_payload["topics"]}
+        for topic in ["cache", "mybatis", "java-collection", "system-design", "operating-system", "security"]:
+            self.assertNotEqual(backend_status.get(topic), "bad")
 
     def test_provider_defaults_are_local_text_first(self):
         settings = ProviderSettings()
         self.assertEqual(settings.llm.provider, "openai_compatible")
+        self.assertFalse(settings.llm.allow_fallback)
         self.assertEqual(settings.asr.provider, "browser")
         self.assertEqual(settings.tts.provider, "browser")
+
+    def test_real_llm_empty_response_fails_without_explicit_fallback(self):
+        interview = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "comprehensive",
+                "provider_config": {
+                    "llm": {
+                        "provider": "openai_compatible",
+                        "api_base": "http://127.0.0.1:9/v1",
+                        "model": "test-model",
+                        "api_key": "test-key",
+                    },
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(interview.status_code, 200)
+        session_id = interview.json()["session_id"]
+        with patch("openinterview_api.interview_engine.build_llm_adapter", return_value=_EmptyLLMAdapter()):
+            turn = client.post(
+                f"/v1/interviews/{session_id}/turn",
+                json={"answer": "我会先说明思路，再做取舍。"},
+            )
+
+        self.assertEqual(turn.status_code, 502)
+        self.assertIn("returned empty text", turn.json()["detail"])
+
+    def test_real_llm_can_opt_into_development_fallback(self):
+        interview = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "comprehensive",
+                "provider_config": {
+                    "llm": {
+                        "provider": "openai_compatible",
+                        "api_base": "http://127.0.0.1:9/v1",
+                        "model": "test-model",
+                        "api_key": "test-key",
+                        "allow_fallback": True,
+                    },
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(interview.status_code, 200)
+        session_id = interview.json()["session_id"]
+        with patch("openinterview_api.interview_engine.build_llm_adapter", return_value=_EmptyLLMAdapter()):
+            turn = client.post(
+                f"/v1/interviews/{session_id}/turn",
+                json={"answer": "我会先说明思路，再做取舍。"},
+            )
+
+        self.assertEqual(turn.status_code, 200)
+        self.assertIn("fallback to mock", turn.json()["provider_notice"])
 
     def test_voice_model_config_env_overrides(self):
         previous = {
@@ -597,6 +666,12 @@ def _silence_wav_base64() -> str:
         wav.setframerate(16000)
         wav.writeframes(b"\x00\x00" * 16000)
     return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+class _EmptyLLMAdapter:
+    def complete(self, messages: list[dict[str, str]], *, temperature: float = 0.4) -> str:
+        del messages, temperature
+        return ""
 
 
 def _minimal_docx_bytes(text: str) -> bytes:

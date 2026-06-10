@@ -1,0 +1,285 @@
+questions:
+  - id: backend-cache-penetration-bloom-filter
+    directions: ["backend"]
+    difficulty: campus
+    topic: cache
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/database/redis/cache-basics.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "接口被大量不存在的商品 ID 请求打穿数据库，你会如何判断是缓存穿透，并用布隆过滤器、空值缓存或参数校验治理？"
+    followups:
+      - "空值缓存的过期时间为什么不能太长？"
+      - "布隆过滤器误判会带来什么影响？"
+    rubric:
+      - "能区分缓存穿透和普通缓存未命中。"
+      - "能说明布隆过滤器、空值缓存、参数合法性校验和限流的作用。"
+      - "能结合误判率、过期策略和数据变更维护布隆过滤器。"
+    tags: ["Redis", "缓存穿透", "布隆过滤器", "限流"]
+
+  - id: backend-cache-breakdown-mutex-logical-expire
+    directions: ["backend"]
+    difficulty: campus
+    topic: cache
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/database/redis/cache-basics.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "一个热点 Key 过期后，大量请求同时回源数据库。你会如何治理缓存击穿？请比较互斥锁、逻辑过期和预热。"
+    followups:
+      - "互斥锁方案如何避免锁失效或锁粒度过大？"
+      - "逻辑过期返回旧数据是否一定可以接受？"
+    rubric:
+      - "能说明缓存击穿通常发生在热点 Key 过期瞬间。"
+      - "能比较互斥回源、逻辑过期、热点预热和异步刷新。"
+      - "能结合一致性要求、延迟和数据库保护做取舍。"
+    tags: ["Redis", "缓存击穿", "热点 Key", "逻辑过期"]
+
+  - id: backend-cache-avalanche-expire-jitter
+    directions: ["backend"]
+    difficulty: campus
+    topic: cache
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/database/redis/cache-basics.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "大量缓存同一时间失效导致数据库压力陡增，你会如何判断缓存雪崩，并从过期时间、限流降级和多级缓存治理？"
+    followups:
+      - "为什么缓存过期时间要加随机抖动？"
+      - "Redis 整体不可用时，服务端如何保护数据库？"
+    rubric:
+      - "能说明缓存雪崩的集中失效或缓存集群故障特征。"
+      - "能提出过期时间打散、多级缓存、预热、限流、降级和熔断。"
+      - "能结合监控判断 Redis 命中率、数据库 QPS 和错误率变化。"
+    tags: ["Redis", "缓存雪崩", "降级", "多级缓存"]
+
+  - id: backend-cache-read-write-strategy
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: cache
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/database/redis/3-commonly-used-cache-read-and-write-strategies.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "请比较 Cache Aside、Read/Write Through 和 Write Behind。普通 Java 后端项目为什么最常用 Cache Aside？"
+    followups:
+      - "Cache Aside 更新时为什么常见删除缓存而不是更新缓存？"
+      - "Write Behind 会带来哪些数据丢失和一致性风险？"
+    rubric:
+      - "能说明三类缓存读写策略的数据流和适用场景。"
+      - "能解释 Cache Aside 的简单性、业务可控性和一致性边界。"
+      - "能结合失败重试、消息队列和幂等处理讨论风险。"
+    tags: ["缓存策略", "Cache Aside", "一致性", "Write Behind"]
+
+  - id: mybatis-dynamic-sql-injection
+    directions: ["backend"]
+    difficulty: campus
+    topic: mybatis
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/system-design/framework/mybatis/mybatis-interview.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "MyBatis 动态 SQL 里 #{} 和 ${} 有什么区别？如果要支持按字段排序，如何避免 SQL 注入？"
+    followups:
+      - "为什么表名、字段名不能简单用 #{} 绑定？"
+      - "动态 where、foreach 和 trim 标签分别解决什么问题？"
+    rubric:
+      - "能说明 #{} 走预编译参数，${} 是字符串替换，存在注入风险。"
+      - "能对排序字段、表名等使用白名单映射，而不是直接拼接用户输入。"
+      - "能结合动态 SQL 标签减少拼接错误和空条件问题。"
+    tags: ["MyBatis", "动态 SQL", "SQL 注入", "白名单"]
+
+  - id: mybatis-resultmap-nested-mapping
+    directions: ["backend"]
+    difficulty: campus
+    topic: mybatis
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/system-design/framework/mybatis/mybatis-interview.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "订单、订单明细、商品信息需要一起返回。MyBatis resultMap 的嵌套查询和嵌套结果分别如何工作，如何避免 N+1？"
+    followups:
+      - "一对多映射时为什么可能出现重复主对象？"
+      - "分页场景下直接 join 明细表会有什么问题？"
+    rubric:
+      - "能区分 association、collection、嵌套查询和嵌套结果。"
+      - "能识别 N+1 查询、重复行、分页失真和结果集膨胀风险。"
+      - "能提出批量查询、分步组装、分页主表再查明细等方案。"
+    tags: ["MyBatis", "resultMap", "N+1", "分页"]
+
+  - id: mybatis-plugin-executor-interceptor
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: mybatis
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/system-design/framework/mybatis/mybatis-interview.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "MyBatis 插件机制可以拦截哪些核心对象？分页插件、SQL 日志和租户过滤通常会在哪些阶段做增强？"
+    followups:
+      - "拦截 Executor 和 StatementHandler 的差异是什么？"
+      - "插件顺序不当可能带来什么问题？"
+    rubric:
+      - "能说出 Executor、StatementHandler、ParameterHandler、ResultSetHandler 等拦截点。"
+      - "能结合分页、SQL 改写、参数处理和结果映射说明扩展边界。"
+      - "能关注插件顺序、SQL 兼容性、性能和可观测。"
+    tags: ["MyBatis", "插件", "Executor", "分页"]
+
+  - id: java-collection-fail-fast-fail-safe
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-collection
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/java/collection/java-collection-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "Java 集合遍历时为什么会出现 ConcurrentModificationException？fail-fast 和 fail-safe 迭代有什么区别？"
+    followups:
+      - "为什么增强 for 里直接 remove 容易出问题？"
+      - "CopyOnWriteArrayList 适合什么读写比例场景？"
+    rubric:
+      - "能说明 fail-fast 通过结构修改计数快速暴露并发或非法修改。"
+      - "能区分 Iterator.remove、并发容器和快照迭代的语义。"
+      - "能结合读多写少、内存开销和一致性要求选择集合。"
+    tags: ["Java 集合", "fail-fast", "Iterator", "CopyOnWriteArrayList"]
+
+  - id: java-collection-queue-blockingqueue
+    directions: ["backend"]
+    difficulty: campus
+    topic: java-collection
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/java/collection/java-collection-questions-02.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "后端异步任务队列为什么常用 BlockingQueue？ArrayBlockingQueue、LinkedBlockingQueue 和 DelayQueue 适合哪些场景？"
+    followups:
+      - "有界队列和无界队列对系统稳定性有什么影响？"
+      - "线程池任务队列选错会导致什么线上风险？"
+    rubric:
+      - "能说明阻塞队列在生产者消费者模型中的背压作用。"
+      - "能比较数组有界队列、链表队列和延迟队列的取舍。"
+      - "能关联线程池队列容量、拒绝策略和 OOM 风险。"
+    tags: ["Java 集合", "BlockingQueue", "线程池", "背压"]
+
+  - id: cs-os-user-kernel-mode-syscall
+    directions: ["backend"]
+    difficulty: campus
+    topic: operating-system
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/cs-basics/operating-system/operating-system-basic-questions-01.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "用户态和内核态为什么要区分？一次 Java 网络读写或文件读写为什么可能涉及系统调用和上下文切换？"
+    followups:
+      - "频繁系统调用会对性能造成什么影响？"
+      - "零拷贝为什么能减少用户态和内核态之间的数据复制？"
+    rubric:
+      - "能说明权限隔离、硬件资源访问和系统调用边界。"
+      - "能把网络 IO、文件 IO 和上下文切换成本联系起来。"
+      - "能解释零拷贝、缓冲区和批量操作的性能意义。"
+    tags: ["操作系统", "用户态", "内核态", "系统调用"]
+
+  - id: cs-os-linux-file-permission-inode
+    directions: ["backend"]
+    difficulty: internship
+    topic: operating-system
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/cs-basics/operating-system/linux-intro.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "Linux 文件权限 rwx、用户/用户组和 inode 分别是什么？后端服务部署时日志目录权限错误会如何排查？"
+    followups:
+      - "目录的 x 权限和文件的 x 权限含义一样吗？"
+      - "磁盘空间没满但无法创建文件，可能和 inode 有什么关系？"
+    rubric:
+      - "能说明文件权限、属主、属组和目录执行权限。"
+      - "能理解 inode 与文件元数据、数量限制的关系。"
+      - "能结合服务用户、日志目录、挂载点和权限命令排查。"
+    tags: ["Linux", "文件权限", "inode", "部署排查"]
+
+  - id: system-design-restful-api-versioning
+    directions: ["backend"]
+    difficulty: campus
+    topic: system-design
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/system-design/basis/RESTfulAPI.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "设计一个对外 RESTful API 时，如何规划资源路径、HTTP 方法、状态码、错误码和版本兼容？"
+    followups:
+      - "业务错误都返回 200 会带来什么问题？"
+      - "接口字段删除或语义变化如何兼容老客户端？"
+    rubric:
+      - "能按资源建模、方法语义、状态码和错误响应设计 API。"
+      - "能说明版本号、兼容字段、灰度和废弃周期。"
+      - "能关注幂等、鉴权、限流、审计和文档。"
+    tags: ["系统设计", "RESTful API", "版本兼容", "错误码"]
+
+  - id: system-design-realtime-message-push
+    directions: ["backend"]
+    difficulty: bigtech
+    topic: system-design
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/system-design/web-real-time-message-push.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "如果要做站内实时通知，你会如何在短轮询、长轮询、SSE 和 WebSocket 之间选型？后端需要哪些连接治理能力？"
+    followups:
+      - "WebSocket 连接数很多时，网关和服务端要关注哪些指标？"
+      - "断线重连后如何避免消息丢失或重复？"
+    rubric:
+      - "能比较几种实时推送方案的延迟、资源占用和复杂度。"
+      - "能设计连接管理、心跳、鉴权、订阅关系和消息确认。"
+      - "能考虑重连补偿、顺序、幂等和水平扩展。"
+    tags: ["系统设计", "实时推送", "WebSocket", "消息可靠性"]
+
+  - id: security-jwt-session-tradeoff
+    directions: ["backend"]
+    difficulty: campus
+    topic: security
+    type: fundamentals
+    source: JavaGuide
+    source_path: "docs/system-design/security/jwt-intro.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "JWT 和传统 Session 的认证方案各有什么优缺点？如果 Token 泄露或用户退出登录，系统如何处理？"
+    followups:
+      - "JWT 为什么不适合存放敏感信息？"
+      - "如何设计 access token 和 refresh token？"
+    rubric:
+      - "能比较无状态、服务端可控性、扩展性和吊销难度。"
+      - "能说明签名、过期时间、刷新、黑名单和密钥轮换。"
+      - "能结合 HTTPS、存储位置和 CSRF/XSS 风险做安全设计。"
+    tags: ["安全", "JWT", "Session", "Token"]
+
+  - id: security-data-desensitization-logging
+    directions: ["backend"]
+    difficulty: campus
+    topic: security
+    type: scenario
+    source: JavaGuide
+    source_path: "docs/system-design/security/data-desensitization.md"
+    source_license: "Apache-2.0"
+    source_usage: "adapted"
+    prompt: "后端日志、接口响应和导出文件里可能包含手机号、身份证、邮箱等敏感数据。你会如何做脱敏和访问控制？"
+    followups:
+      - "脱敏应该在查询层、服务层还是序列化层做？"
+      - "排查线上问题时，开发需要看敏感字段怎么办？"
+    rubric:
+      - "能识别常见敏感字段和不同场景的暴露风险。"
+      - "能设计展示脱敏、日志脱敏、导出审批和权限控制。"
+      - "能兼顾排障、审计、最小权限和合规留存。"
+    tags: ["安全", "数据脱敏", "日志", "权限"]

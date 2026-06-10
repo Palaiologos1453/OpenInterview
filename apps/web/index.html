@@ -66,6 +66,7 @@
               <label>Model<input id="llm-model" type="text" placeholder="例如 gpt-4o-mini 或兼容模型名" /></label>
               <label>API Key<input id="llm-api-key" type="password" autocomplete="off" /></label>
               <label>Temperature<input id="llm-temperature" type="number" min="0" max="2" step="0.1" /></label>
+              <label class="toggle"><input id="llm-allow-fallback" type="checkbox" /><span>LLM 失败时允许 Mock 回退（仅开发调试）</span></label>
 
               <h3>语音配置向导</h3>
               <label>语音模式
