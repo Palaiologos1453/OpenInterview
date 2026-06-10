@@ -7,12 +7,18 @@ TOPICS_BY_DIRECTION = {
         "java-collection",
         "java-concurrency",
         "jvm",
+        "operating-system",
+        "computer-network",
         "spring",
         "mybatis",
         "mysql",
         "redis",
+        "cache",
         "message-queue",
         "distributed-system",
+        "high-availability",
+        "high-performance",
+        "security",
         "system-design",
     ],
     "ai_application": [
@@ -89,7 +95,7 @@ def question_coverage(questions: list[dict], direction_id: str = "backend") -> d
 
 def _coverage_target(direction_id: str, topic: str, ordered_topics: list[str]) -> tuple[int, int]:
     if ordered_topics and topic not in ordered_topics:
-        return 1, 3
+        return 1, 1
     if direction_id == "ai_application":
         return 3, 5
     return 5, 10

@@ -210,21 +210,22 @@ class OpenInterviewAPITest(unittest.TestCase):
         response = client.get("/v1/questions/coverage")
         self.assertEqual(response.status_code, 200)
         payload = response.json()
-        self.assertGreater(payload["total"], 50)
+        self.assertGreaterEqual(payload["total"], 700)
         self.assertTrue(any(item["topic"] == "java-basis" for item in payload["topics"]))
+        self.assertFalse(payload["gaps"])
 
         ai_response = client.get("/v1/questions/coverage?direction_id=ai_application")
         self.assertEqual(ai_response.status_code, 200)
         ai_payload = ai_response.json()
         self.assertEqual(ai_payload["direction_id"], "ai_application")
-        self.assertGreaterEqual(ai_payload["total"], 50)
+        self.assertGreaterEqual(ai_payload["total"], 250)
         self.assertTrue(any(item["topic"] == "rag" for item in ai_payload["topics"]))
-        self.assertFalse(any(item["status"] == "bad" for item in ai_payload["topics"]))
+        self.assertFalse(ai_payload["gaps"])
 
         backend_payload = response.json()
         backend_status = {item["topic"]: item["status"] for item in backend_payload["topics"]}
         for topic in ["cache", "mybatis", "java-collection", "system-design", "operating-system", "security"]:
-            self.assertNotEqual(backend_status.get(topic), "bad")
+            self.assertEqual(backend_status.get(topic), "ok")
 
     def test_provider_defaults_are_local_text_first(self):
         settings = ProviderSettings()
@@ -483,15 +484,21 @@ voice_profiles:
                 score=80,
                 question_meta={"id": "q1"},
             )
+            storage.save_report("s1", {"session_id": "s1", "overall_score": 75, "turns": []})
 
             exported = storage.export_interviews()
             deleted = storage.clear_interviews()
+            imported = storage.import_interviews(exported)
 
             self.assertEqual(exported["schema_version"], 3)
             self.assertEqual(len(exported["interviews"]), 1)
+            self.assertEqual(exported["interviews"][0]["report"]["overall_score"], 75)
             self.assertEqual(len(exported["turns"]), 1)
             self.assertEqual(deleted, 1)
-            self.assertEqual(storage.list_interviews(), [])
+            self.assertEqual(imported["interviews"], 1)
+            self.assertEqual(imported["turns"], 1)
+            self.assertEqual(storage.get_interview("s1")["report"]["overall_score"], 75)
+            self.assertEqual(storage.get_interview_turns("s1")[0]["question_meta"]["id"], "q1")
 
     def test_review_items_and_markdown_export(self):
         interview = client.post(

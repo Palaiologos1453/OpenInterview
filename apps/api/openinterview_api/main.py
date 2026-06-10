@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 from pathlib import Path
 import tempfile
 from uuid import uuid4
@@ -399,6 +400,22 @@ def export_interviews() -> JSONResponse:
         exported,
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.post("/v1/interviews/import")
+async def import_interviews(file: UploadFile = File(...)) -> dict:
+    content = await file.read()
+    try:
+        payload = json.loads(content.decode("utf-8-sig"))
+        stats = storage.import_interviews(payload)
+    except UnicodeDecodeError as exc:
+        raise HTTPException(status_code=400, detail="history file must be UTF-8 JSON") from exc
+    except json.JSONDecodeError as exc:
+        raise HTTPException(status_code=400, detail="history file is not valid JSON") from exc
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    sessions.clear()
+    return {"imported": stats}
 
 
 @app.get("/v1/metrics")

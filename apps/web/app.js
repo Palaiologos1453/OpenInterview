@@ -372,12 +372,14 @@ function renderHistory(interviews) {
         <h3>历史记录</h3>
         <div class="inline-actions">
           <button id="export-history-button" class="secondary" type="button">导出历史</button>
+          <button id="import-history-button" class="secondary" type="button">导入历史</button>
           <button id="clear-history-button" class="secondary danger-action" type="button">清空历史</button>
         </div>
       </div>
       <p class="muted-text">还没有本地面试记录。完成一轮面试后，这里会显示报告和复练入口。</p>
     `;
     $("#export-history-button")?.addEventListener("click", safeHandler(exportHistory));
+    $("#import-history-button")?.addEventListener("click", safeHandler(importHistory));
     $("#clear-history-button")?.addEventListener("click", safeHandler(clearHistory));
     return;
   }
@@ -386,6 +388,7 @@ function renderHistory(interviews) {
       <h3>历史记录</h3>
       <div class="inline-actions">
         <button id="export-history-button" class="secondary" type="button">导出历史</button>
+        <button id="import-history-button" class="secondary" type="button">导入历史</button>
         <button id="clear-history-button" class="secondary danger-action" type="button">清空历史</button>
       </div>
     </div>
@@ -432,6 +435,7 @@ function renderHistory(interviews) {
     button.addEventListener("click", safeHandler(() => createReviewItems(button.dataset.historyReview)));
   });
   $("#export-history-button")?.addEventListener("click", safeHandler(exportHistory));
+  $("#import-history-button")?.addEventListener("click", safeHandler(importHistory));
   $("#clear-history-button")?.addEventListener("click", safeHandler(clearHistory));
 }
 
@@ -560,6 +564,29 @@ async function exportHistory() {
   setStatus("历史记录已导出为 JSON 文件。");
 }
 
+async function importHistory() {
+  ensureBackend();
+  const file = await pickJsonFile();
+  if (!file) return;
+  const body = new FormData();
+  body.append("file", file);
+  setStatus(`正在导入历史：${file.name}`);
+  const response = await authedFetch(`${API_BASE}/v1/interviews/import`, {
+    method: "POST",
+    body
+  });
+  if (!response.ok) throw new Error(await response.text());
+  const payload = await response.json();
+  const imported = payload.imported || {};
+  state.sessionId = null;
+  state.realtimeSessionId = null;
+  elements.reportButton.disabled = true;
+  await loadHistory();
+  setStatus(
+    `历史导入完成：${imported.interviews || 0} 场面试，${imported.turns || 0} 条回答，${imported.review_items || 0} 条错题。`
+  );
+}
+
 async function clearHistory() {
   ensureBackend();
   const ok = window.confirm("确认清空所有本地面试历史、报告、转写和 trace？此操作不会清空模型配置。");
@@ -577,6 +604,25 @@ async function clearHistory() {
     </div>
   `;
   setStatus(`已清空 ${payload.deleted || 0} 条历史记录。`);
+}
+
+function pickJsonFile() {
+  return new Promise((resolve) => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".json,application/json";
+    input.addEventListener("change", () => {
+      resolve(input.files?.[0] || null);
+      input.remove();
+    });
+    input.addEventListener("cancel", () => {
+      resolve(null);
+      input.remove();
+    });
+    input.style.display = "none";
+    document.body.appendChild(input);
+    input.click();
+  });
 }
 
 async function openHistoryReport(sessionId) {

@@ -72,7 +72,13 @@ ASR/TTS 默认走浏览器能力，文本面试不依赖本地语音。建议第
 
 报告会生成复练题、推荐回答结构、示例答案和题目学习卡。学习卡包含参考答案、常见错误、面试官追问点、低分回答 vs 高分回答、关联知识点。逐题复盘还会展示命中评分点、缺失评分点、评分证据和重答建议，方便把一次模拟沉淀成后续复习清单。
 
-题库主要从 `D:\JavaGuide` 的 Java 后端、数据库、缓存、分布式、高可用和 AI 目录改写为面试题。当前 Java 后端方向约 140 题，AI 应用开发方向约 50+ 题；覆盖页会对核心 topic 使用更高阈值，对补充 topic 使用轻量阈值，避免非核心小类目干扰复习优先级。
+题库主要从 `D:\JavaGuide` 的 Java 后端、数据库、缓存、分布式、高可用、高性能、系统设计和 AI 目录改写为面试题。当前 Java 后端方向 700+ 题，AI 应用开发方向 250+ 题；覆盖页会对 Java 后端核心 topic 使用更高阈值，对补充 topic 使用轻量阈值，避免非核心小类目干扰复习优先级。
+
+如本机更新了 JavaGuide，可重新生成批量题库：
+
+```powershell
+python .\scripts\generate_javaguide_questions.py --javaguide-root D:\JavaGuide
+```
 
 ## 简历导入
 
@@ -100,9 +106,10 @@ data/openinterview.sqlite
 - 导出单次 Markdown 报告。
 - 将低分题和缺口加入错题本。
 - 导出历史为 JSON。
+- 从 JSON 导入历史。
 - 清空全部面试历史。
 
-清空历史只删除面试记录、报告、转写和 trace，不会清空浏览器里的模型配置。
+导出 JSON 会包含报告缓存、回答记录、转写、trace 和错题本，适合换电脑或升级前备份。导入历史只写入本机 SQLite；同 ID 的旧记录会被导入文件覆盖。清空历史只删除面试记录、报告、转写和 trace，不会清空浏览器里的模型配置。
 
 ## 错题本和题库覆盖
 
@@ -207,6 +214,7 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 - `GET /v1/interviews/{session_id}/report`
 - `GET /v1/interviews`
 - `GET /v1/interviews/export`
+- `POST /v1/interviews/import`
 - `DELETE /v1/interviews`
 - `DELETE /v1/interviews/{session_id}`
 - `GET /v1/metrics`

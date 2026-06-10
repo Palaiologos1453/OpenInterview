@@ -290,7 +290,7 @@ class Storage:
         return {
             "schema_version": SCHEMA_VERSION,
             "exported_at": utc_now(),
-            "interviews": self.list_interviews(limit=100000),
+            "interviews": self._all_interviews(),
             "turns": self._all_turns(),
             "transcripts": self._all_rows(
                 """
@@ -310,6 +310,190 @@ class Storage:
             ),
             "review_items": self.list_review_items(limit=100000),
         }
+
+    def import_interviews(self, payload: dict) -> dict:
+        if not isinstance(payload, dict):
+            raise ValueError("history JSON must be an object")
+        if not isinstance(payload.get("interviews"), list):
+            raise ValueError("history JSON must contain an interviews list")
+
+        now = utc_now()
+        interview_ids: set[str] = set()
+        stats = {
+            "interviews": 0,
+            "turns": 0,
+            "transcripts": 0,
+            "traces": 0,
+            "review_items": 0,
+        }
+
+        with self.connect() as connection:
+            for item in payload.get("interviews") or []:
+                if not isinstance(item, dict):
+                    continue
+                interview_id = _clean_string(item.get("id"))
+                if not interview_id:
+                    continue
+                interview_ids.add(interview_id)
+                config = item.get("config") if isinstance(item.get("config"), dict) else {}
+                report = item.get("report") if isinstance(item.get("report"), dict) else None
+                connection.execute(
+                    """
+                    INSERT OR REPLACE INTO interviews (
+                        id, user_id, config_json, status, created_at, updated_at, report_json
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        interview_id,
+                        _clean_string(item.get("user_id")),
+                        json.dumps(config, ensure_ascii=False),
+                        _clean_string(item.get("status")) or "reported",
+                        _clean_string(item.get("created_at")) or now,
+                        _clean_string(item.get("updated_at")) or now,
+                        json.dumps(report, ensure_ascii=False) if report else None,
+                    ),
+                )
+                stats["interviews"] += 1
+
+            for interview_id in interview_ids:
+                for table in ("turns", "transcripts", "traces"):
+                    connection.execute(f"DELETE FROM {table} WHERE interview_id = ?", (interview_id,))
+                connection.execute("DELETE FROM review_items WHERE interview_id = ?", (interview_id,))
+
+            for item in payload.get("turns") or []:
+                if not isinstance(item, dict):
+                    continue
+                interview_id = _clean_string(item.get("interview_id"))
+                if interview_id not in interview_ids:
+                    continue
+                tags = item.get("tags") if isinstance(item.get("tags"), list) else []
+                question_meta = item.get("question_meta")
+                connection.execute(
+                    """
+                    INSERT INTO turns (
+                        interview_id, turn_index, question, answer, feedback, tags_json,
+                        question_meta_json, score, created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        interview_id,
+                        int(item.get("turn_index") or 0),
+                        str(item.get("question") or ""),
+                        str(item.get("answer") or ""),
+                        str(item.get("feedback") or ""),
+                        json.dumps(tags, ensure_ascii=False),
+                        json.dumps(question_meta, ensure_ascii=False)
+                        if isinstance(question_meta, dict)
+                        else None,
+                        float(item.get("score") or 0),
+                        _clean_string(item.get("created_at")) or now,
+                    ),
+                )
+                stats["turns"] += 1
+
+            for item in payload.get("transcripts") or []:
+                if not isinstance(item, dict):
+                    continue
+                interview_id = _clean_string(item.get("interview_id"))
+                if interview_id not in interview_ids:
+                    continue
+                connection.execute(
+                    """
+                    INSERT INTO transcripts (interview_id, text, source, created_at)
+                    VALUES (?, ?, ?, ?)
+                    """,
+                    (
+                        interview_id,
+                        str(item.get("text") or ""),
+                        _clean_string(item.get("source")) or "imported",
+                        _clean_string(item.get("created_at")) or now,
+                    ),
+                )
+                stats["transcripts"] += 1
+
+            for item in payload.get("traces") or []:
+                if not isinstance(item, dict):
+                    continue
+                interview_id = _clean_string(item.get("interview_id"))
+                if interview_id not in interview_ids:
+                    continue
+                metadata = item.get("metadata") if isinstance(item.get("metadata"), dict) else {}
+                connection.execute(
+                    """
+                    INSERT INTO traces (
+                        trace_id, interview_id, event_name, duration_ms, metadata_json, created_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        _clean_string(item.get("trace_id")) or "imported",
+                        interview_id,
+                        _clean_string(item.get("event_name")) or "imported",
+                        float(item.get("duration_ms") or 0),
+                        json.dumps(metadata, ensure_ascii=False),
+                        _clean_string(item.get("created_at")) or now,
+                    ),
+                )
+                stats["traces"] += 1
+
+            for item in payload.get("review_items") or []:
+                if not isinstance(item, dict):
+                    continue
+                item_id = _clean_string(item.get("id"))
+                if not item_id:
+                    continue
+                connection.execute(
+                    """
+                    INSERT OR REPLACE INTO review_items (
+                        id, interview_id, question_id, topic, question, answer, score,
+                        gaps_json, rewrite_advice_json, status, attempts_json, created_at, updated_at
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        item_id,
+                        _clean_string(item.get("interview_id")),
+                        _clean_string(item.get("question_id")),
+                        _clean_string(item.get("topic")) or "interview",
+                        str(item.get("question") or ""),
+                        str(item.get("answer") or ""),
+                        float(item.get("score") or 0),
+                        json.dumps(_list_or_empty(item.get("gaps")), ensure_ascii=False),
+                        json.dumps(_list_or_empty(item.get("rewrite_advice")), ensure_ascii=False),
+                        _clean_string(item.get("status")) or "todo",
+                        json.dumps(_list_or_empty(item.get("attempts")), ensure_ascii=False),
+                        _clean_string(item.get("created_at")) or now,
+                        _clean_string(item.get("updated_at")) or now,
+                    ),
+                )
+                stats["review_items"] += 1
+
+        return stats
+
+    def _all_interviews(self) -> list[dict]:
+        with self.connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT id, user_id, config_json, status, created_at, updated_at, report_json
+                FROM interviews
+                ORDER BY created_at ASC
+                """
+            ).fetchall()
+        return [
+            {
+                "id": row["id"],
+                "user_id": row["user_id"],
+                "config": json.loads(row["config_json"]),
+                "status": row["status"],
+                "created_at": row["created_at"],
+                "updated_at": row["updated_at"],
+                "has_report": row["report_json"] is not None,
+                "report": json.loads(row["report_json"]) if row["report_json"] else None,
+            }
+            for row in rows
+        ]
 
     def _all_turns(self) -> list[dict]:
         with self.connect() as connection:
@@ -566,3 +750,14 @@ def _review_item_from_row(row: sqlite3.Row) -> dict:
         "created_at": row["created_at"],
         "updated_at": row["updated_at"],
     }
+
+
+def _clean_string(value: object) -> str | None:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _list_or_empty(value: object) -> list:
+    return value if isinstance(value, list) else []
