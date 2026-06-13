@@ -74,8 +74,7 @@ class APITTSAdapter:
         voice: str | None = None,
         voice_profile: VoiceProfile | None = None,
     ) -> Path:
-        if voice_profile and voice_profile.reference_text:
-            text = f"{voice_profile.reference_text}\n{text}"
+        del voice_profile
         endpoint = _openai_speech_endpoint(self.api_base)
         payload = {
             "model": self.model,

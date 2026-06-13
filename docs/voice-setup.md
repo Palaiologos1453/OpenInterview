@@ -129,6 +129,8 @@ $env:OPENINTERVIEW_COSYVOICE_PATH = "E:\AI\CosyVoice"
 Copy-Item configs\voice-profiles.local.example.yaml configs\voice-profiles.local.yaml
 ```
 
+音色下拉框只是选择一个 profile。真正的克隆音色只在本地 CosyVoice 模式生效，并且需要 `zero_shot` profile 同时配置本地参考音频和参考文本。浏览器 TTS 和云端 API TTS 使用各自的 `voice` 字段，不会读取这里的 wav。
+
 参考音频放到 `voices/`，例如：
 
 ```text
@@ -150,7 +152,7 @@ voice_profiles:
     reference_text: 你好，我是今天的技术面试官，我们会围绕你的项目和基础知识做一些追问。
 ```
 
-启动后前端的“面试官音色”下拉框会读取 local 配置。`configs/voice-profiles.local.yaml` 和 `voices/*.wav` 默认不提交到 git。
+启动后前端的“本地 CosyVoice 音色 Profile”下拉框会读取 local 配置，并提示参考音频是否存在。`configs/voice-profiles.local.yaml` 和 `voices/*.wav` 默认不提交到 git。
 
 ### 5. 启动和自检
 

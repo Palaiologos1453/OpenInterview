@@ -69,7 +69,7 @@ class OpenInterviewAPITest(unittest.TestCase):
         self.assertTrue(payload["tech_choice_questions"])
         self.assertTrue(payload["incident_questions"])
 
-    def test_start_requires_real_llm_config_by_default(self):
+    def test_start_does_not_require_llm_config_by_default(self):
         response = client.post(
             "/v1/interviews",
             json={
@@ -78,7 +78,8 @@ class OpenInterviewAPITest(unittest.TestCase):
                 "mode_id": "comprehensive",
             },
         )
-        self.assertEqual(response.status_code, 400)
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["next_question"])
 
     def test_start_allows_explicit_mock_for_development(self):
         response = client.post(
@@ -234,7 +235,7 @@ class OpenInterviewAPITest(unittest.TestCase):
         self.assertEqual(settings.asr.provider, "browser")
         self.assertEqual(settings.tts.provider, "browser")
 
-    def test_real_llm_empty_response_fails_without_explicit_fallback(self):
+    def test_turn_does_not_call_llm_feedback_during_interview(self):
         interview = client.post(
             "/v1/interviews",
             json={
@@ -247,37 +248,6 @@ class OpenInterviewAPITest(unittest.TestCase):
                         "api_base": "http://127.0.0.1:9/v1",
                         "model": "test-model",
                         "api_key": "test-key",
-                    },
-                    "asr": {"provider": "browser"},
-                    "tts": {"provider": "browser"},
-                },
-            },
-        )
-        self.assertEqual(interview.status_code, 200)
-        session_id = interview.json()["session_id"]
-        with patch("openinterview_api.interview_engine.build_llm_adapter", return_value=_EmptyLLMAdapter()):
-            turn = client.post(
-                f"/v1/interviews/{session_id}/turn",
-                json={"answer": "我会先说明思路，再做取舍。"},
-            )
-
-        self.assertEqual(turn.status_code, 502)
-        self.assertIn("returned empty text", turn.json()["detail"])
-
-    def test_real_llm_can_opt_into_development_fallback(self):
-        interview = client.post(
-            "/v1/interviews",
-            json={
-                "direction_id": "backend",
-                "difficulty_id": "campus",
-                "mode_id": "comprehensive",
-                "provider_config": {
-                    "llm": {
-                        "provider": "openai_compatible",
-                        "api_base": "http://127.0.0.1:9/v1",
-                        "model": "test-model",
-                        "api_key": "test-key",
-                        "allow_fallback": True,
                     },
                     "asr": {"provider": "browser"},
                     "tts": {"provider": "browser"},
@@ -293,7 +263,43 @@ class OpenInterviewAPITest(unittest.TestCase):
             )
 
         self.assertEqual(turn.status_code, 200)
-        self.assertIn("fallback to mock", turn.json()["provider_notice"])
+        self.assertEqual(turn.json()["interviewer_message"], "")
+        self.assertTrue(turn.json()["next_question"])
+        self.assertIsNone(turn.json()["provider_notice"])
+
+    def test_report_llm_summary_failure_falls_back_to_local_summary(self):
+        interview = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "comprehensive",
+                "provider_config": {
+                    "llm": {
+                        "provider": "openai_compatible",
+                        "api_base": "http://127.0.0.1:9/v1",
+                        "model": "test-model",
+                        "api_key": "test-key",
+                    },
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(interview.status_code, 200)
+        session_id = interview.json()["session_id"]
+        turn = client.post(
+            f"/v1/interviews/{session_id}/turn",
+            json={"answer": "我会先说明思路，再做取舍。"},
+        )
+        self.assertEqual(turn.status_code, 200)
+
+        with patch("openinterview_api.interview_engine.build_llm_adapter", return_value=_EmptyLLMAdapter()):
+            report = client.get(f"/v1/interviews/{session_id}/report")
+
+        self.assertEqual(report.status_code, 200)
+        self.assertTrue(report.json()["ai_summary"])
+        self.assertIn("turns", report.json())
 
     def test_voice_model_config_env_overrides(self):
         previous = {
@@ -436,6 +442,15 @@ voice_profiles:
 
         self.assertEqual(profiles[0].id, "custom")
         self.assertEqual(profiles[0].reference_audio, "voices/custom.wav")
+        self.assertEqual(
+            profiles[0].resolved_reference_audio(),
+            project_root() / "voices" / "custom.wav",
+        )
+        payload = profiles[0].as_dict()
+        self.assertTrue(payload["requires_reference_audio"])
+        self.assertTrue(payload["uses_reference_audio"])
+        self.assertFalse(payload["reference_audio_exists"])
+        self.assertEqual(payload["reference_audio_path"], str(project_root() / "voices" / "custom.wav"))
 
     def test_storage_persists_question_meta(self):
         with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
@@ -610,6 +625,53 @@ voice_profiles:
         self.assertEqual(payload["reason"], "no_speech")
         self.assertEqual(payload["transcript"], "")
         self.assertIsNone(payload["turn"])
+        self.assertIn("timings", payload)
+        self.assertIn("convert_ms", payload["timings"])
+        self.assertIn("vad_ms", payload["timings"])
+
+    def test_realtime_audio_turn_accepts_pcm_s16le(self):
+        interview = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "comprehensive",
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "sensevoice"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(interview.status_code, 200)
+        realtime = client.post(
+            "/v1/realtime/sessions",
+            json={"interview_id": interview.json()["session_id"]},
+        )
+        self.assertEqual(realtime.status_code, 200)
+
+        response = client.post(
+            f"/v1/realtime/sessions/{realtime.json()['id']}/audio-turn",
+            json={
+                "audio_base64": _silence_pcm_base64(),
+                "filename": "silence.pcm",
+                "audio_encoding": "pcm_s16le",
+                "sample_rate": 16000,
+                "channels": 1,
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "sensevoice"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["skipped"])
+        self.assertEqual(payload["reason"], "no_speech")
+        self.assertIn("convert_ms", payload["timings"])
+        self.assertIn("vad_ms", payload["timings"])
 
     def test_realtime_duplex_websocket_skips_silence(self):
         interview = client.post(
@@ -653,15 +715,83 @@ voice_profiles:
             self.assertEqual(websocket.receive_json()["type"], "asr_partial")
             websocket.send_json({"type": "commit"})
             seen = []
-            for _ in range(5):
+            for _ in range(10):
                 payload = websocket.receive_json()
                 seen.append(payload["type"])
                 if payload["type"] == "done":
                     self.assertTrue(payload["skipped"])
                     self.assertEqual(payload["reason"], "no_speech")
+                    self.assertIn("timings", payload)
                     break
             self.assertIn("vad_start", seen)
             self.assertIn("vad_final", seen)
+            self.assertIn("timing", seen)
+            self.assertIn("done", seen)
+
+    def test_realtime_duplex_websocket_accepts_pcm_s16le(self):
+        interview = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "comprehensive",
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "sensevoice"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(interview.status_code, 200)
+        realtime = client.post(
+            "/v1/realtime/sessions",
+            json={"interview_id": interview.json()["session_id"]},
+        )
+        self.assertEqual(realtime.status_code, 200)
+
+        with client.websocket_connect(
+            f"/v1/realtime/sessions/{realtime.json()['id']}/duplex"
+        ) as websocket:
+            self.assertEqual(websocket.receive_json()["type"], "ready")
+            websocket.send_json(
+                {
+                    "type": "start",
+                    "provider_config": {
+                        "llm": {"provider": "mock"},
+                        "asr": {"provider": "sensevoice"},
+                        "tts": {"provider": "browser"},
+                    },
+                    "mime_type": "audio/pcm",
+                    "audio_encoding": "pcm_s16le",
+                    "sample_rate": 16000,
+                    "channels": 1,
+                    "partial_interval_chunks": 1,
+                }
+            )
+            self.assertEqual(websocket.receive_json()["type"], "listening")
+            websocket.send_json(
+                {
+                    "type": "audio",
+                    "audio_encoding": "pcm_s16le",
+                    "sample_rate": 16000,
+                    "channels": 1,
+                    "data": _silence_pcm_base64(),
+                }
+            )
+            self.assertEqual(websocket.receive_json()["type"], "asr_partial")
+            websocket.send_json({"type": "commit"})
+            seen = []
+            for _ in range(10):
+                payload = websocket.receive_json()
+                seen.append(payload["type"])
+                if payload["type"] == "done":
+                    self.assertTrue(payload["skipped"])
+                    self.assertEqual(payload["reason"], "no_speech")
+                    self.assertIn("timings", payload)
+                    break
+            self.assertIn("vad_start", seen)
+            self.assertIn("vad_final", seen)
+            self.assertIn("timing", seen)
             self.assertIn("done", seen)
 
 
@@ -673,6 +803,10 @@ def _silence_wav_base64() -> str:
         wav.setframerate(16000)
         wav.writeframes(b"\x00\x00" * 16000)
     return base64.b64encode(buffer.getvalue()).decode("ascii")
+
+
+def _silence_pcm_base64() -> str:
+    return base64.b64encode(b"\x00\x00" * 16000).decode("ascii")
 
 
 class _EmptyLLMAdapter:

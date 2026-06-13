@@ -4,7 +4,7 @@ from dataclasses import dataclass, field
 from statistics import mean
 from uuid import uuid4
 
-from .adapters.llm import build_llm_adapter, is_real_llm, llm_allows_fallback, llm_temperature
+from .adapters.llm import build_llm_adapter, is_real_llm, llm_temperature
 from .catalog import RUBRIC, find_difficulty, find_direction, find_interviewer_style, find_mode
 from .services.question_bank import default_question_bank
 from .services.resume import analyze_resume
@@ -112,8 +112,9 @@ class InterviewSession:
 class CampusInterviewEngine:
     """Deterministic MVP engine.
 
-    The production path will replace question and feedback generation with LLM
-    adapters, while keeping this engine as the auditable fallback and test oracle.
+    The interview path is intentionally deterministic: active interviews should
+    not block on LLM feedback or improvised LLM questions. LLMs are reserved for
+    optional post-interview report summaries.
     """
 
     def start(self, config: InterviewConfig) -> dict:
@@ -157,7 +158,7 @@ class CampusInterviewEngine:
         return {
             "session_id": session.session_id,
             "turn_index": session.turn_index,
-            "interviewer_message": feedback,
+            "interviewer_message": "",
             "next_question": session.current_question,
             "focus_tags": tags,
             "is_finished": self._is_finished(session),
@@ -246,32 +247,11 @@ class CampusInterviewEngine:
             }
             return QUESTION_BANK["self_intro"][0]
         if phase == "project":
-            generated = self._ai_question(session, phase, step)
-            if generated:
-                session.current_question_meta = {
-                    "source": "llm",
-                    "phase": phase,
-                    "tags": self._default_phase_tags(session, phase),
-                    "rubric": [
-                        "是否讲清业务背景和目标",
-                        "是否说明个人贡献和关键技术方案",
-                        "是否给出指标结果、验证方式和复盘",
-                    ],
-                }
-                return generated
             return self._select_project_question(session, step)
         if phase == "fundamentals":
             yaml_question = self._select_bank_question(session, phase, step)
             if yaml_question:
                 return yaml_question
-            generated = self._ai_question(session, phase, step)
-            if generated:
-                session.current_question_meta = {
-                    "source": "llm",
-                    "phase": phase,
-                    "tags": self._default_phase_tags(session, phase),
-                }
-                return generated
             questions = QUESTION_BANK["fundamentals"].get(
                 session.config.direction_id,
                 QUESTION_BANK["fundamentals"]["backend"],
@@ -286,14 +266,6 @@ class CampusInterviewEngine:
             yaml_question = self._select_bank_question(session, phase, step)
             if yaml_question:
                 return yaml_question
-            generated = self._ai_question(session, phase, step)
-            if generated:
-                session.current_question_meta = {
-                    "source": "llm",
-                    "phase": phase,
-                    "tags": self._default_phase_tags(session, phase),
-                }
-                return generated
             session.current_question_meta = {
                 "source": "builtin",
                 "phase": phase,
@@ -456,7 +428,7 @@ class CampusInterviewEngine:
             return None
 
         if gaps:
-            prompt = f"刚才这题你还没有展开“{gaps[0]}”。请继续补充：{followups[0]}"
+            prompt = f"围绕上一题继续追问：{followups[0]}"
         else:
             prompt = f"继续追问上一题：{followups[0]}"
         if len(followups) > 1:
@@ -635,8 +607,7 @@ class CampusInterviewEngine:
         gap = self._gap_hint(answer, session, rubric_gaps)
         fallback = f"{positive}{gap}"
         fallback = self._style_feedback_prefix(session, answer) + fallback
-        generated = self._ai_feedback(session, answer, score, fallback)
-        return generated or fallback, score
+        return fallback, score
 
     def _style_feedback_prefix(self, session: InterviewSession, answer: str) -> str:
         del answer
@@ -804,15 +775,6 @@ class CampusInterviewEngine:
         if phase == "system_design":
             return ["需求澄清", "模块拆分", "容量与稳定性"]
         return ["表达结构", "岗位匹配", "技术亮点"]
-
-    def _default_phase_tags(self, session: InterviewSession, phase: str) -> list[str]:
-        if phase == "fundamentals":
-            return session.direction["topics"][:3]
-        if phase == "project":
-            return session.direction["project_focus"][:3]
-        if phase == "system_design":
-            return ["System Design", "需求澄清", "容量与稳定性"]
-        return ["表达结构", "岗位匹配"]
 
     def _current_phase(self, session: InterviewSession) -> str:
         flow = MODE_FLOW.get(session.config.mode_id, MODE_FLOW["comprehensive"])
@@ -1304,78 +1266,8 @@ class CampusInterviewEngine:
             "第 4 天：回放本轮报告中的逐题缺口，逐项录一版更完整回答。",
         ]
 
-    def _ai_question(self, session: InterviewSession, phase: str, step: int) -> str | None:
-        if not is_real_llm(session.config.provider_config):
-            return None
-
-        history = self._history_prompt(session)
-        resume = (session.config.resume_text or "").strip()
-        resume_hint = resume[:1200] if resume else "候选人未提供简历。"
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "你是 OpenInterview 的计算机类校招技术面试官。"
-                    "你必须贴近真实校招，问题要具体、可追问、可评分。"
-                    "只输出一个中文问题，不要输出解释、编号或答案。"
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    f"方向：{session.direction['name']}。\n"
-                    f"方向知识点：{', '.join(session.direction['topics'])}。\n"
-                    f"难度：{session.difficulty['name']}，要求：{session.difficulty['expectation']}。\n"
-                    f"模式：{session.mode['name']}。\n"
-                    f"面试官风格：{session.interviewer_style['name']}，侧重：{', '.join(session.interviewer_style['focus'])}。\n"
-                    f"当前阶段：{phase}，第 {step + 1} 题。\n"
-                    f"简历：{resume_hint}\n"
-                    f"历史：{history}\n"
-                    "请生成下一道面试题。问题必须符合面试官风格：中小厂基础型要贴近真实一面；"
-                    "八股连环追问型要强调原理和边界；项目真实性拷打型要追问个人贡献和证据；"
-                    "系统设计型要要求候选人说明约束、容量、取舍和验证方式。"
-                ),
-            },
-        ]
-        return self._call_llm(session, messages)
-
-    def _ai_feedback(
-        self,
-        session: InterviewSession,
-        answer: str,
-        score: float,
-        fallback: str,
-    ) -> str | None:
-        if not is_real_llm(session.config.provider_config):
-            return None
-
-        messages = [
-            {
-                "role": "system",
-                "content": (
-                    "你是 OpenInterview 的校招面试评估器。"
-                    "请输出中文反馈，不超过 180 字。先指出一个具体优点，再指出一个具体改进点。"
-                    "不要泛泛鼓励，不要生成下一题。"
-                ),
-            },
-            {
-                "role": "user",
-                "content": (
-                    f"方向：{session.direction['name']}。\n"
-                    f"难度：{session.difficulty['name']}。\n"
-                    f"面试官风格：{session.interviewer_style['name']}，侧重：{', '.join(session.interviewer_style['focus'])}。\n"
-                    f"面试题：{session.current_question}\n"
-                    f"候选人回答：{answer}\n"
-                    f"规则评分：{score}/100。\n"
-                    f"兜底反馈：{fallback}\n"
-                    "请根据校招技术面标准给出反馈。"
-                ),
-            },
-        ]
-        return self._call_llm(session, messages)
-
     def _ai_report_summary(self, session: InterviewSession, average_score: float) -> str | None:
-        if not session.history or not is_real_llm(session.config.provider_config):
+        if not session.history or not self._llm_config_ready(session.config.provider_config):
             return None
 
         compact_turns = "\n".join(
@@ -1403,9 +1295,11 @@ class CampusInterviewEngine:
         ]
         return self._call_llm(session, messages)
 
-    def _call_llm(self, session: InterviewSession, messages: list[dict[str, str]]) -> str | None:
-        real_llm = is_real_llm(session.config.provider_config)
-        allow_fallback = llm_allows_fallback(session.config.provider_config)
+    def _call_llm(
+        self,
+        session: InterviewSession,
+        messages: list[dict[str, str]],
+    ) -> str | None:
         try:
             adapter = build_llm_adapter(session.config.provider_config)
             text = adapter.complete(
@@ -1413,43 +1307,27 @@ class CampusInterviewEngine:
                 temperature=llm_temperature(session.config.provider_config),
             )
         except Exception as exc:
-            if real_llm and not allow_fallback:
-                raise RuntimeError(f"LLM provider failed: {exc}") from exc
             session.provider_notice = f"LLM provider failed, fallback to mock logic: {exc}"
             return None
 
         cleaned = text.strip()
         if not cleaned:
-            if real_llm and not allow_fallback:
-                raise RuntimeError("LLM provider returned empty text.")
             session.provider_notice = "LLM provider returned empty text, fallback to mock logic."
             return None
 
         session.provider_notice = None
         return cleaned
 
-    def _history_prompt(self, session: InterviewSession) -> str:
-        if not session.history:
-            return "暂无。"
-        turns = []
-        for index, turn in enumerate(session.history[-4:], start=1):
-            turns.append(
-                f"{index}. 问：{turn.question}\n答：{turn.answer[:240]}\n反馈：{turn.feedback[:160]}"
-            )
-        return "\n".join(turns)
-
     def _validate_provider_config(self, config: InterviewConfig) -> None:
-        provider_config = config.provider_config or {}
-        llm = provider_config.get("llm") or {}
-        provider = (llm.get("provider") or "openai_compatible").strip().lower()
+        del config
+
+    def _llm_config_ready(self, provider_config: dict | None) -> bool:
+        if not is_real_llm(provider_config):
+            return False
+        llm = (provider_config or {}).get("llm") or {}
+        provider = (llm.get("provider") or "mock").strip().lower()
         if provider in {"openai", "openai_compatible", "compatible"}:
-            missing = [
-                name for name in ("api_base", "model", "api_key")
-                if not str(llm.get(name) or "").strip()
-            ]
-            if missing:
-                raise ValueError(
-                    "LLM provider config is incomplete. "
-                    f"Missing: {', '.join(missing)}. "
-                    "Use provider=mock only for local development."
-                )
+            return all(str(llm.get(name) or "").strip() for name in ("api_base", "model", "api_key"))
+        if provider == "ollama":
+            return bool(str(llm.get("model") or "").strip())
+        return True

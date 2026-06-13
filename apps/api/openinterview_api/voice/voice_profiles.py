@@ -5,6 +5,7 @@ from pathlib import Path
 
 import yaml
 
+from ..settings import project_root
 from ..services.voice_config import voice_profiles_config_path
 
 
@@ -22,7 +23,21 @@ class VoiceProfile:
     style_prompt: str | None = None
 
     def as_dict(self) -> dict:
-        return asdict(self)
+        data = asdict(self)
+        reference_path = self.resolved_reference_audio()
+        data["requires_reference_audio"] = self.mode == "zero_shot"
+        data["uses_reference_audio"] = bool(self.reference_audio)
+        data["reference_audio_exists"] = bool(reference_path and reference_path.exists())
+        data["reference_audio_path"] = str(reference_path) if reference_path else None
+        return data
+
+    def resolved_reference_audio(self) -> Path | None:
+        if not self.reference_audio:
+            return None
+        path = Path(self.reference_audio)
+        if path.is_absolute():
+            return path
+        return project_root() / path
 
 
 def load_voice_profiles(path: Path | None = None) -> list[VoiceProfile]:

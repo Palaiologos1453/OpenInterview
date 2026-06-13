@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import json
 from pathlib import Path
+from time import perf_counter
 import tempfile
 from uuid import uuid4
 
@@ -29,7 +30,7 @@ from .services.voice_config import save_voice_model_config, voice_config_respons
 from .storage import Storage
 from .settings import cors_origins, production_mode, require_auth
 from .tracing import Trace
-from .voice.audio import ensure_16k_mono_wav
+from .voice.audio import ensure_16k_mono_wav, is_pcm_s16le_encoding, write_pcm_s16le_wav
 from .voice.voice_profiles import load_voice_profiles
 from .schemas import (
     ASRRequest,
@@ -220,6 +221,7 @@ def report(session_id: str) -> dict:
 
 @app.post("/v1/tts/speech")
 def text_to_speech(request: TTSRequest) -> Response:
+    started_at = perf_counter()
     config = request.provider_config.model_dump()
     if request.voice_profile_id:
         config.setdefault("tts", {})["voice_profile_id"] = request.voice_profile_id
@@ -234,19 +236,31 @@ def text_to_speech(request: TTSRequest) -> Response:
         with tempfile.TemporaryDirectory(prefix="openinterview-tts-") as temp_dir:
             output_path = Path(temp_dir) / f"speech.{audio_format}"
             voice_profile = tts_voice_profile(config)
+            synth_started = perf_counter()
             adapter.synthesize(
                 request.text,
                 output_path,
                 voice=request.provider_config.tts.voice,
                 voice_profile=voice_profile,
             )
+            synth_ms = _elapsed_ms(synth_started)
+            read_started = perf_counter()
             audio = output_path.read_bytes()
+            read_ms = _elapsed_ms(read_started)
     except NotImplementedError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
 
-    return Response(content=audio, media_type=media_type)
+    return Response(
+        content=audio,
+        media_type=media_type,
+        headers={
+            "X-OpenInterview-TTS-Synthesize-Ms": str(synth_ms),
+            "X-OpenInterview-TTS-Read-Ms": str(read_ms),
+            "X-OpenInterview-TTS-Total-Ms": str(_elapsed_ms(started_at)),
+        },
+    )
 
 
 @app.post("/v1/asr/transcribe", response_model=ASRResponse)
@@ -260,25 +274,41 @@ def speech_to_text(request: ASRRequest) -> dict:
     suffix = Path(request.filename or "audio.webm").suffix or ".webm"
     temp_path: Path | None = None
     wav_path: Path | None = None
+    timings: dict[str, float] = {}
+    started_at = perf_counter()
     try:
+        span_started = perf_counter()
         audio = base64.b64decode(request.audio_base64)
-        with tempfile.NamedTemporaryFile(
-            prefix="openinterview-asr-",
-            suffix=suffix,
-            delete=False,
-        ) as temp_file:
-            temp_file.write(audio)
-            temp_path = Path(temp_file.name)
+        timings["decode_ms"] = _elapsed_ms(span_started)
         with tempfile.NamedTemporaryFile(
             prefix="openinterview-asr-",
             suffix=".wav",
             delete=False,
         ) as wav_file:
             wav_path = Path(wav_file.name)
-        model_input = ensure_16k_mono_wav(temp_path, wav_path)
+        span_started = perf_counter()
+        if is_pcm_s16le_encoding(request.audio_encoding):
+            model_input = write_pcm_s16le_wav(
+                audio,
+                wav_path,
+                sample_rate=request.sample_rate,
+                channels=request.channels,
+            )
+        else:
+            with tempfile.NamedTemporaryFile(
+                prefix="openinterview-asr-",
+                suffix=suffix,
+                delete=False,
+            ) as temp_file:
+                temp_file.write(audio)
+                temp_path = Path(temp_file.name)
+            model_input = ensure_16k_mono_wav(temp_path, wav_path)
+        timings["convert_ms"] = _elapsed_ms(span_started)
         trace = Trace()
+        span_started = perf_counter()
         with trace.span("asr.transcribe", provider=request.provider_config.asr.provider):
             text = adapter.transcribe(model_input, language=request.provider_config.asr.language)
+        timings["asr_ms"] = _elapsed_ms(span_started)
         storage.save_transcript(text, source=request.provider_config.asr.provider)
         storage.save_trace(trace.as_dict())
     except NotImplementedError as exc:
@@ -291,7 +321,8 @@ def speech_to_text(request: ASRRequest) -> dict:
         if wav_path and wav_path.exists():
             wav_path.unlink(missing_ok=True)
 
-    return {"text": text}
+    timings["total_ms"] = _elapsed_ms(started_at)
+    return {"text": text, "timings": timings}
 
 
 @app.post("/v1/vad/detect")
@@ -526,16 +557,21 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
     temp_path: Path | None = None
     wav_path: Path | None = None
     trace = Trace()
+    timings: dict[str, float] = {}
+    started_at = perf_counter()
     try:
-        realtime_session.record("user_speech_start", {"filename": request.filename})
+        realtime_session.record(
+            "user_speech_start",
+            {
+                "filename": request.filename,
+                "audio_encoding": request.audio_encoding,
+                "sample_rate": request.sample_rate,
+                "channels": request.channels,
+            },
+        )
+        span_start = perf_counter()
         audio = base64.b64decode(request.audio_base64)
-        with tempfile.NamedTemporaryFile(
-            prefix="openinterview-realtime-",
-            suffix=suffix,
-            delete=False,
-        ) as temp_file:
-            temp_file.write(audio)
-            temp_path = Path(temp_file.name)
+        timings["decode_ms"] = _elapsed_ms(span_start)
         with tempfile.NamedTemporaryFile(
             prefix="openinterview-realtime-",
             suffix=".wav",
@@ -543,18 +579,38 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
         ) as wav_file:
             wav_path = Path(wav_file.name)
 
+        span_start = perf_counter()
         with trace.span("realtime.audio.convert"):
-            model_input = ensure_16k_mono_wav(temp_path, wav_path)
+            if is_pcm_s16le_encoding(request.audio_encoding):
+                model_input = write_pcm_s16le_wav(
+                    audio,
+                    wav_path,
+                    sample_rate=request.sample_rate,
+                    channels=request.channels,
+                )
+            else:
+                with tempfile.NamedTemporaryFile(
+                    prefix="openinterview-realtime-",
+                    suffix=suffix,
+                    delete=False,
+                ) as temp_file:
+                    temp_file.write(audio)
+                    temp_path = Path(temp_file.name)
+                model_input = ensure_16k_mono_wav(temp_path, wav_path)
+        timings["convert_ms"] = _elapsed_ms(span_start)
 
         realtime_session.record("vad_endpoint", {})
+        span_start = perf_counter()
         with trace.span("vad.detect"):
             from .voice.local_vad import SileroVAD
 
             vad = SileroVAD(threshold=request.vad_threshold).detect_file(model_input)
+        timings["vad_ms"] = _elapsed_ms(span_start)
 
         if vad.get("speech_ms", 0) <= 0:
             realtime_session.record("cancel", {"reason": "no_speech"})
             storage.save_trace(trace.as_dict(), interview_id=realtime_session.interview_id)
+            timings["total_ms"] = _elapsed_ms(started_at)
             return {
                 "session": realtime_session.as_dict(),
                 "vad": vad,
@@ -562,10 +618,13 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
                 "turn": None,
                 "skipped": True,
                 "reason": "no_speech",
+                "timings": timings,
             }
 
+        span_start = perf_counter()
         with trace.span("asr.transcribe", provider=request.provider_config.asr.provider):
             text = asr_adapter.transcribe(model_input, language=request.provider_config.asr.language)
+        timings["asr_ms"] = _elapsed_ms(span_start)
         text = text.strip()
         storage.save_transcript(
             text,
@@ -576,8 +635,10 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
 
         turn_payload = None
         if request.submit_to_interview and interview_session:
+            span_start = perf_counter()
             with trace.span("interview.turn", answer_chars=len(text)):
                 turn_payload = engine.answer(interview_session, text)
+            timings["turn_ms"] = _elapsed_ms(span_start)
             turn = interview_session.history[-1]
             storage.save_turn(
                 interview_session.session_id,
@@ -593,13 +654,14 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
                 "tts_start",
                 {
                     "audio_id": f"turn-{turn_payload['turn_index']}",
-                    "text": f"{turn_payload['interviewer_message']} {turn_payload['next_question']}",
+                    "text": turn_payload["next_question"],
                 },
             )
         else:
             realtime_session.record("playback_confirmed", {})
 
         storage.save_trace(trace.as_dict(), interview_id=realtime_session.interview_id)
+        timings["total_ms"] = _elapsed_ms(started_at)
         return {
             "session": realtime_session.as_dict(),
             "vad": vad,
@@ -607,6 +669,7 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
             "turn": turn_payload,
             "skipped": False,
             "reason": None,
+            "timings": timings,
         }
     except NotImplementedError as exc:
         storage.save_trace(trace.as_dict(), interview_id=realtime_session.interview_id)
@@ -682,6 +745,10 @@ def _redact_config(config: dict) -> dict:
         }
         copied["provider_config"] = provider_config
     return copied
+
+
+def _elapsed_ms(start: float) -> float:
+    return round((perf_counter() - start) * 1000, 2)
 
 
 def _restore_session(session_id: str) -> InterviewSession | None:

@@ -14,7 +14,9 @@ Web client
   -> Web client
 ```
 
-MVP 中 ASR、LLM、TTS 均可使用 mock 或浏览器能力。个人本地真实使用时，建议先接入 LLM provider，ASR/TTS 保持浏览器默认或按需接入本地语音 runtime。
+实时语音输入优先使用前端 `AudioWorklet` 将麦克风音频重采样为 16 kHz mono `pcm_s16le`，每 200ms 通过 duplex WebSocket 上行。后端收到 PCM 后直接封装 WAV 头并进入 VAD/ASR，避免 `MediaRecorder` 产出的 `webm/opus` 再经 ffmpeg 转码。浏览器不支持 `AudioWorklet` 时会自动回退到 `MediaRecorder` 路径。
+
+MVP 中 ASR、LLM、TTS 均可使用 mock 或浏览器能力。文本面试默认依赖本地题库和规则引擎；LLM 只作为可选报告总结能力。ASR/TTS 保持浏览器默认或按需接入本地语音 runtime。
 
 ## 后端边界
 
@@ -57,4 +59,4 @@ mock 引擎不是最终智能体，但它有三个作用：
 - `OPENINTERVIEW_REQUIRE_AUTH=true`
 - `OPENINTERVIEW_CORS_ORIGINS=http://127.0.0.1:5173,http://localhost:5173`
 
-大模型面试官配置默认留空，前端必须由用户手动填写 API URL、模型名和 API Key。只有显式选择 `mock` 时才使用开发回退逻辑。
+大模型配置默认留空。缺少 LLM 配置不会阻塞开始面试；后端只在报告总结阶段尝试调用已配置的 LLM，调用失败或返回空内容时回退到本地总结。

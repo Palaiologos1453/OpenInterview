@@ -58,8 +58,9 @@ class CosyVoiceTTS:
             str(output_path),
         ]
         if voice_profile:
-            if voice_profile.reference_audio:
-                command.extend(["--reference-audio", voice_profile.reference_audio])
+            reference_audio = voice_profile.resolved_reference_audio()
+            if reference_audio:
+                command.extend(["--reference-audio", str(reference_audio)])
             if voice_profile.reference_text:
                 command.extend(["--reference-text", voice_profile.reference_text])
             if voice_profile.style_prompt:
@@ -124,7 +125,8 @@ class CosyVoiceWorker:
             "output": str(output_path),
         }
         if voice_profile:
-            request["reference_audio"] = voice_profile.reference_audio
+            reference_audio = voice_profile.resolved_reference_audio()
+            request["reference_audio"] = str(reference_audio) if reference_audio else None
             request["reference_text"] = voice_profile.reference_text
             request["style_prompt"] = voice_profile.style_prompt
         with self.lock:

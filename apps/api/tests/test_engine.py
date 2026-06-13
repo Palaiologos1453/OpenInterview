@@ -107,8 +107,9 @@ class CampusInterviewEngineTest(unittest.TestCase):
 
         turn = engine.answer(session, "不太清楚。")
 
-        self.assertIn("继续补充", turn["next_question"])
+        self.assertIn("围绕上一题继续追问", turn["next_question"])
         self.assertEqual(session.current_question_meta["type"], "followup")
+        self.assertEqual(turn["interviewer_message"], "")
 
     def test_project_deep_dive_followup_is_project_specific(self):
         engine = CampusInterviewEngine()
@@ -129,11 +130,12 @@ class CampusInterviewEngineTest(unittest.TestCase):
 
         turn = engine.answer(session, "做了一个项目。")
 
-        self.assertIn("继续补充", turn["next_question"])
+        self.assertIn("围绕上一题继续追问", turn["next_question"])
         self.assertTrue(
             any(keyword in turn["next_question"] for keyword in ["本人做的吗", "指标从哪里来", "统计口径", "故障"])
         )
         self.assertEqual(session.current_question_meta["phase"], "project")
+        self.assertEqual(turn["interviewer_message"], "")
 
     def test_interviewer_styles_change_followup_pressure(self):
         engine = CampusInterviewEngine()
@@ -151,7 +153,7 @@ class CampusInterviewEngineTest(unittest.TestCase):
         turn = engine.answer(session, "HashMap 是一个 Map。")
 
         self.assertIn("底层原理", turn["next_question"])
-        self.assertIn("八股连环追问", turn["interviewer_message"])
+        self.assertEqual(turn["interviewer_message"], "")
 
     def test_system_design_style_prioritizes_design_topics(self):
         engine = CampusInterviewEngine()

@@ -150,7 +150,8 @@ button.secondary:hover {
   font-size: 13px;
 }
 
-.voice-mode-help {
+.voice-mode-help,
+.voice-profile-help {
   margin: -2px 0 2px;
   color: var(--muted);
   font-size: 12px;
@@ -314,7 +315,7 @@ textarea:focus {
   min-width: 0;
   padding: 28px;
   display: grid;
-  grid-template-rows: auto minmax(320px, 1fr) auto auto;
+  grid-template-rows: auto minmax(320px, 1fr) auto auto auto;
   gap: 18px;
 }
 
@@ -412,6 +413,66 @@ textarea:focus {
   border-color: #b7d7c1;
   color: var(--accent);
   background: #f2f8f4;
+}
+
+.transcript-panel {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #f9fbfa;
+  padding: 12px 14px;
+  display: grid;
+  gap: 8px;
+}
+
+.transcript-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.transcript-head strong {
+  color: var(--text);
+}
+
+.transcript-text {
+  min-height: 48px;
+  max-height: 140px;
+  overflow: auto;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.6;
+}
+
+.transcript-text.empty,
+.transcript-status {
+  color: var(--muted);
+}
+
+.transcript-status {
+  font-size: 12px;
+}
+
+.voice-timings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.voice-timings span {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 3px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  background: #fff;
+}
+
+.voice-timings b {
+  color: var(--text);
+  font-weight: 600;
+  margin-right: 4px;
 }
 
 .answer-box {

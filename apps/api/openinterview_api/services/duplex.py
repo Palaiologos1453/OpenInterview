@@ -5,6 +5,7 @@ import base64
 from pathlib import Path
 import re
 import tempfile
+from time import perf_counter
 from typing import Awaitable, Callable
 import wave
 
@@ -16,7 +17,7 @@ from ..adapters.tts import build_tts_adapter, tts_voice_profile
 from ..interview_engine import CampusInterviewEngine, InterviewSession
 from ..storage import Storage
 from ..tracing import Trace
-from ..voice.audio import ensure_16k_mono_wav
+from ..voice.audio import ensure_16k_mono_wav, is_pcm_s16le_encoding, write_pcm_s16le_wav
 from ..voice.local_vad import SileroVAD
 from .realtime import RealtimeSession
 
@@ -41,6 +42,9 @@ class DuplexRealtimeConnection:
         self.storage = storage
         self.provider_config: dict = {}
         self.mime_type = "audio/webm"
+        self.audio_encoding = "webm"
+        self.sample_rate = 16000
+        self.channels = 1
         self.audio_chunks: list[bytes] = []
         self.cancel_generation = 0
         self.partial_interval_chunks = 8
@@ -48,6 +52,8 @@ class DuplexRealtimeConnection:
         self.enable_partial_asr = False
         self.partial_task: asyncio.Task | None = None
         self.send_lock = asyncio.Lock()
+        self.turn_started_at = 0.0
+        self.turn_timings: dict[str, float] = {}
 
     async def run(self) -> None:
         await self.websocket.accept()
@@ -70,15 +76,32 @@ class DuplexRealtimeConnection:
         if event_type == "start":
             self.provider_config = message.get("provider_config") or {}
             self.mime_type = message.get("mime_type") or "audio/webm"
+            self.audio_encoding = message.get("audio_encoding") or self.mime_type
+            self.sample_rate = int(message.get("sample_rate") or 16000)
+            self.channels = int(message.get("channels") or 1)
             self.partial_interval_chunks = int(message.get("partial_interval_chunks") or 8)
             self.partial_window_chunks = int(message.get("partial_window_chunks") or 12)
             self.enable_partial_asr = bool(message.get("enable_partial_asr"))
             self.audio_chunks = []
-            self.realtime_session.record("user_speech_start", {"mime_type": self.mime_type})
+            self.realtime_session.record(
+                "user_speech_start",
+                {
+                    "mime_type": self.mime_type,
+                    "audio_encoding": self.audio_encoding,
+                    "sample_rate": self.sample_rate,
+                    "channels": self.channels,
+                },
+            )
             await self._send({"type": "listening", "session": self.realtime_session.as_dict()})
             return
 
         if event_type == "audio":
+            if message.get("audio_encoding"):
+                self.audio_encoding = message["audio_encoding"]
+            if message.get("sample_rate"):
+                self.sample_rate = int(message["sample_rate"])
+            if message.get("channels"):
+                self.channels = int(message["channels"])
             chunk = _decode_audio_chunk(message)
             if chunk:
                 self.audio_chunks.append(chunk)
@@ -121,6 +144,8 @@ class DuplexRealtimeConnection:
 
         generation = self.cancel_generation
         trace = Trace()
+        self.turn_started_at = perf_counter()
+        self.turn_timings = {}
         suffix = _suffix_for_mime(self.mime_type)
         audio = b"".join(self.audio_chunks)
         self.audio_chunks = []
@@ -129,26 +154,40 @@ class DuplexRealtimeConnection:
             temp_root = Path(temp_dir)
             input_path = temp_root / f"input{suffix}"
             wav_path = temp_root / "input.wav"
-            input_path.write_bytes(audio)
             try:
                 await self._send({"type": "vad_start"})
+                started = perf_counter()
                 with trace.span("realtime.ws.audio.convert"):
-                    model_input = ensure_16k_mono_wav(input_path, wav_path)
+                    if is_pcm_s16le_encoding(self.audio_encoding):
+                        model_input = write_pcm_s16le_wav(
+                            audio,
+                            wav_path,
+                            sample_rate=self.sample_rate,
+                            channels=self.channels,
+                        )
+                    else:
+                        input_path.write_bytes(audio)
+                        model_input = ensure_16k_mono_wav(input_path, wav_path)
+                await self._record_timing("convert_ms", started)
                 self.realtime_session.record("vad_endpoint", {})
+                started = perf_counter()
                 with trace.span("vad.detect"):
                     vad = SileroVAD(
                         threshold=float(message.get("vad_threshold") or 0.5)
                     ).detect_file(model_input)
+                await self._record_timing("vad_ms", started)
                 await self._send({"type": "vad_final", "vad": vad})
                 if vad.get("speech_ms", 0) <= 0:
                     self.realtime_session.record("cancel", {"reason": "no_speech"})
                     self.storage.save_trace(trace.as_dict(), interview_id=self.realtime_session.interview_id)
+                    await self._record_timing("total_ms", self.turn_started_at)
                     await self._send(
                         {
                             "type": "done",
                             "skipped": True,
                             "reason": "no_speech",
                             "session": self.realtime_session.as_dict(),
+                            "timings": dict(self.turn_timings),
                         }
                     )
                     return
@@ -156,12 +195,14 @@ class DuplexRealtimeConnection:
                 await self._send({"type": "asr_start"})
                 config = self.provider_config
                 asr_adapter = build_asr_adapter(config)
+                started = perf_counter()
                 with trace.span("asr.transcribe", provider=(config.get("asr") or {}).get("provider")):
                     text = await asyncio.to_thread(
                         asr_adapter.transcribe,
                         model_input,
                         language=(config.get("asr") or {}).get("language") or "zh-CN",
                     )
+                await self._record_timing("asr_ms", started)
                 text = text.strip()
                 self.storage.save_transcript(
                     text,
@@ -171,8 +212,10 @@ class DuplexRealtimeConnection:
                 self.realtime_session.record("asr_final", {"text": text})
                 await self._send({"type": "asr_final", "text": text, "is_final": True})
 
+                started = perf_counter()
                 with trace.span("interview.turn", answer_chars=len(text)):
                     turn_payload = self.engine.answer(self.interview_session, text)
+                await self._record_timing("turn_ms", started)
                 turn = self.interview_session.history[-1]
                 self.storage.save_turn(
                     self.interview_session.session_id,
@@ -186,15 +229,19 @@ class DuplexRealtimeConnection:
                 )
                 await self._send({"type": "turn", "turn": turn_payload})
 
-                speech_text = f"{turn_payload['interviewer_message']} {turn_payload['next_question']}"
+                speech_text = turn_payload["next_question"]
                 if generation == self.cancel_generation:
+                    started = perf_counter()
                     await self._stream_tts(speech_text, config, generation, temp_root / "speech")
+                    await self._record_timing("tts_total_ms", started)
                 self.storage.save_trace(trace.as_dict(), interview_id=self.realtime_session.interview_id)
+                await self._record_timing("total_ms", self.turn_started_at)
                 await self._send(
                     {
                         "type": "done",
                         "skipped": False,
                         "session": self.realtime_session.as_dict(),
+                        "timings": dict(self.turn_timings),
                     }
                 )
             except Exception as exc:
@@ -212,7 +259,17 @@ class DuplexRealtimeConnection:
         tts_settings = config.get("tts") or {}
         provider = (tts_settings.get("provider") or "browser").strip().lower()
         if provider in {"", "browser", "disabled"}:
+            await self._send(
+                {
+                    "type": "tts_start",
+                    "provider": provider or "browser",
+                    "format": "browser",
+                    "media_type": "browser",
+                    "text": text,
+                }
+            )
             await self._send({"type": "tts_text", "text": text})
+            await self._send({"type": "tts_done"})
             return
 
         adapter = build_tts_adapter(config)
@@ -222,6 +279,7 @@ class DuplexRealtimeConnection:
         await self._send(
             {
                 "type": "tts_start",
+                "provider": provider,
                 "format": audio_format,
                 "media_type": _audio_media_type(audio_format),
                 "text": text,
@@ -231,12 +289,21 @@ class DuplexRealtimeConnection:
             if generation != self.cancel_generation:
                 break
             output_path = output_base.with_name(f"{output_base.name}-{index}").with_suffix(f".{audio_format}")
+            started = perf_counter()
             await asyncio.to_thread(
                 adapter.synthesize,
                 segment,
                 output_path,
                 voice=tts_settings.get("voice"),
                 voice_profile=voice_profile,
+            )
+            await self._send(
+                {
+                    "type": "tts_segment_done",
+                    "index": index,
+                    "duration_ms": _elapsed_ms(started),
+                    "chars": len(segment),
+                }
             )
             await self._stream_pcm_from_audio(output_path, generation)
         await self._send({"type": "tts_done"})
@@ -249,10 +316,23 @@ class DuplexRealtimeConnection:
             return
         chunks = list(self.audio_chunks[-max(self.partial_window_chunks, 1):])
         mime_type = self.mime_type
+        audio_encoding = self.audio_encoding
+        sample_rate = self.sample_rate
+        channels = self.channels
         config = dict(self.provider_config)
-        self.partial_task = asyncio.create_task(self._emit_partial_asr(chunks, mime_type, config))
+        self.partial_task = asyncio.create_task(
+            self._emit_partial_asr(chunks, mime_type, audio_encoding, sample_rate, channels, config)
+        )
 
-    async def _emit_partial_asr(self, chunks: list[bytes], mime_type: str, config: dict) -> None:
+    async def _emit_partial_asr(
+        self,
+        chunks: list[bytes],
+        mime_type: str,
+        audio_encoding: str,
+        sample_rate: int,
+        channels: int,
+        config: dict,
+    ) -> None:
         if not chunks:
             return
         suffix = _suffix_for_mime(mime_type)
@@ -261,8 +341,18 @@ class DuplexRealtimeConnection:
                 temp_root = Path(temp_dir)
                 input_path = temp_root / f"partial{suffix}"
                 wav_path = temp_root / "partial.wav"
-                input_path.write_bytes(b"".join(chunks))
-                model_input = await asyncio.to_thread(ensure_16k_mono_wav, input_path, wav_path)
+                audio = b"".join(chunks)
+                if is_pcm_s16le_encoding(audio_encoding):
+                    model_input = await asyncio.to_thread(
+                        write_pcm_s16le_wav,
+                        audio,
+                        wav_path,
+                        sample_rate=sample_rate,
+                        channels=channels,
+                    )
+                else:
+                    input_path.write_bytes(audio)
+                    model_input = await asyncio.to_thread(ensure_16k_mono_wav, input_path, wav_path)
                 vad = await asyncio.to_thread(SileroVAD().detect_file, model_input)
                 if vad.get("speech_ms", 0) <= 0:
                     return
@@ -319,6 +409,11 @@ class DuplexRealtimeConnection:
         async with self.send_lock:
             await self.websocket.send_json(payload)
 
+    async def _record_timing(self, name: str, started_at: float) -> None:
+        duration_ms = _elapsed_ms(started_at)
+        self.turn_timings[name] = duration_ms
+        await self._send({"type": "timing", "name": name, "duration_ms": duration_ms})
+
 
 def _decode_audio_chunk(message: dict) -> bytes:
     data = message.get("data") or ""
@@ -347,6 +442,10 @@ def _audio_media_type(audio_format: str) -> str:
     if normalized == "aac":
         return "audio/aac"
     return "audio/mpeg"
+
+
+def _elapsed_ms(start: float) -> float:
+    return round((perf_counter() - start) * 1000, 2)
 
 
 def _split_tts_segments(text: str, max_chars: int = 90) -> list[str]:

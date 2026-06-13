@@ -22,7 +22,8 @@
           <label>难度<select id="difficulty"></select></label>
           <label>模式<select id="mode"></select></label>
           <label>面试官风格<select id="interviewer-style"></select></label>
-          <label>面试官音色<select id="voice-profile"></select></label>
+          <label>本地 CosyVoice 音色 Profile<select id="voice-profile"></select></label>
+          <p id="voice-profile-help" class="voice-profile-help"></p>
           <label>候选人姓名<input id="candidate-name" type="text" placeholder="可选" /></label>
           <label>
             简历 / 项目经历
@@ -39,7 +40,7 @@
           <details class="provider-panel">
             <summary>模型配置（本机保存）</summary>
             <p class="provider-note">
-              默认使用文本面试：填写 LLM 的 API Base、Model 和 API Key 即可。语音输入/播报默认走浏览器，本地 SenseVoice/CosyVoice 属于可选增强。
+              文本面试默认走题库和本地规则，不需要等待 LLM。LLM 只用于可选报告总结；语音输入/播报默认走浏览器，本地 SenseVoice/CosyVoice 属于可选增强。
             </p>
             <div class="provider-grid">
               <h3>LLM</h3>
@@ -155,6 +156,16 @@
             <strong>OpenInterview</strong>
             <span>选择方向和难度，填写本地模型配置后开始一轮计算机校招模拟面试。</span>
           </div>
+        </section>
+
+        <section id="live-transcript" class="transcript-panel" aria-live="polite">
+          <div class="transcript-head">
+            <strong>实时转写</strong>
+            <span id="live-transcript-source">等待语音输入</span>
+          </div>
+          <div id="live-transcript-text" class="transcript-text empty">语音转文字会实时显示在这里。</div>
+          <div id="live-transcript-status" class="transcript-status">未开始</div>
+          <div id="voice-timings" class="voice-timings" hidden></div>
         </section>
 
         <form id="answer-form" class="answer-box">

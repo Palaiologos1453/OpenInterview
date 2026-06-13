@@ -104,11 +104,15 @@ class TTSRequest(BaseModel):
 class ASRRequest(BaseModel):
     audio_base64: str = Field(min_length=1)
     filename: str = Field(default="answer.webm")
+    audio_encoding: str | None = None
+    sample_rate: int = Field(default=16000, ge=8000, le=48000)
+    channels: int = Field(default=1, ge=1, le=2)
     provider_config: ProviderSettings = Field(default_factory=ProviderSettings)
 
 
 class ASRResponse(BaseModel):
     text: str
+    timings: dict[str, float] = Field(default_factory=dict)
 
 
 class VADRequest(BaseModel):
@@ -151,6 +155,9 @@ class RealtimeEventRequest(BaseModel):
 class RealtimeAudioTurnRequest(BaseModel):
     audio_base64: str = Field(min_length=1)
     filename: str = Field(default="answer.webm")
+    audio_encoding: str | None = None
+    sample_rate: int = Field(default=16000, ge=8000, le=48000)
+    channels: int = Field(default=1, ge=1, le=2)
     provider_config: ProviderSettings = Field(default_factory=ProviderSettings)
     vad_threshold: float = Field(default=0.5, ge=0.1, le=0.95)
     submit_to_interview: bool = Field(default=True)

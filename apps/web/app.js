@@ -100,8 +100,22 @@ const state = {
   localAuth: loadLocalAuth(),
   readiness: null,
   messages: [],
+  transcriptFinal: "",
+  transcriptInterim: "",
+  transcriptSource: "",
+  voiceTimings: {},
+  voiceTurnStartedAt: 0,
+  browserRecognition: null,
   mediaRecorder: null,
   mediaStream: null,
+  pcmCaptureContext: null,
+  pcmCaptureSource: null,
+  pcmCaptureNode: null,
+  pcmCaptureMode: "",
+  pcmCaptureFlushing: null,
+  pcmCaptureChunkCount: 0,
+  pcmCaptureBytes: 0,
+  duplexAudioSends: [],
   realtimeSocket: null,
   realtimeMode: "idle",
   ttsChunks: [],
@@ -126,6 +140,7 @@ const elements = {
   candidateName: $("#candidate-name"),
   resume: $("#resume"),
   voiceOutput: $("#voice-output"),
+  voiceProfileHelp: $("#voice-profile-help"),
   llmProvider: $("#llm-provider"),
   llmTemplate: $("#llm-template"),
   llmApiBase: $("#llm-api-base"),
@@ -164,6 +179,11 @@ const elements = {
   resumeFile: $("#resume-file"),
   sessionTitle: $("#session-title"),
   conversation: $("#conversation"),
+  liveTranscript: $("#live-transcript"),
+  liveTranscriptSource: $("#live-transcript-source"),
+  liveTranscriptText: $("#live-transcript-text"),
+  liveTranscriptStatus: $("#live-transcript-status"),
+  voiceTimings: $("#voice-timings"),
   answerForm: $("#answer-form"),
   answer: $("#answer"),
   sendButton: $("#send-button"),
@@ -189,7 +209,7 @@ async function init() {
     state.catalog = await fetchJson(`${API_BASE}/v1/catalog`, { timeoutMs: 3000 });
     state.voiceConfig = await fetchJson(`${API_BASE}/v1/voice/config`, { timeoutMs: 3000 });
     state.backendReady = true;
-    setStatus(`已连接本地后端：${API_BASE}。填写兼容 OpenAI 的 URL、模型名和 Key 后即可开始文本面试；语音为可选能力。`);
+    setStatus(`已连接本地后端：${API_BASE}。文本面试可直接开始；LLM 仅用于可选报告总结，语音为可选能力。`);
   } catch (error) {
     state.backendReady = false;
     state.catalog = fallbackCatalog;
@@ -203,6 +223,7 @@ async function init() {
   fillSelect(elements.voiceProfile, state.catalog.voice_profiles || [], "id", "name");
   fillLocalVoiceForm(state.voiceConfig);
   fillProviderForm(state.providerConfig);
+  updateVoiceProfileHelp();
   wireEvents();
   renderSetupChecklist();
   if (state.backendReady) refreshReadiness();
@@ -243,6 +264,7 @@ function wireEvents() {
   [elements.direction, elements.difficulty, elements.mode, elements.interviewerStyle, elements.voiceProfile].forEach((input) => {
     input.addEventListener("change", renderSetupChecklist);
   });
+  elements.voiceProfile.addEventListener("change", updateVoiceProfileHelp);
 }
 
 function safeHandler(handler) {
@@ -268,6 +290,7 @@ async function startInterview(event) {
   validateProviderConfig(config.provider_config);
   state.providerConfig = config.provider_config;
   state.messages = [];
+  resetTranscript({ source: "等待语音输入", status: "未开始" });
   elements.report.hidden = true;
 
   const payload = await postJson(`${API_BASE}/v1/interviews`, config);
@@ -296,10 +319,9 @@ async function submitAnswer(event) {
   elements.sendButton.disabled = true;
   try {
     const payload = await postJson(`${API_BASE}/v1/interviews/${state.sessionId}/turn`, { answer });
-    addMessage("interviewer", "反馈", payload.interviewer_message, payload.focus_tags);
-    addMessage("interviewer", payload.is_finished ? "结束" : "问题", payload.next_question);
+    addTurnQuestion(payload);
     showProviderNotice(payload.provider_notice);
-    speak(`${payload.interviewer_message} ${payload.next_question}`);
+    speak(payload.next_question);
   } finally {
     elements.sendButton.disabled = false;
   }
@@ -702,11 +724,7 @@ function readProviderConfig() {
 }
 
 function validateProviderConfig(config) {
-  if (config.llm.provider === "openai_compatible") {
-    if (!config.llm.api_base || !config.llm.model || !config.llm.api_key) {
-      throw new Error("请填写大模型面试官的 API URL、模型名和 API Key。");
-    }
-  }
+  void config;
 }
 
 async function refreshReadiness() {
@@ -964,18 +982,19 @@ function updateVoiceModeUi() {
   elements.localVoicePaths.hidden = !showLocal;
   elements.saveLocalVoiceConfig.hidden = !showLocal;
   elements.voiceModeHelp.textContent = voiceModeHelpText(mode);
+  updateVoiceProfileHelp();
 }
 
 function voiceModeHelpText(mode) {
   if (mode === "api") return "语音 API 的 Key 只保存在当前浏览器，不写入后端配置文件。";
-  if (mode === "local") return "本地路径会写入 configs/voice-models.local.yaml，文件已被 git 忽略。";
+  if (mode === "local") return "本地路径会写入 configs/voice-models.local.yaml。音色克隆还需要 configs/voice-profiles.local.yaml 指向本地 wav。";
   if (mode === "disabled") return "关闭后仍可正常使用文本面试。";
-  return "最快跑通方式：浏览器负责麦克风识别和播报，不需要下载语音模型。";
+  return "最快跑通方式：浏览器负责麦克风识别和播报，不需要下载语音模型；本地下拉音色不会影响浏览器播报。";
 }
 
 function voiceModeStatus(mode) {
   if (mode === "api") return "已切到云端语音 API。请填写 ASR/TTS 的 URL、模型名和 Key，然后分别测试。";
-  if (mode === "local") return "已切到本地语音模型。填写模型目录后保存本地路径，再执行语音自检。";
+  if (mode === "local") return "已切到本地语音模型。填写模型目录并配置本地音色 wav 后，再执行语音自检。";
   if (mode === "disabled") return "语音已关闭，文本面试不受影响。";
   return "已切到浏览器语音。通常无需额外配置，只需允许麦克风权限。";
 }
@@ -1072,21 +1091,21 @@ function renderSetupChecklist() {
 
 function llmChecklistItem(llm) {
   if (llm.provider === "mock") {
-    return { label: "LLM 面试官", status: "warn", detail: "当前是 Mock，只适合本地开发验证流程" };
+    return { label: "LLM 报告总结", status: "warn", detail: "未接入 LLM；面试题库和本地报告仍可用" };
   }
   if (llm.provider === "ollama") {
     return {
-      label: "LLM 面试官",
+      label: "LLM 报告总结",
       status: llm.model ? "ok" : "warn",
-      detail: llm.model ? `Ollama：${llm.model}` : "Ollama 未填写模型名，将使用后端默认值"
+      detail: llm.model ? `Ollama：${llm.model}` : "Ollama 未填写模型名；面试过程不受影响"
     };
   }
   const missing = llmMissingFields(llm);
   return {
-    label: "LLM 面试官",
-    status: missing.length ? "bad" : llm.allow_fallback ? "warn" : "ok",
+    label: "LLM 报告总结",
+    status: missing.length ? "warn" : llm.allow_fallback ? "warn" : "ok",
     detail: missing.length
-      ? `缺少 ${missing.join("、")}`
+      ? `可选配置缺少 ${missing.join("、")}；不会阻塞面试`
       : llm.allow_fallback
         ? `${llm.model} 已配置，但真实调用失败时会回退到 Mock`
         : `${llm.model} 已配置，失败时不会静默回退`
@@ -1131,23 +1150,71 @@ function ttsChecklistItem(tts) {
     return {
       label: "语音播报",
       status: window.speechSynthesis ? "ok" : "warn",
-      detail: window.speechSynthesis ? "浏览器播报可用" : "当前浏览器不支持播报"
+      detail: window.speechSynthesis ? "浏览器播报可用，实时面试延迟最低" : "当前浏览器不支持播报"
     };
   }
   if (tts.provider === "cosyvoice") {
     const modelPath = state.readiness?.voice_config?.tts_model_dir || tts.model || "未填写";
+    const profile = selectedVoiceProfile();
+    const profileProblem = voiceProfileProblem(profile);
     return {
       label: "语音播报",
-      status: state.readiness?.ready_for_local_voice ? "ok" : "warn",
-      detail: state.readiness?.ready_for_local_voice ? `Local CosyVoice 已就绪：${modelPath}` : `Local CosyVoice 未就绪：${modelPath}`
+      status: state.readiness?.ready_for_local_voice && !profileProblem ? "ok" : "warn",
+      detail: profileProblem
+        ? profileProblem
+        : state.readiness?.ready_for_local_voice
+          ? `Local CosyVoice 已就绪：${modelPath}；音色更好但首包延迟通常高于浏览器播报`
+          : `Local CosyVoice 未就绪：${modelPath}`
     };
   }
   const ready = Boolean(tts.api_base && tts.model && tts.api_key);
   return {
     label: "语音播报",
     status: ready ? "ok" : "warn",
-    detail: ready ? "API TTS 已配置" : "API TTS 缺少 URL、模型名或 Key"
+    detail: ready ? "API TTS 已配置；会增加网络和服务商排队延迟" : "API TTS 缺少 URL、模型名或 Key"
   };
+}
+
+function selectedVoiceProfile() {
+  return (state.catalog.voice_profiles || []).find((profile) => profile.id === elements.voiceProfile.value) || null;
+}
+
+function voiceProfileProblem(profile = selectedVoiceProfile()) {
+  if (!profile) return "未选择本地 CosyVoice 音色 profile";
+  if (profile.mode === "zero_shot") {
+    if (!profile.reference_audio) return `${profile.name} 是克隆音色，但没有配置 reference_audio`;
+    if (!profile.reference_text) return `${profile.name} 是克隆音色，但没有配置 reference_text`;
+    if (!profile.reference_audio_exists) return `${profile.name} 的参考音频不存在：${profile.reference_audio}`;
+  }
+  return "";
+}
+
+function updateVoiceProfileHelp() {
+  if (!elements.voiceProfileHelp) return;
+  const profile = selectedVoiceProfile();
+  const mode = elements.voiceMode?.value || "browser";
+  if (!profile) {
+    elements.voiceProfileHelp.textContent = "未选择本地 CosyVoice 音色 profile。";
+    return;
+  }
+  if (mode !== "local") {
+    elements.voiceProfileHelp.textContent = "该下拉只影响本地 CosyVoice；浏览器播报和云端 API TTS 使用各自的 voice 字段。";
+    return;
+  }
+  const problem = voiceProfileProblem(profile);
+  if (problem) {
+    elements.voiceProfileHelp.textContent = problem;
+    return;
+  }
+  if (profile.mode === "zero_shot") {
+    elements.voiceProfileHelp.textContent = `将使用本地参考音频克隆：${profile.reference_audio}`;
+    return;
+  }
+  if (profile.style_prompt) {
+    elements.voiceProfileHelp.textContent = `将使用 CosyVoice instruct 风格提示，不是本地克隆音色：${profile.style_prompt}`;
+    return;
+  }
+  elements.voiceProfileHelp.textContent = "该 profile 没有参考音频或风格提示，可能不会改变本地 TTS 音色。";
 }
 
 function localVoiceChecklistItem() {
@@ -1224,6 +1291,7 @@ function fillProviderForm(config) {
   elements.ttsApiKey.value = config.tts.api_key || "";
   if (config.tts.voice_profile_id) elements.voiceProfile.value = config.tts.voice_profile_id;
   applyVoiceMode(detectVoiceMode(config), { silent: true });
+  updateVoiceProfileHelp();
   renderSetupChecklist();
 }
 
@@ -1258,13 +1326,17 @@ function clearProviderConfig() {
   fillProviderForm(state.providerConfig);
   applyVoiceMode("browser", { silent: true });
   renderSetupChecklist();
-  setStatus("模型配置已清空。填写 LLM 的 API Base、Model 和 API Key 后即可开始。");
+  setStatus("模型配置已清空。文本面试可直接开始；需要 AI 报告总结时再填写 LLM 配置。");
 }
 
 async function handleVoiceInput() {
   ensureBackend();
   const config = readProviderConfig();
   if (config.asr.provider === "browser") {
+    if (state.browserRecognition) {
+      stopBrowserSpeechRecognition();
+      return;
+    }
     startBrowserSpeechRecognition();
     return;
   }
@@ -1280,11 +1352,11 @@ async function handleVoiceInput() {
 
 async function toggleDuplexStreaming(config) {
   if (state.realtimeMode === "recording") {
-    commitDuplexAudio();
+    await commitDuplexAudio();
     return;
   }
   if (state.realtimeMode === "speaking" || state.realtimeMode === "thinking") {
-    cancelDuplexTurn();
+    await cancelDuplexTurn();
     return;
   }
   await startDuplexStreaming(config);
@@ -1300,37 +1372,117 @@ async function startDuplexStreaming(config) {
   } catch (error) {
     throw new Error(microphoneErrorMessage(error));
   }
-  const mimeType = selectRecordingMimeType();
   const socket = new WebSocket(realtimeWebSocketUrl());
   state.mediaStream = stream;
   state.realtimeSocket = socket;
   state.realtimeMode = "connecting";
   state.ttsChunks = [];
+  resetVoiceTimings();
   setStatus("正在建立实时语音通道。");
 
-  socket.onopen = () => {
-    socket.send(JSON.stringify({
-      type: "start",
-      provider_config: config,
-      mime_type: mimeType || "audio/webm",
-      partial_interval_chunks: 6,
-      partial_window_chunks: 12,
-      enable_partial_asr: true
-    }));
-    state.recordedChunks = [];
-    state.mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
-    state.mediaRecorder.ondataavailable = (event) => sendDuplexAudioChunk(event.data);
-    state.mediaRecorder.onstop = () => stopMediaStream();
-    state.mediaRecorder.start(500);
-    state.realtimeMode = "recording";
-    elements.listenButton.textContent = "提交语音";
-    setStatus("实时收音中。");
+  socket.onopen = async () => {
+    try {
+      const captureMode = await startPreferredDuplexCapture(stream, config);
+      state.realtimeMode = "recording";
+      elements.listenButton.textContent = "提交语音";
+      resetTranscript({ source: "服务端 ASR", status: "正在收音" });
+      updateTranscriptStatus(captureMode === "pcm" ? "正在收音：16k PCM 低延迟上行" : "正在收音");
+      setStatus(captureMode === "pcm" ? "实时 PCM 收音中。" : "实时收音中。");
+    } catch (error) {
+      resetRealtimeUi();
+      setStatus(`实时语音启动失败：${error.message}`);
+    }
   };
   socket.onmessage = (event) => handleDuplexMessage(JSON.parse(event.data));
   socket.onerror = () => setStatus("实时语音通道异常。可切换到普通录音或文本回答。");
   socket.onclose = () => {
     resetRealtimeUi();
   };
+}
+
+async function startPreferredDuplexCapture(stream, config) {
+  if (supportsPcmCapture()) {
+    try {
+      await startPcmDuplexCapture(stream, config);
+      return "pcm";
+    } catch (error) {
+      console.warn("PCM capture unavailable, falling back to MediaRecorder.", error);
+      await stopPcmCapture({ flush: false });
+    }
+  }
+  startMediaRecorderDuplexCapture(stream, config);
+  return "media_recorder";
+}
+
+function supportsPcmCapture() {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  return Boolean(
+    AudioContextClass &&
+      typeof AudioWorkletNode !== "undefined" &&
+      "audioWorklet" in AudioContextClass.prototype
+  );
+}
+
+async function startPcmDuplexCapture(stream, config) {
+  const AudioContextClass = window.AudioContext || window.webkitAudioContext;
+  if (!AudioContextClass || typeof AudioWorkletNode === "undefined") throw new Error("AudioWorklet is not supported.");
+  const context = new AudioContextClass({ sampleRate: 16000 });
+  state.pcmCaptureContext = context;
+  if (!context.audioWorklet) throw new Error("AudioWorklet is not available in this context.");
+  await context.audioWorklet.addModule("./audio-worklet/pcm-processor.js");
+  const source = context.createMediaStreamSource(stream);
+  const node = new AudioWorkletNode(context, "openinterview-pcm-processor");
+  const mutedGain = context.createGain();
+  mutedGain.gain.value = 0;
+  source.connect(node);
+  node.connect(mutedGain);
+  mutedGain.connect(context.destination);
+  node.port.onmessage = (event) => handlePcmCaptureMessage(event.data);
+  state.pcmCaptureSource = source;
+  state.pcmCaptureNode = node;
+  state.pcmCaptureMode = "pcm";
+  state.pcmCaptureChunkCount = 0;
+  state.pcmCaptureBytes = 0;
+  if (context.state === "suspended") await context.resume();
+  sendDuplexStart(config, {
+    mime_type: "audio/pcm",
+    audio_encoding: "pcm_s16le",
+    sample_rate: 16000,
+    channels: 1,
+    partial_interval_chunks: 5
+  });
+}
+
+function startMediaRecorderDuplexCapture(stream, config) {
+  const mimeType = selectRecordingMimeType();
+  state.duplexAudioSends = [];
+  sendDuplexStart(config, {
+    mime_type: mimeType || "audio/webm",
+    audio_encoding: mimeType || "audio/webm"
+  });
+  state.recordedChunks = [];
+  state.mediaRecorder = new MediaRecorder(stream, mimeType ? { mimeType } : undefined);
+  state.mediaRecorder.ondataavailable = (event) => {
+    const sendPromise = sendDuplexAudioChunk(event.data);
+    state.duplexAudioSends.push(sendPromise);
+    sendPromise.finally(() => {
+      state.duplexAudioSends = state.duplexAudioSends.filter((item) => item !== sendPromise);
+    });
+  };
+  state.mediaRecorder.onstop = () => stopMediaStream();
+  state.mediaRecorder.start(500);
+}
+
+function sendDuplexStart(config, audioOptions = {}) {
+  if (state.realtimeSocket?.readyState !== WebSocket.OPEN) return;
+  state.realtimeSocket.send(JSON.stringify({
+    type: "start",
+    provider_config: config,
+    partial_interval_chunks: 6,
+    partial_window_chunks: 12,
+    enable_partial_asr: false,
+    ...audioOptions
+  }));
 }
 
 async function sendDuplexAudioChunk(blob) {
@@ -1341,10 +1493,106 @@ async function sendDuplexAudioChunk(blob) {
   }));
 }
 
-function commitDuplexAudio() {
-  if (state.mediaRecorder?.state === "recording") state.mediaRecorder.stop();
+function handlePcmCaptureMessage(message) {
+  if (message?.type === "flushed") {
+    if (state.pcmCaptureFlushing) {
+      state.pcmCaptureFlushing.resolve();
+      state.pcmCaptureFlushing = null;
+    }
+    return;
+  }
+  if (message?.type !== "chunk" || !message.buffer) return;
+  sendDuplexPcmChunk(message.buffer);
+}
+
+function sendDuplexPcmChunk(buffer) {
+  if (!buffer || state.realtimeSocket?.readyState !== WebSocket.OPEN) return;
+  state.pcmCaptureChunkCount += 1;
+  state.pcmCaptureBytes += buffer.byteLength || 0;
+  state.realtimeSocket.send(JSON.stringify({
+    type: "audio",
+    audio_encoding: "pcm_s16le",
+    sample_rate: 16000,
+    channels: 1,
+    data: arrayBufferToBase64(buffer)
+  }));
+}
+
+async function stopDuplexCapture({ flush = false } = {}) {
+  if (state.mediaRecorder?.state === "recording") {
+    await stopMediaRecorderCapture();
+  } else if (state.mediaRecorder) {
+    state.mediaRecorder = null;
+  }
+  if (state.duplexAudioSends.length) {
+    await Promise.allSettled(state.duplexAudioSends);
+    state.duplexAudioSends = [];
+  }
+  await stopPcmCapture({ flush });
   stopMediaStream();
+}
+
+function stopMediaRecorderCapture() {
+  const recorder = state.mediaRecorder;
+  if (!recorder || recorder.state !== "recording") return Promise.resolve();
+  return new Promise((resolve) => {
+    const previousStop = recorder.onstop;
+    recorder.onstop = (event) => {
+      if (typeof previousStop === "function") previousStop(event);
+      state.mediaRecorder = null;
+      resolve();
+    };
+    recorder.stop();
+  });
+}
+
+async function stopPcmCapture({ flush = false } = {}) {
+  const node = state.pcmCaptureNode;
+  if (node && flush) await flushPcmCapture();
+  try {
+    if (state.pcmCaptureSource) state.pcmCaptureSource.disconnect();
+  } catch {
+    // Already disconnected.
+  }
+  try {
+    if (node) node.disconnect();
+  } catch {
+    // Already disconnected.
+  }
+  if (state.pcmCaptureContext) {
+    await state.pcmCaptureContext.close().catch(() => {});
+  }
+  state.pcmCaptureContext = null;
+  state.pcmCaptureSource = null;
+  state.pcmCaptureNode = null;
+  state.pcmCaptureMode = "";
+  state.pcmCaptureFlushing = null;
+}
+
+function flushPcmCapture() {
+  if (!state.pcmCaptureNode) return Promise.resolve();
+  if (state.pcmCaptureFlushing) return state.pcmCaptureFlushing.promise;
+  let timeoutId;
+  const promise = new Promise((resolve) => {
+    timeoutId = window.setTimeout(resolve, 250);
+    state.pcmCaptureFlushing = {
+      resolve: () => {
+        window.clearTimeout(timeoutId);
+        resolve();
+      },
+      promise: null
+    };
+  });
+  state.pcmCaptureFlushing.promise = promise;
+  state.pcmCaptureNode.port.postMessage({ type: "flush" });
+  return promise;
+}
+
+async function commitDuplexAudio() {
+  await stopDuplexCapture({ flush: true });
   if (state.realtimeSocket?.readyState === WebSocket.OPEN) {
+    updateVoiceTiming("client_wait_ms", 0);
+    state.voiceTurnStartedAt = performance.now();
     state.realtimeSocket.send(JSON.stringify({
       type: "commit",
       provider_config: readProviderConfig()
@@ -1352,20 +1600,21 @@ function commitDuplexAudio() {
   }
   state.realtimeMode = "thinking";
   elements.listenButton.textContent = "取消";
-  setStatus("正在端点检测、转写和生成反馈。");
+  updateTranscriptStatus("正在检测端点并转写");
+  setStatus("正在端点检测、转写和生成下一题。");
 }
 
-function cancelDuplexTurn() {
+async function cancelDuplexTurn() {
   if (state.currentAudio) {
     state.currentAudio.pause();
     state.currentAudio = null;
   }
   resetPcmPlayback();
-  if (state.mediaRecorder?.state === "recording") state.mediaRecorder.stop();
-  stopMediaStream();
+  await stopDuplexCapture({ flush: false });
   if (state.realtimeSocket?.readyState === WebSocket.OPEN) {
     state.realtimeSocket.send(JSON.stringify({ type: "cancel" }));
   }
+  updateTranscriptStatus("已取消");
   state.realtimeMode = "idle";
   elements.listenButton.textContent = "语音输入";
   setStatus("已取消实时语音轮次。");
@@ -1373,28 +1622,47 @@ function cancelDuplexTurn() {
 
 function handleDuplexMessage(message) {
   if (message.type === "ready" || message.type === "listening") return;
+  if (message.type === "timing") {
+    updateVoiceTiming(message.name, message.duration_ms);
+    return;
+  }
   if (message.type === "asr_partial") {
-    if (message.text) elements.answer.value = message.text;
+    if (message.text) {
+      updateTranscript({
+        interim: message.text,
+        source: "服务端 ASR",
+        status: "实时转写中"
+      });
+    } else {
+      updateTranscriptStatus(`已接收 ${message.audio_bytes || 0} 字节音频`);
+    }
     setStatus(message.text ? `实时转写：${message.text}` : `已接收音频 ${message.audio_bytes || 0} 字节。`);
     return;
   }
   if (message.type === "vad_start") {
+    updateTranscriptStatus("正在检测语音端点");
     setStatus("正在检测语音端点。");
     return;
   }
   if (message.type === "asr_start") {
+    updateTranscriptStatus("正在生成最终转写");
     setStatus("正在转写语音。");
     return;
   }
   if (message.type === "asr_final") {
     elements.answer.value = "";
+    updateTranscript({
+      finalText: message.text || "",
+      interim: "",
+      source: "服务端 ASR",
+      status: message.text ? "最终转写已提交" : "未识别到文本"
+    });
     if (message.text) addMessage("candidate", "候选人", message.text);
     return;
   }
   if (message.type === "turn") {
     const turn = message.turn;
-    addMessage("interviewer", "反馈", turn.interviewer_message, turn.focus_tags);
-    addMessage("interviewer", turn.is_finished ? "结束" : "问题", turn.next_question);
+    addTurnQuestion(turn);
     showProviderNotice(turn.provider_notice);
     state.realtimeMode = "speaking";
     elements.listenButton.textContent = "取消";
@@ -1402,15 +1670,18 @@ function handleDuplexMessage(message) {
     return;
   }
   if (message.type === "tts_text") {
-    speakWithBrowser(message.text);
+    updateVoiceTiming("tts_first_output_ms", elapsedSinceVoiceTurnStart());
+    void speakWithBrowser(message.text);
     return;
   }
   if (message.type === "tts_start") {
     state.ttsChunks = [];
+    updateVoiceTiming("tts_start_ms", elapsedSinceVoiceTurnStart());
     setStatus("正在接收语音播报。");
     return;
   }
   if (message.type === "tts_pcm_start") {
+    updateVoiceTiming("tts_first_audio_ms", elapsedSinceVoiceTurnStart());
     startPcmPlayback(message);
     setStatus("正在流式播放语音。");
     return;
@@ -1424,28 +1695,42 @@ function handleDuplexMessage(message) {
     return;
   }
   if (message.type === "tts_done") {
+    updateVoiceTiming("tts_done_ms", elapsedSinceVoiceTurnStart());
     if (state.ttsChunks.length) playStreamedTts(message.format || "mp3");
     return;
   }
   if (message.type === "done") {
+    if (message.timings) mergeVoiceTimings(message.timings);
+    updateVoiceTiming("client_total_ms", elapsedSinceVoiceTurnStart());
     resetRealtimeUi();
-    if (message.skipped) setStatus(message.reason === "no_speech" ? "未检测到有效语音。" : "实时语音轮次已跳过。");
-    else setStatus("实时语音轮次完成。");
+    if (message.skipped) {
+      updateTranscriptStatus(message.reason === "no_speech" ? "未检测到有效语音" : "实时语音轮次已跳过");
+      setStatus(message.reason === "no_speech" ? "未检测到有效语音。" : "实时语音轮次已跳过。");
+    } else {
+      updateTranscriptStatus("实时语音轮次完成");
+      setStatus("实时语音轮次完成。");
+    }
     return;
   }
   if (message.type === "cancelled") {
     resetRealtimeUi();
+    updateTranscriptStatus("实时语音轮次已取消");
     setStatus("实时语音轮次已取消。");
     return;
   }
   if (message.type === "error") {
     resetRealtimeUi();
+    updateTranscriptStatus("实时语音错误");
     setStatus(`实时语音错误：${message.error}。可切换到普通录音或文本回答。`);
   }
 }
 
 function resetRealtimeUi() {
-  stopMediaStream();
+  if (state.browserRecognition) {
+    state.browserRecognition.abort();
+    state.browserRecognition = null;
+  }
+  void stopDuplexCapture({ flush: false });
   resetPcmPlayback();
   state.realtimeMode = "idle";
   state.realtimeSocket = null;
@@ -1517,25 +1802,65 @@ function startBrowserSpeechRecognition() {
   }
   const recognition = new Recognition();
   recognition.lang = "zh-CN";
-  recognition.interimResults = false;
+  recognition.continuous = true;
+  recognition.interimResults = true;
   recognition.onstart = () => {
-    elements.listenButton.disabled = true;
+    state.browserRecognition = recognition;
+    elements.listenButton.disabled = false;
+    elements.listenButton.textContent = "停止听写";
+    resetTranscript({ source: "浏览器 ASR", status: "正在听写" });
     setStatus("浏览器正在听写。请说出你的回答。");
   };
   recognition.onresult = (event) => {
-    elements.answer.value = [elements.answer.value.trim(), event.results[0][0].transcript].filter(Boolean).join("\n");
+    let finalText = "";
+    let interimText = "";
+    for (let index = event.resultIndex; index < event.results.length; index += 1) {
+      const result = event.results[index];
+      const transcript = result[0]?.transcript || "";
+      if (result.isFinal) finalText += transcript;
+      else interimText += transcript;
+    }
+    if (finalText.trim()) {
+      appendAnswerText(finalText);
+      updateTranscript({
+        finalText: [state.transcriptFinal, finalText].filter(Boolean).join(""),
+        interim: interimText,
+        source: "浏览器 ASR",
+        status: interimText ? "实时转写中" : "已收到最终文本"
+      });
+    } else {
+      updateTranscript({
+        interim: interimText,
+        source: "浏览器 ASR",
+        status: interimText ? "实时转写中" : "正在听写"
+      });
+    }
   };
-  recognition.onerror = (event) => setStatus(`浏览器语音输入失败：${browserRecognitionErrorMessage(event)}。可以继续使用文本回答。`);
+  recognition.onerror = (event) => {
+    updateTranscriptStatus("浏览器语音输入失败");
+    setStatus(`浏览器语音输入失败：${browserRecognitionErrorMessage(event)}。可以继续使用文本回答。`);
+  };
   recognition.onend = () => {
+    state.browserRecognition = null;
+    elements.listenButton.textContent = "语音输入";
     elements.listenButton.disabled = !canUseVoiceInput();
+    updateTranscriptStatus(elements.answer.value.trim() ? "浏览器语音输入完成" : "未收到可用文本");
     setStatus(elements.answer.value.trim() ? "浏览器语音输入完成。" : "浏览器语音输入结束，未收到可用文本。");
   };
   try {
     recognition.start();
   } catch (error) {
+    state.browserRecognition = null;
+    elements.listenButton.textContent = "语音输入";
     elements.listenButton.disabled = !canUseVoiceInput();
     setStatus(`浏览器语音输入启动失败：${error.message}`);
   }
+}
+
+function stopBrowserSpeechRecognition() {
+  if (!state.browserRecognition) return;
+  updateTranscriptStatus("正在停止听写");
+  state.browserRecognition.stop();
 }
 
 async function toggleServerRecording(config) {
@@ -1563,8 +1888,17 @@ async function toggleServerRecording(config) {
       if (state.realtimeSessionId && state.sessionId) {
         await submitRealtimeAudioTurn(blob, config);
       } else {
-        const text = await transcribeWithServer(blob, config);
-        elements.answer.value = [elements.answer.value.trim(), text].filter(Boolean).join("\n");
+        state.voiceTurnStartedAt = performance.now();
+        const result = await transcribeWithServer(blob, config);
+        mergeVoiceTimings(result.timings || {});
+        const text = result.text || "";
+        appendAnswerText(text);
+        updateTranscript({
+          finalText: text,
+          interim: "",
+          source: "服务端 ASR",
+          status: text ? "最终转写已写入输入框" : "未识别到文本"
+        });
         setStatus("语音转写完成。");
       }
     } catch (error) {
@@ -1577,6 +1911,8 @@ async function toggleServerRecording(config) {
   state.mediaRecorder.start();
   elements.listenButton.textContent = "停止录音";
   elements.sendButton.disabled = true;
+  resetVoiceTimings();
+  resetTranscript({ source: "服务端 ASR", status: "正在录音" });
   setStatus("正在录音。");
 }
 
@@ -1586,12 +1922,15 @@ async function transcribeWithServer(blob, config) {
       filename: "answer.webm",
       provider_config: config
     });
-  return payload.text || "";
+  return payload;
 }
 
 async function submitRealtimeAudioTurn(blob, config) {
   elements.listenButton.disabled = true;
   elements.sendButton.disabled = true;
+  resetVoiceTimings();
+  state.voiceTurnStartedAt = performance.now();
+  updateTranscriptStatus("正在转写并生成下一题");
   setStatus("正在转写并推进面试轮次。");
   try {
     const payload = await postJson(`${API_BASE}/v1/realtime/sessions/${state.realtimeSessionId}/audio-turn`, {
@@ -1601,18 +1940,29 @@ async function submitRealtimeAudioTurn(blob, config) {
       submit_to_interview: true
     });
     if (payload.skipped) {
+      if (payload.timings) mergeVoiceTimings(payload.timings);
+      updateVoiceTiming("client_total_ms", elapsedSinceVoiceTurnStart());
+      updateTranscriptStatus(payload.reason === "no_speech" ? "未检测到有效语音" : "语音轮次已跳过");
       setStatus(payload.reason === "no_speech" ? "未检测到有效语音。" : "语音轮次已跳过。");
       return;
     }
+    if (payload.timings) mergeVoiceTimings(payload.timings);
     const transcript = payload.transcript || "";
     const turn = payload.turn;
+    updateTranscript({
+      finalText: transcript,
+      interim: "",
+      source: "服务端 ASR",
+      status: transcript ? "最终转写已提交" : "未识别到文本"
+    });
     if (transcript) addMessage("candidate", "候选人", transcript);
     if (turn) {
-      addMessage("interviewer", "反馈", turn.interviewer_message, turn.focus_tags);
-      addMessage("interviewer", turn.is_finished ? "结束" : "问题", turn.next_question);
+      addTurnQuestion(turn);
       showProviderNotice(turn.provider_notice);
-      speak(`${turn.interviewer_message} ${turn.next_question}`);
+      void speak(turn.next_question);
     }
+    updateVoiceTiming("client_total_ms", elapsedSinceVoiceTurnStart());
+    updateTranscriptStatus("语音轮次完成");
     setStatus("语音轮次完成。");
   } finally {
     elements.listenButton.disabled = !canUseVoiceInput();
@@ -1624,7 +1974,7 @@ async function speak(text) {
   const config = readProviderConfig();
   if (!elements.voiceOutput.checked || config.tts.provider === "disabled") return;
   if (config.tts.provider === "browser") {
-    speakWithBrowser(text);
+    await speakWithBrowser(text);
     return;
   }
   try {
@@ -1637,23 +1987,41 @@ async function speak(text) {
 function speakWithBrowser(text) {
   if (!window.speechSynthesis) {
     setStatus("当前浏览器不支持语音播报。");
-    return;
+    return Promise.resolve();
   }
-  window.speechSynthesis.cancel();
-  const utterance = new SpeechSynthesisUtterance(text);
-  utterance.lang = "zh-CN";
-  utterance.onerror = (event) => setStatus(`浏览器语音播报失败：${event.error || "未知错误"}`);
-  window.speechSynthesis.speak(utterance);
+  return new Promise((resolve) => {
+    window.speechSynthesis.cancel();
+    const started = performance.now();
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "zh-CN";
+    utterance.onstart = () => {
+      updateVoiceTiming("browser_tts_start_ms", Math.round(performance.now() - started));
+      updateVoiceTiming("tts_first_output_ms", elapsedSinceVoiceTurnStart());
+    };
+    utterance.onend = () => {
+      updateVoiceTiming("browser_tts_total_ms", Math.round(performance.now() - started));
+      resolve();
+    };
+    utterance.onerror = (event) => {
+      setStatus(`浏览器语音播报失败：${event.error || "未知错误"}`);
+      resolve();
+    };
+    window.speechSynthesis.speak(utterance);
+  });
 }
 
 async function speakWithServer(text, config) {
+  const started = performance.now();
   const response = await authedFetch(`${API_BASE}/v1/tts/speech`, {
     method: "POST",
     headers: jsonHeaders(),
     body: JSON.stringify({ text, provider_config: config, voice_profile_id: elements.voiceProfile.value })
   });
   if (!response.ok) throw new Error(await response.text());
+  updateVoiceTiming("server_tts_response_ms", Math.round(performance.now() - started));
+  updateTtsHeaderTiming(response, "X-OpenInterview-TTS-Synthesize-Ms", "server_tts_synthesize_ms");
   const blob = await response.blob();
+  updateVoiceTiming("server_tts_blob_ms", Math.round(performance.now() - started));
   if (state.currentAudio) {
     state.currentAudio.pause();
     state.currentAudio = null;
@@ -1661,15 +2029,21 @@ async function speakWithServer(text, config) {
   const url = URL.createObjectURL(blob);
   const audio = new Audio(url);
   state.currentAudio = audio;
-  audio.onended = () => {
-    URL.revokeObjectURL(url);
-    if (state.currentAudio === audio) state.currentAudio = null;
-  };
-  audio.onerror = () => {
-    URL.revokeObjectURL(url);
-    if (state.currentAudio === audio) state.currentAudio = null;
-  };
-  await audio.play();
+  await new Promise((resolve, reject) => {
+    audio.onplaying = () => updateVoiceTiming("server_tts_first_audio_ms", Math.round(performance.now() - started));
+    audio.onended = () => {
+      updateVoiceTiming("server_tts_total_ms", Math.round(performance.now() - started));
+      URL.revokeObjectURL(url);
+      if (state.currentAudio === audio) state.currentAudio = null;
+      resolve();
+    };
+    audio.onerror = () => {
+      URL.revokeObjectURL(url);
+      if (state.currentAudio === audio) state.currentAudio = null;
+      reject(new Error("audio playback failed"));
+    };
+    audio.play().catch(reject);
+  });
 }
 
 function canUseVoiceInput() {
@@ -1862,6 +2236,142 @@ function addMessage(role, title, content, tags = []) {
   elements.conversation.scrollTop = elements.conversation.scrollHeight;
 }
 
+function addTurnQuestion(turn) {
+  if (!turn?.next_question) return;
+  addMessage("interviewer", turn.is_finished ? "结束" : "问题", turn.next_question, turn.focus_tags || []);
+}
+
+function appendAnswerText(text) {
+  const cleaned = String(text || "").trim();
+  if (!cleaned) return;
+  elements.answer.value = [elements.answer.value.trim(), cleaned].filter(Boolean).join("\n");
+}
+
+function resetTranscript({ source = "等待语音输入", status = "未开始" } = {}) {
+  state.transcriptFinal = "";
+  state.transcriptInterim = "";
+  state.transcriptSource = source;
+  renderTranscript(status);
+}
+
+function updateTranscript({ finalText, interim, source, status } = {}) {
+  if (finalText !== undefined) state.transcriptFinal = String(finalText || "").trim();
+  if (interim !== undefined) state.transcriptInterim = String(interim || "").trim();
+  if (source) state.transcriptSource = source;
+  renderTranscript(status || "实时转写中");
+}
+
+function updateTranscriptStatus(status) {
+  renderTranscript(status);
+}
+
+function renderTranscript(status = "未开始") {
+  if (!elements.liveTranscriptText) return;
+  const finalText = state.transcriptFinal || "";
+  const interimText = state.transcriptInterim || "";
+  const combined = [finalText, interimText].filter(Boolean).join(finalText && interimText ? "\n" : "");
+  elements.liveTranscriptSource.textContent = state.transcriptSource || "等待语音输入";
+  elements.liveTranscriptText.textContent = combined || "语音转文字会实时显示在这里。";
+  elements.liveTranscriptText.classList.toggle("empty", !combined);
+  elements.liveTranscriptStatus.textContent = `${status} · ${new Date().toLocaleTimeString("zh-CN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })}`;
+}
+
+function resetVoiceTimings() {
+  state.voiceTimings = {};
+  state.voiceTurnStartedAt = 0;
+  renderVoiceTimings();
+}
+
+function mergeVoiceTimings(timings = {}) {
+  Object.entries(timings).forEach(([name, value]) => updateVoiceTiming(name, value, { render: false }));
+  renderVoiceTimings();
+}
+
+function updateVoiceTiming(name, durationMs, options = {}) {
+  if (!name || durationMs === undefined || durationMs === null || Number.isNaN(Number(durationMs))) return;
+  state.voiceTimings[name] = Number(durationMs);
+  if (options.render !== false) renderVoiceTimings();
+}
+
+function elapsedSinceVoiceTurnStart() {
+  if (!state.voiceTurnStartedAt) return 0;
+  return Math.round(performance.now() - state.voiceTurnStartedAt);
+}
+
+function renderVoiceTimings() {
+  if (!elements.voiceTimings) return;
+  const entries = voiceTimingEntries();
+  elements.voiceTimings.hidden = entries.length === 0;
+  elements.voiceTimings.innerHTML = entries.map(([name, value]) => `
+    <span><b>${escapeHtml(voiceTimingLabel(name))}</b>${escapeHtml(formatDuration(value))}</span>
+  `).join("");
+}
+
+function voiceTimingEntries() {
+  const order = [
+    "decode_ms",
+    "convert_ms",
+    "vad_ms",
+    "asr_ms",
+    "turn_ms",
+    "tts_start_ms",
+    "tts_first_output_ms",
+    "tts_first_audio_ms",
+    "tts_done_ms",
+    "tts_total_ms",
+    "browser_tts_start_ms",
+    "browser_tts_total_ms",
+    "server_tts_response_ms",
+    "server_tts_synthesize_ms",
+    "server_tts_blob_ms",
+    "server_tts_first_audio_ms",
+    "server_tts_total_ms",
+    "total_ms",
+    "client_total_ms"
+  ];
+  const seen = new Set(order);
+  const ordered = order.filter((name) => state.voiceTimings[name] !== undefined);
+  const rest = Object.keys(state.voiceTimings).filter((name) => !seen.has(name)).sort();
+  return ordered.concat(rest).map((name) => [name, state.voiceTimings[name]]);
+}
+
+function voiceTimingLabel(name) {
+  const labels = {
+    decode_ms: "解码",
+    convert_ms: "转码",
+    vad_ms: "VAD",
+    asr_ms: "ASR",
+    turn_ms: "下一题",
+    tts_start_ms: "TTS开始",
+    tts_first_output_ms: "首个播报",
+    tts_first_audio_ms: "首段音频",
+    tts_done_ms: "TTS完成",
+    tts_total_ms: "TTS总计",
+    browser_tts_start_ms: "浏览器TTS首音",
+    browser_tts_total_ms: "浏览器TTS总计",
+    server_tts_response_ms: "服务端TTS响应",
+    server_tts_synthesize_ms: "服务端TTS合成",
+    server_tts_blob_ms: "音频下载",
+    server_tts_first_audio_ms: "服务端TTS首音",
+    server_tts_total_ms: "服务端TTS总计",
+    total_ms: "后端总计",
+    client_total_ms: "前端总计"
+  };
+  return labels[name] || name.replace(/_/g, " ");
+}
+
+function formatDuration(value) {
+  const ms = Number(value) || 0;
+  if (ms >= 1000) return `${(ms / 1000).toFixed(2)}s`;
+  return `${Math.round(ms)}ms`;
+}
+
+function updateTtsHeaderTiming(response, headerName, timingName) {
+  const raw = response.headers.get(headerName);
+  if (!raw) return;
+  updateVoiceTiming(timingName, Number(raw));
+}
+
 function renderList(title, items = []) {
   return `<h3>${escapeHtml(title)}</h3><ul class="report-list">${items.map((item) => `<li>${escapeHtml(item)}</li>`).join("")}</ul>`;
 }
@@ -1918,6 +2428,16 @@ function blobToBase64(blob) {
     reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
+}
+
+function arrayBufferToBase64(buffer) {
+  const bytes = new Uint8Array(buffer);
+  let binary = "";
+  const chunkSize = 0x8000;
+  for (let index = 0; index < bytes.length; index += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(index, index + chunkSize));
+  }
+  return btoa(binary);
 }
 
 function realtimeWebSocketUrl() {
