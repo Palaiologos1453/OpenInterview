@@ -95,6 +95,7 @@ const state = {
   catalog: fallbackCatalog,
   sessionId: null,
   realtimeSessionId: null,
+  sessionFinished: false,
   backendReady: false,
   authRequired: false,
   localAuth: loadLocalAuth(),
@@ -295,6 +296,7 @@ async function startInterview(event) {
 
   const payload = await postJson(`${API_BASE}/v1/interviews`, config);
   state.sessionId = payload.session_id;
+  state.sessionFinished = false;
   const realtime = await postJson(`${API_BASE}/v1/realtime/sessions`, { interview_id: state.sessionId });
   state.realtimeSessionId = realtime.id;
   elements.sessionTitle.textContent = `${selectedName(elements.direction)} / ${selectedName(elements.difficulty)}`;
@@ -312,6 +314,10 @@ async function startInterview(event) {
 async function submitAnswer(event) {
   event.preventDefault();
   ensureBackend();
+  if (state.sessionFinished) {
+    setStatus("本轮面试已经结束，请生成报告或开始新面试。");
+    return;
+  }
   const answer = elements.answer.value.trim();
   if (!answer) return;
   addMessage("candidate", "候选人", answer);
@@ -323,7 +329,7 @@ async function submitAnswer(event) {
     showProviderNotice(payload.provider_notice);
     speak(payload.next_question);
   } finally {
-    elements.sendButton.disabled = false;
+    elements.sendButton.disabled = state.sessionFinished;
   }
 }
 
@@ -1331,6 +1337,10 @@ function clearProviderConfig() {
 
 async function handleVoiceInput() {
   ensureBackend();
+  if (state.sessionFinished) {
+    setStatus("本轮面试已经结束，请生成报告或开始新面试。");
+    return;
+  }
   const config = readProviderConfig();
   if (config.asr.provider === "browser") {
     if (state.browserRecognition) {
@@ -1735,8 +1745,8 @@ function resetRealtimeUi() {
   state.realtimeMode = "idle";
   state.realtimeSocket = null;
   elements.listenButton.textContent = "语音输入";
-  elements.listenButton.disabled = !canUseVoiceInput();
-  elements.sendButton.disabled = false;
+  elements.listenButton.disabled = state.sessionFinished || !canUseVoiceInput();
+  elements.sendButton.disabled = state.sessionFinished;
 }
 
 function playStreamedTts(format) {
@@ -1965,8 +1975,8 @@ async function submitRealtimeAudioTurn(blob, config) {
     updateTranscriptStatus("语音轮次完成");
     setStatus("语音轮次完成。");
   } finally {
-    elements.listenButton.disabled = !canUseVoiceInput();
-    elements.sendButton.disabled = false;
+    elements.listenButton.disabled = state.sessionFinished || !canUseVoiceInput();
+    elements.sendButton.disabled = state.sessionFinished;
   }
 }
 
@@ -2239,6 +2249,16 @@ function addMessage(role, title, content, tags = []) {
 function addTurnQuestion(turn) {
   if (!turn?.next_question) return;
   addMessage("interviewer", turn.is_finished ? "结束" : "问题", turn.next_question, turn.focus_tags || []);
+  setSessionFinished(Boolean(turn.is_finished));
+}
+
+function setSessionFinished(isFinished) {
+  state.sessionFinished = isFinished;
+  if (!isFinished) return;
+  elements.answer.disabled = true;
+  elements.sendButton.disabled = true;
+  elements.listenButton.disabled = true;
+  elements.reportButton.disabled = false;
 }
 
 function appendAnswerText(text) {

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import binascii
 from pathlib import Path
 import re
 import tempfile
@@ -23,6 +24,8 @@ from .realtime import RealtimeSession
 
 
 SendJson = Callable[[dict], Awaitable[None]]
+MAX_WEBSOCKET_AUDIO_BYTES = 24 * 1024 * 1024
+MAX_WEBSOCKET_CHUNK_BYTES = 2 * 1024 * 1024
 
 
 class DuplexRealtimeConnection:
@@ -102,8 +105,19 @@ class DuplexRealtimeConnection:
                 self.sample_rate = int(message["sample_rate"])
             if message.get("channels"):
                 self.channels = int(message["channels"])
-            chunk = _decode_audio_chunk(message)
+            try:
+                chunk = _decode_audio_chunk(message)
+            except ValueError as exc:
+                await self._send({"type": "error", "error": str(exc)})
+                return
             if chunk:
+                if len(chunk) > MAX_WEBSOCKET_CHUNK_BYTES:
+                    await self._send({"type": "error", "error": "Audio chunk exceeds 2MB."})
+                    return
+                if self._audio_bytes() + len(chunk) > MAX_WEBSOCKET_AUDIO_BYTES:
+                    self.audio_chunks = []
+                    await self._send({"type": "error", "error": "Audio turn exceeds 24MB."})
+                    return
                 self.audio_chunks.append(chunk)
             if len(self.audio_chunks) % max(self.partial_interval_chunks, 1) == 0:
                 await self._send(
@@ -414,12 +428,18 @@ class DuplexRealtimeConnection:
         self.turn_timings[name] = duration_ms
         await self._send({"type": "timing", "name": name, "duration_ms": duration_ms})
 
+    def _audio_bytes(self) -> int:
+        return sum(len(item) for item in self.audio_chunks)
+
 
 def _decode_audio_chunk(message: dict) -> bytes:
     data = message.get("data") or ""
     if not data:
         return b""
-    return base64.b64decode(data)
+    try:
+        return base64.b64decode(data, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise ValueError("Audio chunk must be valid base64.") from exc
 
 
 def _suffix_for_mime(mime_type: str) -> str:

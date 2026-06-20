@@ -4,6 +4,8 @@ from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
 from uuid import uuid4
 
+MAX_STORED_EVENTS = 200
+
 
 @dataclass
 class RealtimeEvent:
@@ -25,6 +27,8 @@ class RealtimeSession:
         payload = payload or {}
         event = RealtimeEvent(event_type, payload)
         self.events.append(event)
+        if len(self.events) > MAX_STORED_EVENTS:
+            self.events = self.events[-MAX_STORED_EVENTS:]
         if event_type == "user_speech_start":
             self.state = "listening"
         elif event_type == "vad_endpoint":
@@ -61,4 +65,3 @@ class RealtimeRegistry:
 
     def get(self, session_id: str) -> RealtimeSession | None:
         return self.sessions.get(session_id)
-

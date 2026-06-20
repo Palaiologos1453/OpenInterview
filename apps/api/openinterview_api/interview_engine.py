@@ -139,6 +139,9 @@ class CampusInterviewEngine:
         }
 
     def answer(self, session: InterviewSession, answer: str) -> dict:
+        if self._is_finished(session):
+            raise RuntimeError("Interview is already finished. Generate a report or start a new interview.")
+
         cleaned = answer.strip()
         feedback, score = self._feedback(session, cleaned)
         tags = self._focus_tags(session)

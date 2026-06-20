@@ -13,8 +13,6 @@ from .settings import database_path
 SCHEMA = """
 PRAGMA journal_mode = WAL;
 
-DROP TABLE IF EXISTS coding_submissions;
-
 CREATE TABLE IF NOT EXISTS users (
     id TEXT PRIMARY KEY,
     display_name TEXT NOT NULL,
@@ -113,9 +111,13 @@ class Storage:
             connection.close()
 
     def initialize(self) -> None:
-        with sqlite3.connect(self.path) as connection:
+        connection = sqlite3.connect(self.path)
+        try:
             connection.executescript(SCHEMA)
             self._apply_migrations(connection)
+            connection.commit()
+        finally:
+            connection.close()
 
     def _apply_migrations(self, connection: sqlite3.Connection) -> None:
         _ensure_column(connection, "turns", "question_meta_json", "TEXT")

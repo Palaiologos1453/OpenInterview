@@ -40,6 +40,27 @@ class CampusInterviewEngineTest(unittest.TestCase):
         self.assertTrue(turn["next_question"])
         self.assertGreater(session.history[0].score, 50)
 
+    def test_answer_after_finished_raises(self):
+        engine = CampusInterviewEngine()
+        result = engine.start(
+            InterviewConfig(
+                direction_id="backend",
+                difficulty_id="campus",
+                mode_id="fundamentals",
+                provider_config=MOCK_PROVIDER,
+            )
+        )
+        session = result["session"]
+        for _ in range(10):
+            turn = engine.answer(session, "首先说明背景，再讲方案、结果、边界和验证方式。")
+            if turn["is_finished"]:
+                break
+        self.assertTrue(turn["is_finished"])
+
+        with self.assertRaises(RuntimeError):
+            engine.answer(session, "结束后不应该继续写入。")
+        self.assertEqual(len(session.history), turn["turn_index"])
+
     def test_report_contains_dimensions(self):
         engine = CampusInterviewEngine()
         result = engine.start(

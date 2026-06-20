@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import binascii
 import json
 from pathlib import Path
 from time import perf_counter
@@ -51,6 +52,10 @@ from .schemas import (
     RealtimeEventRequest,
     RealtimeAudioTurnRequest,
 )
+
+MAX_AUDIO_BYTES = 24 * 1024 * 1024
+MAX_HISTORY_IMPORT_BYTES = 32 * 1024 * 1024
+MAX_RESUME_UPLOAD_BYTES = 8 * 1024 * 1024
 
 
 app = FastAPI(
@@ -185,6 +190,8 @@ def answer_turn(session_id: str, request: TurnRequest) -> dict:
             payload = engine.answer(session, request.answer)
     except RuntimeError as exc:
         storage.save_trace(trace.as_dict(), interview_id=session_id)
+        if "already finished" in str(exc):
+            raise HTTPException(status_code=409, detail=str(exc)) from exc
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     turn = session.history[-1]
     storage.save_turn(
@@ -278,7 +285,7 @@ def speech_to_text(request: ASRRequest) -> dict:
     started_at = perf_counter()
     try:
         span_started = perf_counter()
-        audio = base64.b64decode(request.audio_base64)
+        audio = _decode_base64_audio(request.audio_base64)
         timings["decode_ms"] = _elapsed_ms(span_started)
         with tempfile.NamedTemporaryFile(
             prefix="openinterview-asr-",
@@ -311,6 +318,8 @@ def speech_to_text(request: ASRRequest) -> dict:
         timings["asr_ms"] = _elapsed_ms(span_started)
         storage.save_transcript(text, source=request.provider_config.asr.provider)
         storage.save_trace(trace.as_dict())
+    except HTTPException:
+        raise
     except NotImplementedError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
@@ -331,7 +340,7 @@ def detect_voice_activity(request: VADRequest) -> dict:
     temp_path: Path | None = None
     wav_path: Path | None = None
     try:
-        audio = base64.b64decode(request.audio_base64)
+        audio = _decode_base64_audio(request.audio_base64)
         with tempfile.NamedTemporaryFile(
             prefix="openinterview-vad-",
             suffix=suffix,
@@ -353,6 +362,8 @@ def detect_voice_activity(request: VADRequest) -> dict:
             payload = SileroVAD(threshold=request.threshold).detect_file(model_input)
         storage.save_trace(trace.as_dict())
         return payload
+    except HTTPException:
+        raise
     except Exception as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     finally:
@@ -391,7 +402,7 @@ def resume_analyze(request: ResumeAnalyzeRequest) -> dict:
 
 @app.post("/v1/resume/extract", response_model=ResumeExtractResponse)
 async def resume_extract(file: UploadFile = File(...)) -> dict:
-    content = await file.read()
+    content = await _read_upload_limited(file, MAX_RESUME_UPLOAD_BYTES, "简历文件超过 8MB，请先导出为文本或压缩内容后再导入。")
     try:
         return extract_resume_text(file.filename or "resume", content)
     except ValueError as exc:
@@ -435,7 +446,7 @@ def export_interviews() -> JSONResponse:
 
 @app.post("/v1/interviews/import")
 async def import_interviews(file: UploadFile = File(...)) -> dict:
-    content = await file.read()
+    content = await _read_upload_limited(file, MAX_HISTORY_IMPORT_BYTES, "history file exceeds 32MB")
     try:
         payload = json.loads(content.decode("utf-8-sig"))
         stats = storage.import_interviews(payload)
@@ -570,7 +581,7 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
             },
         )
         span_start = perf_counter()
-        audio = base64.b64decode(request.audio_base64)
+        audio = _decode_base64_audio(request.audio_base64)
         timings["decode_ms"] = _elapsed_ms(span_start)
         with tempfile.NamedTemporaryFile(
             prefix="openinterview-realtime-",
@@ -637,7 +648,12 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
         if request.submit_to_interview and interview_session:
             span_start = perf_counter()
             with trace.span("interview.turn", answer_chars=len(text)):
-                turn_payload = engine.answer(interview_session, text)
+                try:
+                    turn_payload = engine.answer(interview_session, text)
+                except RuntimeError as exc:
+                    if "already finished" in str(exc):
+                        raise HTTPException(status_code=409, detail=str(exc)) from exc
+                    raise
             timings["turn_ms"] = _elapsed_ms(span_start)
             turn = interview_session.history[-1]
             storage.save_turn(
@@ -671,6 +687,9 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
             "reason": None,
             "timings": timings,
         }
+    except HTTPException:
+        storage.save_trace(trace.as_dict(), interview_id=realtime_session.interview_id)
+        raise
     except NotImplementedError as exc:
         storage.save_trace(trace.as_dict(), interview_id=realtime_session.interview_id)
         raise HTTPException(status_code=400, detail=str(exc)) from exc
@@ -749,6 +768,23 @@ def _redact_config(config: dict) -> dict:
 
 def _elapsed_ms(start: float) -> float:
     return round((perf_counter() - start) * 1000, 2)
+
+
+async def _read_upload_limited(file: UploadFile, max_bytes: int, error_message: str) -> bytes:
+    content = await file.read(max_bytes + 1)
+    if len(content) > max_bytes:
+        raise HTTPException(status_code=413, detail=error_message)
+    return content
+
+
+def _decode_base64_audio(audio_base64: str) -> bytes:
+    try:
+        audio = base64.b64decode(audio_base64, validate=True)
+    except (binascii.Error, ValueError) as exc:
+        raise HTTPException(status_code=400, detail="audio_base64 must be valid base64") from exc
+    if len(audio) > MAX_AUDIO_BYTES:
+        raise HTTPException(status_code=413, detail="audio payload exceeds 24MB")
+    return audio
 
 
 def _restore_session(session_id: str) -> InterviewSession | None:

@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from pydantic import BaseModel, Field
 
+MAX_AUDIO_BASE64_CHARS = 32 * 1024 * 1024
+
 
 class LLMProviderSettings(BaseModel):
     provider: str = Field(default="openai_compatible")
@@ -102,7 +104,7 @@ class TTSRequest(BaseModel):
 
 
 class ASRRequest(BaseModel):
-    audio_base64: str = Field(min_length=1)
+    audio_base64: str = Field(min_length=1, max_length=MAX_AUDIO_BASE64_CHARS)
     filename: str = Field(default="answer.webm")
     audio_encoding: str | None = None
     sample_rate: int = Field(default=16000, ge=8000, le=48000)
@@ -116,7 +118,7 @@ class ASRResponse(BaseModel):
 
 
 class VADRequest(BaseModel):
-    audio_base64: str = Field(min_length=1)
+    audio_base64: str = Field(min_length=1, max_length=MAX_AUDIO_BASE64_CHARS)
     filename: str = Field(default="audio.wav")
     threshold: float = Field(default=0.5, ge=0.1, le=0.95)
 
@@ -153,7 +155,7 @@ class RealtimeEventRequest(BaseModel):
 
 
 class RealtimeAudioTurnRequest(BaseModel):
-    audio_base64: str = Field(min_length=1)
+    audio_base64: str = Field(min_length=1, max_length=MAX_AUDIO_BASE64_CHARS)
     filename: str = Field(default="answer.webm")
     audio_encoding: str | None = None
     sample_rate: int = Field(default=16000, ge=8000, le=48000)

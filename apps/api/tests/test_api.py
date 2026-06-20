@@ -10,17 +10,21 @@ import zipfile
 
 from fastapi.testclient import TestClient
 
-from openinterview_api.main import app
-from openinterview_api.schemas import ProviderSettings
-from openinterview_api.settings import project_root
-from openinterview_api.services.voice_config import (
+_TEST_DB_DIR = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
+os.environ["OPENINTERVIEW_DB_PATH"] = str(Path(_TEST_DB_DIR.name) / "test.sqlite")
+
+from openinterview_api.main import app  # noqa: E402
+from openinterview_api.schemas import MAX_AUDIO_BASE64_CHARS  # noqa: E402
+from openinterview_api.schemas import ProviderSettings  # noqa: E402
+from openinterview_api.settings import project_root  # noqa: E402
+from openinterview_api.services.voice_config import (  # noqa: E402
     asr_model_dir,
     cosyvoice_runtime_path,
     tts_model_dir,
     vad_model_path,
 )
-from openinterview_api.storage import Storage
-from openinterview_api.voice.voice_profiles import load_voice_profiles
+from openinterview_api.storage import Storage  # noqa: E402
+from openinterview_api.voice.voice_profiles import load_voice_profiles  # noqa: E402
 
 
 client = TestClient(app)
@@ -126,6 +130,45 @@ class OpenInterviewAPITest(unittest.TestCase):
 
         self.assertEqual(report.status_code, 200)
         self.assertEqual(report.json()["interviewer_style"], "系统设计型")
+
+    def test_turn_after_finished_is_rejected(self):
+        interview = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "fundamentals",
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(interview.status_code, 200)
+        session_id = interview.json()["session_id"]
+        last_turn = None
+        turn_count = 0
+        for _ in range(10):
+            last_turn = client.post(
+                f"/v1/interviews/{session_id}/turn",
+                json={"answer": "首先说明背景，再讲方案、结果、边界和验证方式。"},
+            )
+            self.assertEqual(last_turn.status_code, 200)
+            turn_count += 1
+            if last_turn.json()["is_finished"]:
+                break
+        self.assertTrue(last_turn.json()["is_finished"])
+
+        rejected = client.post(
+            f"/v1/interviews/{session_id}/turn",
+            json={"answer": "结束后不应该继续写入。"},
+        )
+        self.assertEqual(rejected.status_code, 409)
+
+        report = client.get(f"/v1/interviews/{session_id}/report")
+        self.assertEqual(report.status_code, 200)
+        self.assertEqual(len(report.json()["turns"]), turn_count)
 
     def test_llm_connection_test_allows_mock(self):
         response = client.post(
@@ -559,6 +602,27 @@ voice_profiles:
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn("segments", response.json())
+
+    def test_audio_base64_validation(self):
+        bad = client.post(
+            "/v1/vad/detect",
+            json={"audio_base64": "not base64!", "filename": "bad.wav"},
+        )
+        self.assertEqual(bad.status_code, 400)
+
+        too_large = client.post(
+            "/v1/asr/transcribe",
+            json={
+                "audio_base64": "A" * (MAX_AUDIO_BASE64_CHARS + 1),
+                "filename": "too-large.wav",
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(too_large.status_code, 422)
 
     def test_readiness_smoke_lightweight(self):
         response = client.get("/v1/readiness/smoke")
