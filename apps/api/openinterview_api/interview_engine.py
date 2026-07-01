@@ -2,10 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from statistics import mean
+from time import perf_counter
 from uuid import uuid4
 
 from .adapters.llm import build_llm_adapter, is_real_llm, llm_temperature
 from .catalog import RUBRIC, find_difficulty, find_direction, find_interviewer_style, find_mode
+from .services.errors import classify_error
+from .services.metrics import registry as metrics_registry
 from .services.question_bank import default_question_bank
 from .services.resume import analyze_resume
 
@@ -1303,6 +1306,9 @@ class CampusInterviewEngine:
         session: InterviewSession,
         messages: list[dict[str, str]],
     ) -> str | None:
+        llm_settings = (session.config.provider_config or {}).get("llm") or {}
+        provider = (llm_settings.get("provider") or "mock").strip().lower()
+        started_at = perf_counter()
         try:
             adapter = build_llm_adapter(session.config.provider_config)
             text = adapter.complete(
@@ -1310,14 +1316,31 @@ class CampusInterviewEngine:
                 temperature=llm_temperature(session.config.provider_config),
             )
         except Exception as exc:
+            metrics_registry.record_llm_call(
+                provider,
+                round((perf_counter() - started_at) * 1000, 2),
+                status="error",
+                error_category=classify_error(exc),
+            )
             session.provider_notice = f"LLM provider failed, fallback to mock logic: {exc}"
             return None
 
         cleaned = text.strip()
         if not cleaned:
+            metrics_registry.record_llm_call(
+                provider,
+                round((perf_counter() - started_at) * 1000, 2),
+                status="error",
+                error_category="empty_response",
+            )
             session.provider_notice = "LLM provider returned empty text, fallback to mock logic."
             return None
 
+        metrics_registry.record_llm_call(
+            provider,
+            round((perf_counter() - started_at) * 1000, 2),
+            status="ok",
+        )
         session.provider_notice = None
         return cleaned
 

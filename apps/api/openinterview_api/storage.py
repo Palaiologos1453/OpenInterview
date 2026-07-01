@@ -33,12 +33,14 @@ CREATE TABLE IF NOT EXISTS interviews (
 CREATE TABLE IF NOT EXISTS turns (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     interview_id TEXT NOT NULL,
+    request_id TEXT,
     turn_index INTEGER NOT NULL,
     question TEXT NOT NULL,
     answer TEXT NOT NULL,
     feedback TEXT NOT NULL,
     tags_json TEXT NOT NULL,
     question_meta_json TEXT,
+    payload_json TEXT,
     score REAL NOT NULL,
     created_at TEXT NOT NULL
 );
@@ -85,12 +87,14 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 """
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 5
 
 MIGRATIONS = [
     (1, "add_turn_question_meta", "ALTER TABLE turns ADD COLUMN question_meta_json TEXT"),
     (2, "add_schema_migrations_table", None),
     (3, "add_review_items_table", None),
+    (4, "add_turn_request_id", "ALTER TABLE turns ADD COLUMN request_id TEXT"),
+    (5, "add_turn_payload", "ALTER TABLE turns ADD COLUMN payload_json TEXT"),
 ]
 
 
@@ -121,7 +125,10 @@ class Storage:
 
     def _apply_migrations(self, connection: sqlite3.Connection) -> None:
         _ensure_column(connection, "turns", "question_meta_json", "TEXT")
+        _ensure_column(connection, "turns", "request_id", "TEXT")
+        _ensure_column(connection, "turns", "payload_json", "TEXT")
         _ensure_review_items_table(connection)
+        _ensure_turn_request_index(connection)
         applied = {
             row[0]
             for row in connection.execute("SELECT version FROM schema_migrations").fetchall()
@@ -191,6 +198,7 @@ class Storage:
         self,
         interview_id: str,
         *,
+        request_id: str | None = None,
         turn_index: int,
         question: str,
         answer: str,
@@ -198,24 +206,27 @@ class Storage:
         tags: list[str],
         score: float,
         question_meta: dict | None = None,
+        payload: dict | None = None,
     ) -> None:
         with self.connect() as connection:
             connection.execute(
                 """
                 INSERT INTO turns (
-                    interview_id, turn_index, question, answer, feedback, tags_json,
-                    question_meta_json, score, created_at
+                    interview_id, request_id, turn_index, question, answer, feedback, tags_json,
+                    question_meta_json, payload_json, score, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     interview_id,
+                    request_id,
                     turn_index,
                     question,
                     answer,
                     feedback,
                     json.dumps(tags, ensure_ascii=False),
                     json.dumps(question_meta, ensure_ascii=False) if question_meta else None,
+                    json.dumps(payload, ensure_ascii=False) if payload else None,
                     score,
                     utc_now(),
                 ),
@@ -374,13 +385,14 @@ class Storage:
                 connection.execute(
                     """
                     INSERT INTO turns (
-                        interview_id, turn_index, question, answer, feedback, tags_json,
-                        question_meta_json, score, created_at
+                        interview_id, request_id, turn_index, question, answer, feedback, tags_json,
+                        question_meta_json, payload_json, score, created_at
                     )
-                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                     """,
                     (
                         interview_id,
+                        _clean_string(item.get("request_id")),
                         int(item.get("turn_index") or 0),
                         str(item.get("question") or ""),
                         str(item.get("answer") or ""),
@@ -388,6 +400,9 @@ class Storage:
                         json.dumps(tags, ensure_ascii=False),
                         json.dumps(question_meta, ensure_ascii=False)
                         if isinstance(question_meta, dict)
+                        else None,
+                        json.dumps(item.get("payload"), ensure_ascii=False)
+                        if isinstance(item.get("payload"), dict)
                         else None,
                         float(item.get("score") or 0),
                         _clean_string(item.get("created_at")) or now,
@@ -501,8 +516,8 @@ class Storage:
         with self.connect() as connection:
             rows = connection.execute(
                 """
-                SELECT id, interview_id, turn_index, question, answer, feedback, tags_json,
-                       question_meta_json, score, created_at
+                SELECT id, interview_id, request_id, turn_index, question, answer, feedback, tags_json,
+                       question_meta_json, payload_json, score, created_at
                 FROM turns
                 ORDER BY interview_id ASC, turn_index ASC
                 """
@@ -511,12 +526,14 @@ class Storage:
             {
                 "id": row["id"],
                 "interview_id": row["interview_id"],
+                "request_id": row["request_id"],
                 "turn_index": row["turn_index"],
                 "question": row["question"],
                 "answer": row["answer"],
                 "feedback": row["feedback"],
                 "tags": json.loads(row["tags_json"]),
                 "question_meta": json.loads(row["question_meta_json"]) if row["question_meta_json"] else None,
+                "payload": json.loads(row["payload_json"]) if row["payload_json"] else None,
                 "score": row["score"],
                 "created_at": row["created_at"],
             }
@@ -539,7 +556,7 @@ class Storage:
             rows = connection.execute(
                 """
                 SELECT turn_index, question, answer, feedback, tags_json,
-                       question_meta_json, score, created_at
+                       request_id, question_meta_json, payload_json, score, created_at
                 FROM turns
                 WHERE interview_id = ?
                 ORDER BY turn_index ASC
@@ -549,16 +566,46 @@ class Storage:
         return [
             {
                 "turn_index": row["turn_index"],
+                "request_id": row["request_id"],
                 "question": row["question"],
                 "answer": row["answer"],
                 "feedback": row["feedback"],
                 "tags": json.loads(row["tags_json"]),
                 "question_meta": json.loads(row["question_meta_json"]) if row["question_meta_json"] else None,
+                "payload": json.loads(row["payload_json"]) if row["payload_json"] else None,
                 "score": row["score"],
                 "created_at": row["created_at"],
             }
             for row in rows
         ]
+
+    def get_turn_by_request_id(self, interview_id: str, request_id: str | None) -> dict | None:
+        if not request_id:
+            return None
+        with self.connect() as connection:
+            row = connection.execute(
+                """
+                SELECT turn_index, question, answer, feedback, tags_json,
+                       request_id, question_meta_json, payload_json, score, created_at
+                FROM turns
+                WHERE interview_id = ? AND request_id = ?
+                """,
+                (interview_id, request_id),
+            ).fetchone()
+        if not row:
+            return None
+        return {
+            "turn_index": row["turn_index"],
+            "request_id": row["request_id"],
+            "question": row["question"],
+            "answer": row["answer"],
+            "feedback": row["feedback"],
+            "tags": json.loads(row["tags_json"]),
+            "question_meta": json.loads(row["question_meta_json"]) if row["question_meta_json"] else None,
+            "payload": json.loads(row["payload_json"]) if row["payload_json"] else None,
+            "score": row["score"],
+            "created_at": row["created_at"],
+        }
 
     def delete_interview(self, interview_id: str) -> bool:
         with self.connect() as connection:
@@ -732,6 +779,16 @@ def _ensure_review_items_table(connection: sqlite3.Connection) -> None:
             created_at TEXT NOT NULL,
             updated_at TEXT NOT NULL
         )
+        """
+    )
+
+
+def _ensure_turn_request_index(connection: sqlite3.Connection) -> None:
+    connection.execute(
+        """
+        CREATE UNIQUE INDEX IF NOT EXISTS idx_turns_interview_request
+        ON turns(interview_id, request_id)
+        WHERE request_id IS NOT NULL
         """
     )
 

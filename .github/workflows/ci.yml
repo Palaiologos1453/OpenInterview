@@ -38,6 +38,9 @@ jobs:
           $env:PYTHONPATH = "$PWD\apps\api"
           python -m unittest apps.api.tests.test_engine apps.api.tests.test_api
 
+      - name: Run scoring evaluation
+        run: python scripts/evaluate_scoring.py --output apps/api/eval/scoring-report.md --json-output apps/api/eval/scoring-report.json
+
       - name: Check frontend syntax
         run: node --check apps/web/app.js
 

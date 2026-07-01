@@ -17,8 +17,9 @@ from .adapters.asr import build_asr_adapter
 from .adapters.tts import build_tts_adapter, tts_voice_profile
 from .auth import authenticate_websocket, auth_middleware
 from .catalog import get_catalog
-from .interview_engine import CampusInterviewEngine, InterviewConfig, InterviewSession, Turn
+from .interview_engine import CampusInterviewEngine, InterviewConfig, InterviewSession
 from .security import hash_token, new_api_token
+from .services.metrics import registry as metrics_registry
 from .services.question_bank import default_question_bank
 from .services.coverage import question_coverage
 from .services.provider_diagnostics import diagnose_llm_error
@@ -27,6 +28,7 @@ from .services.review import report_to_markdown, review_items_from_report
 from .services.resume import analyze_resume
 from .services.resume_file import extract_resume_text
 from .services.realtime import RealtimeRegistry
+from .services.session_store import SQLiteBackedSessionStore
 from .services.voice_config import save_voice_model_config, voice_config_response
 from .storage import Storage
 from .settings import cors_origins, production_mode, require_auth
@@ -73,8 +75,8 @@ app.add_middleware(
 app.middleware("http")(auth_middleware)
 
 engine = CampusInterviewEngine()
-sessions: dict[str, InterviewSession] = {}
 storage = Storage()
+session_store = SQLiteBackedSessionStore(storage=storage, engine=engine)
 question_bank = default_question_bank()
 realtime_registry = RealtimeRegistry()
 
@@ -127,6 +129,8 @@ def catalog() -> dict:
 @app.post("/v1/providers/llm/test")
 def test_llm_connection(request: LLMConnectionTestRequest) -> dict:
     config = request.provider_config.model_dump()
+    provider = (config.get("llm") or {}).get("provider") or "unknown"
+    started_at = perf_counter()
     try:
         adapter = build_llm_adapter(config)
         text = adapter.complete(
@@ -143,15 +147,21 @@ def test_llm_connection(request: LLMConnectionTestRequest) -> dict:
             temperature=llm_temperature(config),
         )
     except Exception as exc:
-        diagnostic = diagnose_llm_error(exc, (config.get("llm") or {}).get("provider") or "unknown")
+        diagnostic = diagnose_llm_error(exc, provider)
+        metrics_registry.record_llm_call(
+            provider,
+            _elapsed_ms(started_at),
+            status="error",
+            error_category=diagnostic["category"],
+        )
         return {
             "ok": False,
-            "provider": (config.get("llm") or {}).get("provider") or "unknown",
+            "provider": provider,
             "message": str(exc),
             "diagnostic": diagnostic,
         }
 
-    provider = (config.get("llm") or {}).get("provider") or "mock"
+    metrics_registry.record_llm_call(provider, _elapsed_ms(started_at), status="ok")
     return {
         "ok": True,
         "provider": provider,
@@ -171,7 +181,7 @@ def start_interview(request: Request, config_request: InterviewConfigRequest) ->
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     session = result["session"]
-    sessions[session.session_id] = session
+    session_store.save(session)
     storage.create_interview(
         session.session_id,
         _redact_config(config_request.model_dump()),
@@ -183,35 +193,43 @@ def start_interview(request: Request, config_request: InterviewConfigRequest) ->
 
 @app.post("/v1/interviews/{session_id}/turn", response_model=TurnResponse)
 def answer_turn(session_id: str, request: TurnRequest) -> dict:
-    session = _get_session(session_id)
-    trace = Trace()
-    try:
-        with trace.span("interview.turn", answer_chars=len(request.answer)):
-            payload = engine.answer(session, request.answer)
-    except RuntimeError as exc:
+    with session_store.session_lock(session_id):
+        existing_turn = storage.get_turn_by_request_id(session_id, request.request_id)
+        if existing_turn and existing_turn.get("payload"):
+            return existing_turn["payload"]
+
+        session = _get_session(session_id)
+        trace = Trace()
+        try:
+            with trace.span("interview.turn", answer_chars=len(request.answer)):
+                payload = engine.answer(session, request.answer)
+        except RuntimeError as exc:
+            storage.save_trace(trace.as_dict(), interview_id=session_id)
+            if "already finished" in str(exc):
+                raise HTTPException(status_code=409, detail=str(exc)) from exc
+            raise HTTPException(status_code=502, detail=str(exc)) from exc
+        turn = session.history[-1]
+        storage.save_turn(
+            session_id,
+            turn_index=payload["turn_index"],
+            question=turn.question,
+            answer=turn.answer,
+            feedback=turn.feedback,
+            tags=turn.tags,
+            score=turn.score,
+            question_meta=turn.question_meta,
+            request_id=request.request_id,
+            payload=payload,
+        )
+        session_store.save(session)
         storage.save_trace(trace.as_dict(), interview_id=session_id)
-        if "already finished" in str(exc):
-            raise HTTPException(status_code=409, detail=str(exc)) from exc
-        raise HTTPException(status_code=502, detail=str(exc)) from exc
-    turn = session.history[-1]
-    storage.save_turn(
-        session_id,
-        turn_index=payload["turn_index"],
-        question=turn.question,
-        answer=turn.answer,
-        feedback=turn.feedback,
-        tags=turn.tags,
-        score=turn.score,
-        question_meta=turn.question_meta,
-    )
-    storage.save_trace(trace.as_dict(), interview_id=session_id)
-    return payload
+        return payload
 
 
 @app.get("/v1/interviews/{session_id}/report", response_model=ReportResponse)
 def report(session_id: str) -> dict:
     record = storage.get_interview(session_id)
-    if session_id not in sessions and record and record.get("report"):
+    if not session_store.contains(session_id) and record and record.get("report"):
         return record["report"]
     session = _get_session(session_id)
     trace = Trace()
@@ -456,25 +474,35 @@ async def import_interviews(file: UploadFile = File(...)) -> dict:
         raise HTTPException(status_code=400, detail="history file is not valid JSON") from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    sessions.clear()
+    session_store.clear()
     return {"imported": stats}
 
 
 @app.get("/v1/metrics")
 def metrics() -> dict:
-    return storage.metrics()
+    payload = storage.metrics()
+    payload["runtime"] = metrics_registry.snapshot()
+    return payload
+
+
+@app.get("/v1/metrics/prometheus")
+def metrics_prometheus() -> PlainTextResponse:
+    return PlainTextResponse(
+        metrics_registry.prometheus_text(),
+        media_type="text/plain; version=0.0.4",
+    )
 
 
 @app.delete("/v1/interviews")
 def clear_interviews() -> dict:
-    sessions.clear()
+    session_store.clear()
     deleted = storage.clear_interviews()
     return {"deleted": deleted}
 
 
 @app.delete("/v1/interviews/{session_id}")
 def delete_interview(session_id: str) -> dict:
-    sessions.pop(session_id, None)
+    session_store.delete(session_id)
     deleted = storage.delete_interview(session_id)
     if not deleted:
         raise HTTPException(status_code=404, detail=f"Unknown session: {session_id}")
@@ -542,6 +570,7 @@ def record_realtime_event(session_id: str, request: RealtimeEventRequest) -> dic
     trace = Trace()
     with trace.span("realtime.event", event_type=request.type):
         payload = session.record(request.type, request.payload)
+    realtime_registry.save(session)
     storage.save_trace(trace.as_dict(), interview_id=session.interview_id)
     return payload
 
@@ -580,6 +609,7 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
                 "channels": request.channels,
             },
         )
+        realtime_registry.save(realtime_session)
         span_start = perf_counter()
         audio = _decode_base64_audio(request.audio_base64)
         timings["decode_ms"] = _elapsed_ms(span_start)
@@ -611,6 +641,7 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
         timings["convert_ms"] = _elapsed_ms(span_start)
 
         realtime_session.record("vad_endpoint", {})
+        realtime_registry.save(realtime_session)
         span_start = perf_counter()
         with trace.span("vad.detect"):
             from .voice.local_vad import SileroVAD
@@ -620,6 +651,7 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
 
         if vad.get("speech_ms", 0) <= 0:
             realtime_session.record("cancel", {"reason": "no_speech"})
+            realtime_registry.save(realtime_session)
             storage.save_trace(trace.as_dict(), interview_id=realtime_session.interview_id)
             timings["total_ms"] = _elapsed_ms(started_at)
             return {
@@ -643,29 +675,33 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
             interview_id=realtime_session.interview_id,
         )
         realtime_session.record("asr_final", {"text": text})
+        realtime_registry.save(realtime_session)
 
         turn_payload = None
         if request.submit_to_interview and interview_session:
-            span_start = perf_counter()
-            with trace.span("interview.turn", answer_chars=len(text)):
-                try:
-                    turn_payload = engine.answer(interview_session, text)
-                except RuntimeError as exc:
-                    if "already finished" in str(exc):
-                        raise HTTPException(status_code=409, detail=str(exc)) from exc
-                    raise
-            timings["turn_ms"] = _elapsed_ms(span_start)
-            turn = interview_session.history[-1]
-            storage.save_turn(
-                interview_session.session_id,
-                turn_index=turn_payload["turn_index"],
-                question=turn.question,
-                answer=turn.answer,
-                feedback=turn.feedback,
-                tags=turn.tags,
-                score=turn.score,
-                question_meta=turn.question_meta,
-            )
+            with session_store.session_lock(interview_session.session_id):
+                span_start = perf_counter()
+                with trace.span("interview.turn", answer_chars=len(text)):
+                    try:
+                        turn_payload = engine.answer(interview_session, text)
+                    except RuntimeError as exc:
+                        if "already finished" in str(exc):
+                            raise HTTPException(status_code=409, detail=str(exc)) from exc
+                        raise
+                timings["turn_ms"] = _elapsed_ms(span_start)
+                turn = interview_session.history[-1]
+                storage.save_turn(
+                    interview_session.session_id,
+                    turn_index=turn_payload["turn_index"],
+                    question=turn.question,
+                    answer=turn.answer,
+                    feedback=turn.feedback,
+                    tags=turn.tags,
+                    score=turn.score,
+                    question_meta=turn.question_meta,
+                    payload=turn_payload,
+                )
+                session_store.save(interview_session)
             realtime_session.record(
                 "tts_start",
                 {
@@ -673,8 +709,10 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
                     "text": turn_payload["next_question"],
                 },
             )
+            realtime_registry.save(realtime_session)
         else:
             realtime_session.record("playback_confirmed", {})
+            realtime_registry.save(realtime_session)
 
         storage.save_trace(trace.as_dict(), interview_id=realtime_session.interview_id)
         timings["total_ms"] = _elapsed_ms(started_at)
@@ -695,6 +733,7 @@ def realtime_audio_turn(session_id: str, request: RealtimeAudioTurnRequest) -> d
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     except Exception as exc:
         realtime_session.record("cancel", {"reason": "error", "error": str(exc)})
+        realtime_registry.save(realtime_session)
         storage.save_trace(trace.as_dict(), interview_id=realtime_session.interview_id)
         raise HTTPException(status_code=502, detail=str(exc)) from exc
     finally:
@@ -724,16 +763,15 @@ async def realtime_duplex(session_id: str, websocket: WebSocket) -> None:
         interview_session=interview_session,
         engine=engine,
         storage=storage,
+        on_session_updated=session_store.save,
+        on_realtime_updated=realtime_registry.save,
+        session_lock_factory=session_store.session_lock,
     )
     await connection.run()
 
 
 def _get_session(session_id: str) -> InterviewSession:
-    session = sessions.get(session_id)
-    if session is None:
-        session = _restore_session(session_id)
-        if session:
-            sessions[session_id] = session
+    session = session_store.get(session_id)
     if session is None:
         raise HTTPException(status_code=404, detail=f"Unknown session: {session_id}")
     return session
@@ -785,47 +823,6 @@ def _decode_base64_audio(audio_base64: str) -> bytes:
     if len(audio) > MAX_AUDIO_BYTES:
         raise HTTPException(status_code=413, detail="audio payload exceeds 24MB")
     return audio
-
-
-def _restore_session(session_id: str) -> InterviewSession | None:
-    record = storage.get_interview(session_id)
-    if not record:
-        return None
-    config = record["config"]
-    if config.get("direction_id") not in _valid_direction_ids():
-        config["direction_id"] = "backend"
-    config.setdefault("interviewer_style_id", "small_company_basic")
-    provider_config = config.get("provider_config")
-    redacted_provider_config = False
-    if isinstance(provider_config, dict):
-        for group in provider_config.values():
-            if isinstance(group, dict) and group.get("api_key") == "***":
-                group["api_key"] = ""
-                redacted_provider_config = True
-        if redacted_provider_config:
-            llm = provider_config.get("llm")
-            if isinstance(llm, dict):
-                llm["provider"] = "mock"
-    try:
-        interview_config = InterviewConfig(**config)
-    except TypeError:
-        return None
-    session = InterviewSession(config=interview_config, session_id=session_id)
-    turns = storage.get_interview_turns(session_id)
-    for item in turns:
-        session.history.append(
-            Turn(
-                question=item["question"],
-                answer=item["answer"],
-                feedback=item["feedback"],
-                tags=item["tags"],
-                score=item["score"],
-                question_meta=item.get("question_meta"),
-            )
-        )
-    session.turn_index = len(session.history)
-    session.current_question = engine._select_question(session, step=session.turn_index)
-    return session
 
 
 def _valid_direction_ids() -> set[str]:

@@ -3,11 +3,12 @@ from __future__ import annotations
 import asyncio
 import base64
 import binascii
+from contextlib import nullcontext
 from pathlib import Path
 import re
 import tempfile
 from time import perf_counter
-from typing import Awaitable, Callable
+from typing import Awaitable, Callable, ContextManager
 import wave
 
 from fastapi import WebSocket
@@ -37,12 +38,18 @@ class DuplexRealtimeConnection:
         interview_session: InterviewSession,
         engine: CampusInterviewEngine,
         storage: Storage,
+        on_session_updated: Callable[[InterviewSession], None] | None = None,
+        on_realtime_updated: Callable[[RealtimeSession], None] | None = None,
+        session_lock_factory: Callable[[str], ContextManager[None]] | None = None,
     ):
         self.websocket = websocket
         self.realtime_session = realtime_session
         self.interview_session = interview_session
         self.engine = engine
         self.storage = storage
+        self.on_session_updated = on_session_updated
+        self.on_realtime_updated = on_realtime_updated
+        self.session_lock_factory = session_lock_factory
         self.provider_config: dict = {}
         self.mime_type = "audio/webm"
         self.audio_encoding = "webm"
@@ -95,6 +102,7 @@ class DuplexRealtimeConnection:
                     "channels": self.channels,
                 },
             )
+            self._persist_realtime()
             await self._send({"type": "listening", "session": self.realtime_session.as_dict()})
             return
 
@@ -139,6 +147,7 @@ class DuplexRealtimeConnection:
             self.cancel_generation += 1
             self.audio_chunks = []
             self.realtime_session.record("cancel", {"reason": "client_cancel"})
+            self._persist_realtime()
             await self._send({"type": "cancelled", "session": self.realtime_session.as_dict()})
             return
 
@@ -184,6 +193,7 @@ class DuplexRealtimeConnection:
                         model_input = ensure_16k_mono_wav(input_path, wav_path)
                 await self._record_timing("convert_ms", started)
                 self.realtime_session.record("vad_endpoint", {})
+                self._persist_realtime()
                 started = perf_counter()
                 with trace.span("vad.detect"):
                     vad = SileroVAD(
@@ -193,6 +203,7 @@ class DuplexRealtimeConnection:
                 await self._send({"type": "vad_final", "vad": vad})
                 if vad.get("speech_ms", 0) <= 0:
                     self.realtime_session.record("cancel", {"reason": "no_speech"})
+                    self._persist_realtime()
                     self.storage.save_trace(trace.as_dict(), interview_id=self.realtime_session.interview_id)
                     await self._record_timing("total_ms", self.turn_started_at)
                     await self._send(
@@ -224,23 +235,28 @@ class DuplexRealtimeConnection:
                     interview_id=self.realtime_session.interview_id,
                 )
                 self.realtime_session.record("asr_final", {"text": text})
+                self._persist_realtime()
                 await self._send({"type": "asr_final", "text": text, "is_final": True})
 
-                started = perf_counter()
-                with trace.span("interview.turn", answer_chars=len(text)):
-                    turn_payload = self.engine.answer(self.interview_session, text)
-                await self._record_timing("turn_ms", started)
-                turn = self.interview_session.history[-1]
-                self.storage.save_turn(
-                    self.interview_session.session_id,
-                    turn_index=turn_payload["turn_index"],
-                    question=turn.question,
-                    answer=turn.answer,
-                    feedback=turn.feedback,
-                    tags=turn.tags,
-                    score=turn.score,
-                    question_meta=turn.question_meta,
-                )
+                with self._session_lock():
+                    started = perf_counter()
+                    with trace.span("interview.turn", answer_chars=len(text)):
+                        turn_payload = self.engine.answer(self.interview_session, text)
+                    await self._record_timing("turn_ms", started)
+                    turn = self.interview_session.history[-1]
+                    self.storage.save_turn(
+                        self.interview_session.session_id,
+                        turn_index=turn_payload["turn_index"],
+                        question=turn.question,
+                        answer=turn.answer,
+                        feedback=turn.feedback,
+                        tags=turn.tags,
+                        score=turn.score,
+                        question_meta=turn.question_meta,
+                        payload=turn_payload,
+                    )
+                    if self.on_session_updated:
+                        self.on_session_updated(self.interview_session)
                 await self._send({"type": "turn", "turn": turn_payload})
 
                 speech_text = turn_payload["next_question"]
@@ -260,6 +276,7 @@ class DuplexRealtimeConnection:
                 )
             except Exception as exc:
                 self.realtime_session.record("cancel", {"reason": "error", "error": str(exc)})
+                self._persist_realtime()
                 self.storage.save_trace(trace.as_dict(), interview_id=self.realtime_session.interview_id)
                 await self._send({"type": "error", "error": str(exc)})
 
@@ -290,6 +307,7 @@ class DuplexRealtimeConnection:
         audio_format = tts_settings.get("response_format") or "mp3"
         voice_profile = tts_voice_profile(config)
         self.realtime_session.record("tts_start", {"audio_id": f"turn-{self.interview_session.turn_index}"})
+        self._persist_realtime()
         await self._send(
             {
                 "type": "tts_start",
@@ -322,6 +340,7 @@ class DuplexRealtimeConnection:
             await self._stream_pcm_from_audio(output_path, generation)
         await self._send({"type": "tts_done"})
         self.realtime_session.record("playback_confirmed", {})
+        self._persist_realtime()
 
     def _schedule_partial_asr(self) -> None:
         if not self.enable_partial_asr or not self.provider_config:
@@ -430,6 +449,15 @@ class DuplexRealtimeConnection:
 
     def _audio_bytes(self) -> int:
         return sum(len(item) for item in self.audio_chunks)
+
+    def _persist_realtime(self) -> None:
+        if self.on_realtime_updated:
+            self.on_realtime_updated(self.realtime_session)
+
+    def _session_lock(self) -> ContextManager[None]:
+        if self.session_lock_factory:
+            return self.session_lock_factory(self.interview_session.session_id)
+        return nullcontext()
 
 
 def _decode_audio_chunk(message: dict) -> bytes:

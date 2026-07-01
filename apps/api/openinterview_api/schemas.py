@@ -68,6 +68,7 @@ class InterviewStartResponse(BaseModel):
 
 class TurnRequest(BaseModel):
     answer: str = Field(default="")
+    request_id: str | None = Field(default=None, min_length=1, max_length=120)
 
 
 class TurnResponse(BaseModel):

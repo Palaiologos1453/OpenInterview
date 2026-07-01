@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field, asdict
 from datetime import datetime, timezone
+from threading import Lock
+from typing import Protocol
 from uuid import uuid4
 
 MAX_STORED_EVENTS = 200
@@ -54,14 +56,48 @@ class RealtimeSession:
         return data
 
 
-class RealtimeRegistry:
+class RealtimeSessionStore(Protocol):
+    def create(self, interview_id: str | None = None) -> RealtimeSession:
+        ...
+
+    def get(self, session_id: str) -> RealtimeSession | None:
+        ...
+
+    def save(self, session: RealtimeSession) -> None:
+        ...
+
+    def delete(self, session_id: str) -> None:
+        ...
+
+    def clear(self) -> None:
+        ...
+
+
+class InMemoryRealtimeSessionStore:
     def __init__(self):
         self.sessions: dict[str, RealtimeSession] = {}
+        self.lock = Lock()
 
     def create(self, interview_id: str | None = None) -> RealtimeSession:
         session = RealtimeSession(interview_id=interview_id)
-        self.sessions[session.id] = session
+        self.save(session)
         return session
 
     def get(self, session_id: str) -> RealtimeSession | None:
-        return self.sessions.get(session_id)
+        with self.lock:
+            return self.sessions.get(session_id)
+
+    def save(self, session: RealtimeSession) -> None:
+        with self.lock:
+            self.sessions[session.id] = session
+
+    def delete(self, session_id: str) -> None:
+        with self.lock:
+            self.sessions.pop(session_id, None)
+
+    def clear(self) -> None:
+        with self.lock:
+            self.sessions.clear()
+
+
+RealtimeRegistry = InMemoryRealtimeSessionStore

@@ -2,6 +2,7 @@ import base64
 import io
 import os
 from pathlib import Path
+import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -23,6 +24,7 @@ from openinterview_api.services.voice_config import (  # noqa: E402
     tts_model_dir,
     vad_model_path,
 )
+from openinterview_api.services.evaluation import evaluate_scoring_cases, expand_seed_cases  # noqa: E402
 from openinterview_api.storage import Storage  # noqa: E402
 from openinterview_api.voice.voice_profiles import load_voice_profiles  # noqa: E402
 
@@ -169,6 +171,36 @@ class OpenInterviewAPITest(unittest.TestCase):
         report = client.get(f"/v1/interviews/{session_id}/report")
         self.assertEqual(report.status_code, 200)
         self.assertEqual(len(report.json()["turns"]), turn_count)
+
+    def test_turn_request_id_is_idempotent(self):
+        interview = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "fundamentals",
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+        self.assertEqual(interview.status_code, 200)
+        session_id = interview.json()["session_id"]
+        request_payload = {
+            "answer": "首先说明背景，再讲方案、结果、边界和验证方式。",
+            "request_id": "retry-turn-1",
+        }
+
+        first = client.post(f"/v1/interviews/{session_id}/turn", json=request_payload)
+        second = client.post(f"/v1/interviews/{session_id}/turn", json=request_payload)
+        report = client.get(f"/v1/interviews/{session_id}/report")
+
+        self.assertEqual(first.status_code, 200)
+        self.assertEqual(second.status_code, 200)
+        self.assertEqual(first.json(), second.json())
+        self.assertEqual(len(report.json()["turns"]), 1)
 
     def test_llm_connection_test_allows_mock(self):
         response = client.post(
@@ -534,6 +566,7 @@ voice_profiles:
             )
             storage.save_turn(
                 "s1",
+                request_id="r1",
                 turn_index=1,
                 question="Q",
                 answer="A",
@@ -541,6 +574,7 @@ voice_profiles:
                 tags=["Java"],
                 score=80,
                 question_meta={"id": "q1"},
+                payload={"turn_index": 1, "next_question": "N"},
             )
             storage.save_report("s1", {"session_id": "s1", "overall_score": 75, "turns": []})
 
@@ -548,7 +582,7 @@ voice_profiles:
             deleted = storage.clear_interviews()
             imported = storage.import_interviews(exported)
 
-            self.assertEqual(exported["schema_version"], 3)
+            self.assertEqual(exported["schema_version"], 5)
             self.assertEqual(len(exported["interviews"]), 1)
             self.assertEqual(exported["interviews"][0]["report"]["overall_score"], 75)
             self.assertEqual(len(exported["turns"]), 1)
@@ -557,6 +591,101 @@ voice_profiles:
             self.assertEqual(imported["turns"], 1)
             self.assertEqual(storage.get_interview("s1")["report"]["overall_score"], 75)
             self.assertEqual(storage.get_interview_turns("s1")[0]["question_meta"]["id"], "q1")
+            self.assertEqual(storage.get_turn_by_request_id("s1", "r1")["payload"]["next_question"], "N")
+
+    def test_storage_migrates_old_turn_schema(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            db_path = Path(temp_dir) / "old.sqlite"
+
+            connection = sqlite3.connect(db_path)
+            try:
+                connection.executescript(
+                    """
+                    CREATE TABLE interviews (
+                        id TEXT PRIMARY KEY,
+                        user_id TEXT,
+                        config_json TEXT NOT NULL,
+                        status TEXT NOT NULL,
+                        created_at TEXT NOT NULL,
+                        updated_at TEXT NOT NULL,
+                        report_json TEXT
+                    );
+                    CREATE TABLE turns (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        interview_id TEXT NOT NULL,
+                        turn_index INTEGER NOT NULL,
+                        question TEXT NOT NULL,
+                        answer TEXT NOT NULL,
+                        feedback TEXT NOT NULL,
+                        tags_json TEXT NOT NULL,
+                        score REAL NOT NULL,
+                        created_at TEXT NOT NULL
+                    );
+                    CREATE TABLE schema_migrations (
+                        version INTEGER PRIMARY KEY,
+                        name TEXT NOT NULL,
+                        applied_at TEXT NOT NULL
+                    );
+                    """
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            storage = Storage(db_path)
+            storage.create_interview(
+                "s1",
+                {
+                    "direction_id": "backend",
+                    "difficulty_id": "campus",
+                    "provider_config": {"llm": {"provider": "mock"}},
+                },
+            )
+            storage.save_turn(
+                "s1",
+                request_id="r1",
+                turn_index=1,
+                question="Q",
+                answer="A",
+                feedback="F",
+                tags=[],
+                score=70,
+                payload={"turn_index": 1},
+            )
+
+            self.assertEqual(storage.get_turn_by_request_id("s1", "r1")["turn_index"], 1)
+
+    def test_metrics_endpoints_include_runtime_and_prometheus(self):
+        client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "fundamentals",
+                "provider_config": {
+                    "llm": {"provider": "mock"},
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+
+        metrics = client.get("/v1/metrics")
+        prometheus = client.get("/v1/metrics/prometheus")
+
+        self.assertEqual(metrics.status_code, 200)
+        self.assertIn("runtime", metrics.json())
+        self.assertEqual(prometheus.status_code, 200)
+        self.assertIn("openinterview_operation_total", prometheus.text)
+
+    def test_scoring_evaluation_dataset(self):
+        cases = expand_seed_cases()
+        result = evaluate_scoring_cases(cases)
+
+        self.assertEqual(len(cases), 100)
+        self.assertEqual(result["case_count"], 100)
+        self.assertIn("score_mae", result)
+        self.assertIn("misjudgments", result)
 
     def test_review_items_and_markdown_export(self):
         interview = client.post(
