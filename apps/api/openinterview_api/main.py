@@ -20,6 +20,7 @@ from .catalog import get_catalog
 from .interview_engine import CampusInterviewEngine, InterviewConfig, InterviewSession
 from .security import hash_token, new_api_token
 from .services.metrics import registry as metrics_registry
+from .services.local_diagnostics import local_diagnostics_report
 from .services.question_bank import default_question_bank
 from .services.coverage import question_coverage
 from .services.provider_diagnostics import diagnose_llm_error
@@ -95,7 +96,18 @@ def health() -> dict:
 
 @app.get("/v1/readiness")
 def readiness() -> dict:
-    return readiness_report()
+    payload = readiness_report()
+    diagnostics = local_diagnostics_report(storage)
+    payload["local_diagnostics"] = {
+        "ok": diagnostics["ok"],
+        "recommendations": diagnostics["recommendations"],
+    }
+    return payload
+
+
+@app.get("/v1/local/diagnostics")
+def local_diagnostics() -> dict:
+    return local_diagnostics_report(storage)
 
 
 @app.get("/v1/readiness/smoke")

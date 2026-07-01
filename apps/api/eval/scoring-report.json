@@ -1,388 +1,377 @@
 {
   "case_count": 100,
-  "score_mae": 12.45,
-  "within_tolerance_rate": 0.6,
-  "gap_precision": 0.789,
-  "gap_recall": 0.85,
-  "misjudgment_count": 40,
+  "score_mae": 8.8,
+  "within_tolerance_rate": 0.68,
+  "gap_precision": 0.932,
+  "gap_recall": 0.993,
+  "misjudgment_count": 32,
   "misjudgments": [
     {
-      "id": "backend-system-design-keyword-stuffing",
+      "id": "backend-index-vague",
       "direction_id": "backend",
-      "phase": "system_design",
-      "question": "如果要支持万人同时在线模拟面试，你会如何考虑会话状态、消息队列和服务扩缩容？",
-      "expected_score": 45.0,
-      "actual_score": 82.5,
-      "score_error": 37.5,
+      "phase": "fundamentals",
+      "question": "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
+      "expected_score": 42.0,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
-        "能澄清用户规模、读写比例、延迟目标和一致性要求",
-        "能拆分接入层、会话状态、题库、评分和报告模块",
-        " Redis/Postgres、消息队列、幂等和重试设计",
-        "监控、限流、降级、故障恢复和压测验证"
+        " B+ 树叶子节点有序链表适合范围查询",
+        "回表、覆盖索引、最左前缀和选择性等边界",
+        "能结合 explain、慢查询或压测验证优化效果"
       ],
-      "actual_gaps": [],
-      "actual_hits": [
-        "能澄清用户规模、读写比例、延迟目标和一致性要求",
-        "能拆分接入层、会话状态、题库、评分和报告模块",
-        " Redis/Postgres、消息队列、幂等和重试设计",
-        "监控、限流、降级、故障恢复和压测验证"
+      "actual_gaps": [
+        "索引减少扫描行数和随机查找成本",
+        " B+ 树叶子节点有序链表适合范围查询",
+        "回表、覆盖索引、最左前缀和选择性等边界",
+        "能结合 explain、慢查询或压测验证优化效果"
       ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按系统设计面试标准看，你的回答已经覆盖：能澄清用户规模、读写比例、延迟目标和一致性要求、能拆分接入层、会话状态、题库、评分和报告模块。 项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
-      "note": "关键词堆砌不应高分。"
+      "actual_hits": [],
+      "gap_precision": 0.75,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充索引减少扫描行数和随机查找成本；建议补充更具体的例子或技术细节。",
+      "note": ""
     },
     {
-      "id": "backend-project-truth-keyword-stuffing",
+      "id": "backend-cache-consistency-vague",
+      "direction_id": "backend",
+      "phase": "fundamentals",
+      "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
+      "expected_score": 42.0,
+      "actual_score": 25,
+      "score_error": 17.0,
+      "expected_gaps": [
+        "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
+        " TTL、互斥锁、降级、重试和幂等",
+        "监控、告警和数据修复手段"
+      ],
+      "actual_gaps": [
+        "缓存穿透、击穿、雪崩和缓存数据库不一致",
+        "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
+        " TTL、互斥锁、降级、重试和幂等",
+        "监控、告警和数据修复手段"
+      ],
+      "actual_hits": [],
+      "gap_precision": 0.75,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充缓存穿透、击穿、雪崩和缓存数据库不一致；建议补充更具体的例子或技术细节。",
+      "note": ""
+    },
+    {
+      "id": "backend-thread-process-vague",
+      "direction_id": "backend",
+      "phase": "fundamentals",
+      "question": "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
+      "expected_score": 42.0,
+      "actual_score": 25,
+      "score_error": 17.0,
+      "expected_gaps": [
+        "上下文切换成本、通信方式和故障隔离",
+        "能结合 IO 密集、CPU 密集和异步服务场景选型",
+        "线程池、阻塞调用和上下文传递风险"
+      ],
+      "actual_gaps": [
+        "进程资源隔离、线程共享进程资源、协程用户态调度",
+        "上下文切换成本、通信方式和故障隔离",
+        "能结合 IO 密集、CPU 密集和异步服务场景选型",
+        "线程池、阻塞调用和上下文传递风险"
+      ],
+      "actual_hits": [],
+      "gap_precision": 0.75,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充进程资源隔离、线程共享进程资源、协程用户态调度；建议补充更具体的例子或技术细节。",
+      "note": ""
+    },
+    {
+      "id": "backend-project-truth-vague",
       "direction_id": "backend",
       "phase": "project",
       "question": "请讲清项目背景、你的个人贡献、核心方案和结果。",
-      "expected_score": 45.0,
-      "actual_score": 79.9,
-      "score_error": 34.9,
+      "expected_score": 42.0,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
+        "说明个人贡献和关键技术方案",
+        "给出指标结果、验证方式和复盘",
+        "能解释技术选型依据、故障风险和项目真实性"
+      ],
+      "actual_gaps": [
         "讲清业务背景和目标",
         "说明个人贡献和关键技术方案",
         "给出指标结果、验证方式和复盘",
         "能解释技术选型依据、故障风险和项目真实性"
       ],
-      "actual_gaps": [],
-      "actual_hits": [
-        "讲清业务背景和目标",
-        "说明个人贡献和关键技术方案",
-        "给出指标结果、验证方式和复盘",
-        "能解释技术选型依据、故障风险和项目真实性"
-      ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：讲清业务背景和目标、说明个人贡献和关键技术方案。 建议补充更具体的例子或技术细节。",
-      "note": "关键词堆砌不应高分。"
-    },
-    {
-      "id": "backend-thread-process-keyword-stuffing",
-      "direction_id": "backend",
-      "phase": "fundamentals",
-      "question": "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
-      "expected_score": 45.0,
-      "actual_score": 78.5,
-      "score_error": 33.5,
-      "expected_gaps": [
-        "进程资源隔离、线程共享进程资源、协程用户态调度",
-        "上下文切换成本、通信方式和故障隔离",
-        "能结合 IO 密集、CPU 密集和异步服务场景选型",
-        "线程池、阻塞调用和上下文传递风险"
-      ],
-      "actual_gaps": [],
-      "actual_hits": [
-        "进程资源隔离、线程共享进程资源、协程用户态调度",
-        "上下文切换成本、通信方式和故障隔离",
-        "能结合 IO 密集、CPU 密集和异步服务场景选型",
-        "线程池、阻塞调用和上下文传递风险"
-      ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：进程资源隔离、线程共享进程资源、协程用户态调度、上下文切换成本、通信方式和故障隔离。 可以补充方案取舍，而不只是描述做了什么。",
-      "note": "关键词堆砌不应高分。"
-    },
-    {
-      "id": "ai-evaluation-keyword-stuffing",
-      "direction_id": "ai_application",
-      "phase": "project",
-      "question": "你做过的 AI 应用如何证明效果？请说明评测集、指标、误判和迭代方式。",
-      "expected_score": 45.0,
-      "actual_score": 78.5,
-      "score_error": 33.5,
-      "expected_gaps": [
-        "说明业务目标、基线和评测集来源",
-        "覆盖准确率、召回率、幻觉率、延迟和成本指标",
-        "分析误判案例、人工复核和灰度策略",
-        "能解释 Prompt、RAG、模型选择和监控迭代"
-      ],
-      "actual_gaps": [],
-      "actual_hits": [
-        "说明业务目标、基线和评测集来源",
-        "覆盖准确率、召回率、幻觉率、延迟和成本指标",
-        "分析误判案例、人工复核和灰度策略",
-        "能解释 Prompt、RAG、模型选择和监控迭代"
-      ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：说明业务目标、基线和评测集来源、覆盖准确率、召回率、幻觉率、延迟和成本指标。 项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
-      "note": "关键词堆砌不应高分。"
-    },
-    {
-      "id": "ai-agent-tools-keyword-stuffing",
-      "direction_id": "ai_application",
-      "phase": "fundamentals",
-      "question": "Agent 调用工具时，为什么需要参数校验、权限控制、审计和人工确认？",
-      "expected_score": 45.0,
-      "actual_score": 77.6,
-      "score_error": 32.6,
-      "expected_gaps": [
-        "工具调用会放大模型幻觉和越权风险",
-        "参数 schema 校验、权限边界和最小授权",
-        "审计日志、人工确认、回滚和幂等",
-        "能结合高风险动作、沙箱和监控告警设计"
-      ],
-      "actual_gaps": [],
-      "actual_hits": [
-        "工具调用会放大模型幻觉和越权风险",
-        "参数 schema 校验、权限边界和最小授权",
-        "审计日志、人工确认、回滚和幂等",
-        "能结合高风险动作、沙箱和监控告警设计"
-      ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：工具调用会放大模型幻觉和越权风险、参数 schema 校验、权限边界和最小授权。 可以补充方案取舍，而不只是描述做了什么。",
-      "note": "关键词堆砌不应高分。"
-    },
-    {
-      "id": "backend-cache-consistency-keyword-stuffing",
-      "direction_id": "backend",
-      "phase": "fundamentals",
-      "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
-      "expected_score": 45.0,
-      "actual_score": 76.0,
-      "score_error": 31.0,
-      "expected_gaps": [
-        "缓存穿透、击穿、雪崩和缓存数据库不一致",
-        "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
-        " TTL、互斥锁、降级、重试和幂等",
-        "监控、告警和数据修复手段"
-      ],
-      "actual_gaps": [],
-      "actual_hits": [
-        "缓存穿透、击穿、雪崩和缓存数据库不一致",
-        "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
-        " TTL、互斥锁、降级、重试和幂等",
-        "监控、告警和数据修复手段"
-      ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：缓存穿透、击穿、雪崩和缓存数据库不一致、先更新数据库再删缓存、延迟双删、订阅 binlog 等方。 可以补充方案取舍，而不只是描述做了什么。",
-      "note": "关键词堆砌不应高分。"
-    },
-    {
-      "id": "backend-observability-keyword-stuffing",
-      "direction_id": "backend",
-      "phase": "system_design",
-      "question": "你会如何给一个面试系统设计日志、指标和 trace 观测体系？",
-      "expected_score": 45.0,
-      "actual_score": 74.7,
-      "score_error": 29.7,
-      "expected_gaps": [
-        "日志、指标、trace 分别解决什么问题",
-        "延迟、错误率、吞吐、队列积压和资源使用指标",
-        "能设计 traceId、结构化日志、采样和脱敏",
-        "告警阈值、看板、SLO 和故障复盘"
-      ],
-      "actual_gaps": [],
-      "actual_hits": [
-        "日志、指标、trace 分别解决什么问题",
-        "延迟、错误率、吞吐、队列积压和资源使用指标",
-        "能设计 traceId、结构化日志、采样和脱敏",
-        "告警阈值、看板、SLO 和故障复盘"
-      ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按系统设计面试标准看，你的回答已经覆盖：日志、指标、trace 分别解决什么问题、延迟、错误率、吞吐、队列积压和资源使用指标。 项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
-      "note": "关键词堆砌不应高分。"
-    },
-    {
-      "id": "backend-index-keyword-stuffing",
-      "direction_id": "backend",
-      "phase": "fundamentals",
-      "question": "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
-      "expected_score": 45.0,
-      "actual_score": 74.3,
-      "score_error": 29.3,
-      "expected_gaps": [
-        "索引减少扫描行数和随机查找成本",
-        " B+ 树叶子节点有序链表适合范围查询",
-        "回表、覆盖索引、最左前缀和选择性等边界",
-        "能结合 explain、慢查询或压测验证优化效果"
-      ],
-      "actual_gaps": [],
-      "actual_hits": [
-        "索引减少扫描行数和随机查找成本",
-        " B+ 树叶子节点有序链表适合范围查询",
-        "回表、覆盖索引、最左前缀和选择性等边界",
-        "能结合 explain、慢查询或压测验证优化效果"
-      ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：索引减少扫描行数和随机查找成本、 B+ 树叶子节点有序链表适合范围查询。 可以补充方案取舍，而不只是描述做了什么。",
-      "note": "关键词堆砌不应高分。"
-    },
-    {
-      "id": "ai-token-sampling-keyword-stuffing",
-      "direction_id": "ai_application",
-      "phase": "fundamentals",
-      "question": "请解释 Token、上下文窗口和采样参数会怎样影响 LLM 应用的质量、成本和稳定性。",
-      "expected_score": 45.0,
-      "actual_score": 72.4,
-      "score_error": 27.4,
-      "expected_gaps": [
-        " token 数影响上下文长度、延迟和成本",
-        " temperature、top_p 等采样参数影响随机",
-        "上下文截断、幻觉、重复和格式漂移风险",
-        "能结合评测集、日志和线上指标调参"
-      ],
-      "actual_gaps": [],
-      "actual_hits": [
-        " token 数影响上下文长度、延迟和成本",
-        " temperature、top_p 等采样参数影响随机",
-        "上下文截断、幻觉、重复和格式漂移风险",
-        "能结合评测集、日志和线上指标调参"
-      ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖： token 数影响上下文长度、延迟和成本、 temperature、top_p 等采样参数影响随机。 可以补充方案取舍，而不只是描述做了什么。",
-      "note": "关键词堆砌不应高分。"
-    },
-    {
-      "id": "backend-cache-consistency-structured-mid",
-      "direction_id": "backend",
-      "phase": "fundamentals",
-      "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
-      "expected_score": 70.0,
-      "actual_score": 95,
-      "score_error": 25.0,
-      "expected_gaps": [
-        "监控、告警和数据修复手段"
-      ],
-      "actual_gaps": [
-        "监控、告警和数据修复手段"
-      ],
-      "actual_hits": [
-        "缓存穿透、击穿、雪崩和缓存数据库不一致",
-        "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
-        " TTL、互斥锁、降级、重试和幂等"
-      ],
-      "gap_precision": 1.0,
+      "actual_hits": [],
+      "gap_precision": 0.75,
       "gap_recall": 1.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：缓存穿透、击穿、雪崩和缓存数据库不一致、先更新数据库再删缓存、延迟双删、订阅 binlog 等方。 建议补充监控、告警和数据修复手段；可以补充方案取舍，而不只是描述做了什么。",
+      "feedback": "按项目真实性拷打标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充讲清业务背景和目标；建议补充更具体的例子或技术细节；项目题最好量化结果或说明验证方式。",
       "note": ""
     },
     {
-      "id": "backend-thread-process-structured-mid",
-      "direction_id": "backend",
-      "phase": "fundamentals",
-      "question": "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
-      "expected_score": 70.0,
-      "actual_score": 95,
-      "score_error": 25.0,
-      "expected_gaps": [
-        "线程池、阻塞调用和上下文传递风险"
-      ],
-      "actual_gaps": [
-        "线程池、阻塞调用和上下文传递风险"
-      ],
-      "actual_hits": [
-        "进程资源隔离、线程共享进程资源、协程用户态调度",
-        "上下文切换成本、通信方式和故障隔离",
-        "能结合 IO 密集、CPU 密集和异步服务场景选型"
-      ],
-      "gap_precision": 1.0,
-      "gap_recall": 1.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：进程资源隔离、线程共享进程资源、协程用户态调度、上下文切换成本、通信方式和故障隔离。 建议补充线程池、阻塞调用和上下文传递风险；可以补充方案取舍，而不只是描述做了什么。",
-      "note": ""
-    },
-    {
-      "id": "backend-system-design-structured-mid",
+      "id": "backend-system-design-vague",
       "direction_id": "backend",
       "phase": "system_design",
       "question": "如果要支持万人同时在线模拟面试，你会如何考虑会话状态、消息队列和服务扩缩容？",
-      "expected_score": 70.0,
-      "actual_score": 95,
-      "score_error": 25.0,
+      "expected_score": 42.0,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
+        "能拆分接入层、会话状态、题库、评分和报告模块",
+        " Redis/Postgres、消息队列、幂等和重试设计",
         "监控、限流、降级、故障恢复和压测验证"
       ],
       "actual_gaps": [
-        "监控、限流、降级、故障恢复和压测验证"
-      ],
-      "actual_hits": [
         "能澄清用户规模、读写比例、延迟目标和一致性要求",
         "能拆分接入层、会话状态、题库、评分和报告模块",
-        " Redis/Postgres、消息队列、幂等和重试设计"
+        " Redis/Postgres、消息队列、幂等和重试设计",
+        "监控、限流、降级、故障恢复和压测验证"
       ],
-      "gap_precision": 1.0,
+      "actual_hits": [],
+      "gap_precision": 0.75,
       "gap_recall": 1.0,
-      "feedback": "按系统设计面试标准看，你的回答已经覆盖：能澄清用户规模、读写比例、延迟目标和一致性要求、能拆分接入层、会话状态、题库、评分和报告模块。 建议补充监控、限流、降级、故障恢复和压测验证；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "feedback": "按系统设计面试标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充能澄清用户规模、读写比例、延迟目标和一致性要求；建议补充更具体的例子或技术细节；项目题最好量化结果或说明验证方式。",
       "note": ""
     },
     {
-      "id": "ai-token-sampling-structured-mid",
+      "id": "ai-token-sampling-vague",
       "direction_id": "ai_application",
       "phase": "fundamentals",
       "question": "请解释 Token、上下文窗口和采样参数会怎样影响 LLM 应用的质量、成本和稳定性。",
-      "expected_score": 70.0,
-      "actual_score": 95,
-      "score_error": 25.0,
+      "expected_score": 42.0,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
+        " temperature、top_p 等采样参数影响随机",
+        "上下文截断、幻觉、重复和格式漂移风险",
         "能结合评测集、日志和线上指标调参"
       ],
       "actual_gaps": [
-        "能结合评测集、日志和线上指标调参"
-      ],
-      "actual_hits": [
         " token 数影响上下文长度、延迟和成本",
         " temperature、top_p 等采样参数影响随机",
-        "上下文截断、幻觉、重复和格式漂移风险"
+        "上下文截断、幻觉、重复和格式漂移风险",
+        "能结合评测集、日志和线上指标调参"
       ],
-      "gap_precision": 1.0,
+      "actual_hits": [],
+      "gap_precision": 0.75,
       "gap_recall": 1.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖： token 数影响上下文长度、延迟和成本、 temperature、top_p 等采样参数影响随机。 建议补充能结合评测集、日志和线上指标调参；可以补充方案取舍，而不只是描述做了什么。",
+      "feedback": "按八股连环追问标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充 token 数影响上下文长度、延迟和成本；建议补充更具体的例子或技术细节。",
       "note": ""
     },
     {
-      "id": "backend-observability-structured-mid",
+      "id": "ai-rag-pipeline-vague",
+      "direction_id": "ai_application",
+      "phase": "system_design",
+      "question": "设计一个 RAG 问答链路时，文档切分、召回、Rerank 和上下文组装分别解决什么问题？",
+      "expected_score": 42.0,
+      "actual_score": 25,
+      "score_error": 17.0,
+      "expected_gaps": [
+        "向量召回、关键词召回和 Rerank 的作用",
+        "上下文组装、引用、去重和 token 预算",
+        "离线评测、线上反馈和失败案例分析"
+      ],
+      "actual_gaps": [
+        "文档切分粒度、元数据和召回召准权衡",
+        "向量召回、关键词召回和 Rerank 的作用",
+        "上下文组装、引用、去重和 token 预算",
+        "离线评测、线上反馈和失败案例分析"
+      ],
+      "actual_hits": [],
+      "gap_precision": 0.75,
+      "gap_recall": 1.0,
+      "feedback": "按系统设计面试标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充文档切分粒度、元数据和召回召准权衡；建议补充更具体的例子或技术细节；项目题最好量化结果或说明验证方式。",
+      "note": ""
+    },
+    {
+      "id": "ai-agent-tools-vague",
+      "direction_id": "ai_application",
+      "phase": "fundamentals",
+      "question": "Agent 调用工具时，为什么需要参数校验、权限控制、审计和人工确认？",
+      "expected_score": 42.0,
+      "actual_score": 25,
+      "score_error": 17.0,
+      "expected_gaps": [
+        "参数 schema 校验、权限边界和最小授权",
+        "审计日志、人工确认、回滚和幂等",
+        "能结合高风险动作、沙箱和监控告警设计"
+      ],
+      "actual_gaps": [
+        "工具调用会放大模型幻觉和越权风险",
+        "参数 schema 校验、权限边界和最小授权",
+        "审计日志、人工确认、回滚和幂等",
+        "能结合高风险动作、沙箱和监控告警设计"
+      ],
+      "actual_hits": [],
+      "gap_precision": 0.75,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充工具调用会放大模型幻觉和越权风险；建议补充更具体的例子或技术细节。",
+      "note": ""
+    },
+    {
+      "id": "ai-evaluation-vague",
+      "direction_id": "ai_application",
+      "phase": "project",
+      "question": "你做过的 AI 应用如何证明效果？请说明评测集、指标、误判和迭代方式。",
+      "expected_score": 42.0,
+      "actual_score": 25,
+      "score_error": 17.0,
+      "expected_gaps": [
+        "覆盖准确率、召回率、幻觉率、延迟和成本指标",
+        "分析误判案例、人工复核和灰度策略",
+        "能解释 Prompt、RAG、模型选择和监控迭代"
+      ],
+      "actual_gaps": [
+        "说明业务目标、基线和评测集来源",
+        "覆盖准确率、召回率、幻觉率、延迟和成本指标",
+        "分析误判案例、人工复核和灰度策略",
+        "能解释 Prompt、RAG、模型选择和监控迭代"
+      ],
+      "actual_hits": [],
+      "gap_precision": 0.75,
+      "gap_recall": 1.0,
+      "feedback": "按项目真实性拷打标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充说明业务目标、基线和评测集来源；建议补充更具体的例子或技术细节；项目题最好量化结果或说明验证方式。",
+      "note": ""
+    },
+    {
+      "id": "backend-observability-vague",
       "direction_id": "backend",
       "phase": "system_design",
       "question": "你会如何给一个面试系统设计日志、指标和 trace 观测体系？",
-      "expected_score": 70.0,
-      "actual_score": 95,
-      "score_error": 25.0,
+      "expected_score": 42.0,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
+        "延迟、错误率、吞吐、队列积压和资源使用指标",
+        "能设计 traceId、结构化日志、采样和脱敏",
         "告警阈值、看板、SLO 和故障复盘"
       ],
       "actual_gaps": [
-        "告警阈值、看板、SLO 和故障复盘"
-      ],
-      "actual_hits": [
         "日志、指标、trace 分别解决什么问题",
         "延迟、错误率、吞吐、队列积压和资源使用指标",
-        "能设计 traceId、结构化日志、采样和脱敏"
+        "能设计 traceId、结构化日志、采样和脱敏",
+        "告警阈值、看板、SLO 和故障复盘"
       ],
-      "gap_precision": 1.0,
+      "actual_hits": [],
+      "gap_precision": 0.75,
       "gap_recall": 1.0,
-      "feedback": "按系统设计面试标准看，你的回答已经覆盖：日志、指标、trace 分别解决什么问题、延迟、错误率、吞吐、队列积压和资源使用指标。 建议补充告警阈值、看板、SLO 和故障复盘；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "feedback": "按系统设计面试标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充日志、指标、trace 分别解决什么问题；建议补充更具体的例子或技术细节；项目题最好量化结果或说明验证方式。",
       "note": ""
     },
     {
-      "id": "backend-index-structured-mid",
+      "id": "backend-index-wrong-confident",
       "direction_id": "backend",
       "phase": "fundamentals",
       "question": "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
-      "expected_score": 70.0,
-      "actual_score": 92.1,
-      "score_error": 22.1,
+      "expected_score": 38.0,
+      "actual_score": 25,
+      "score_error": 13.0,
       "expected_gaps": [
+        " B+ 树叶子节点有序链表适合范围查询",
+        "回表、覆盖索引、最左前缀和选择性等边界",
         "能结合 explain、慢查询或压测验证优化效果"
       ],
       "actual_gaps": [
+        "索引减少扫描行数和随机查找成本",
+        " B+ 树叶子节点有序链表适合范围查询",
+        "回表、覆盖索引、最左前缀和选择性等边界",
         "能结合 explain、慢查询或压测验证优化效果"
       ],
+      "actual_hits": [],
+      "gap_precision": 0.75,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充索引减少扫描行数和随机查找成本；建议补充更具体的例子或技术细节。",
+      "note": "自信但错误，规则评分容易因语气和关键词虚高。"
+    },
+    {
+      "id": "backend-index-project-linked",
+      "direction_id": "backend",
+      "phase": "fundamentals",
+      "question": "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
+      "expected_score": 82.0,
+      "actual_score": 95,
+      "score_error": 13.0,
+      "expected_gaps": [],
+      "actual_gaps": [],
       "actual_hits": [
         "索引减少扫描行数和随机查找成本",
         " B+ 树叶子节点有序链表适合范围查询",
-        "回表、覆盖索引、最左前缀和选择性等边界"
+        "回表、覆盖索引、最左前缀和选择性等边界",
+        "能结合 explain、慢查询或压测验证优化效果"
       ],
       "gap_precision": 1.0,
       "gap_recall": 1.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：索引减少扫描行数和随机查找成本、 B+ 树叶子节点有序链表适合范围查询。 建议补充能结合 explain、慢查询或压测验证优化效果；可以补充方案取舍，而不只是描述做了什么。",
+      "feedback": "按八股连环追问标准看，你的回答已经覆盖：索引减少扫描行数和随机查找成本、 B+ 树叶子节点有序链表适合范围查询。 下一步可以继续展开边界条件和失败场景。",
       "note": ""
+    },
+    {
+      "id": "backend-cache-consistency-wrong-confident",
+      "direction_id": "backend",
+      "phase": "fundamentals",
+      "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
+      "expected_score": 38.0,
+      "actual_score": 25,
+      "score_error": 13.0,
+      "expected_gaps": [
+        "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
+        " TTL、互斥锁、降级、重试和幂等",
+        "监控、告警和数据修复手段"
+      ],
+      "actual_gaps": [
+        "缓存穿透、击穿、雪崩和缓存数据库不一致",
+        "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
+        " TTL、互斥锁、降级、重试和幂等",
+        "监控、告警和数据修复手段"
+      ],
+      "actual_hits": [],
+      "gap_precision": 0.75,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充缓存穿透、击穿、雪崩和缓存数据库不一致；建议补充更具体的例子或技术细节。",
+      "note": "自信但错误，规则评分容易因语气和关键词虚高。"
+    },
+    {
+      "id": "backend-cache-consistency-project-linked",
+      "direction_id": "backend",
+      "phase": "fundamentals",
+      "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
+      "expected_score": 82.0,
+      "actual_score": 95,
+      "score_error": 13.0,
+      "expected_gaps": [],
+      "actual_gaps": [],
+      "actual_hits": [
+        "缓存穿透、击穿、雪崩和缓存数据库不一致",
+        "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
+        " TTL、互斥锁、降级、重试和幂等",
+        "监控、告警和数据修复手段"
+      ],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的回答已经覆盖：缓存穿透、击穿、雪崩和缓存数据库不一致、先更新数据库再删缓存、延迟双删、订阅 binlog 等方。 下一步可以继续展开边界条件和失败场景。",
+      "note": ""
+    },
+    {
+      "id": "backend-thread-process-wrong-confident",
+      "direction_id": "backend",
+      "phase": "fundamentals",
+      "question": "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
+      "expected_score": 38.0,
+      "actual_score": 25,
+      "score_error": 13.0,
+      "expected_gaps": [
+        "上下文切换成本、通信方式和故障隔离",
+        "能结合 IO 密集、CPU 密集和异步服务场景选型",
+        "线程池、阻塞调用和上下文传递风险"
+      ],
+      "actual_gaps": [
+        "进程资源隔离、线程共享进程资源、协程用户态调度",
+        "上下文切换成本、通信方式和故障隔离",
+        "能结合 IO 密集、CPU 密集和异步服务场景选型",
+        "线程池、阻塞调用和上下文传递风险"
+      ],
+      "actual_hits": [],
+      "gap_precision": 0.75,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充进程资源隔离、线程共享进程资源、协程用户态调度；建议补充更具体的例子或技术细节。",
+      "note": "自信但错误，规则评分容易因语气和关键词虚高。"
     }
   ],
   "cases": [
@@ -392,8 +381,8 @@
       "phase": "fundamentals",
       "question": "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
       "expected_score": 25.0,
-      "actual_score": 30,
-      "score_error": 5.0,
+      "actual_score": 25,
+      "score_error": 0.0,
       "expected_gaps": [
         "索引减少扫描行数和随机查找成本",
         " B+ 树叶子节点有序链表适合范围查询",
@@ -418,8 +407,8 @@
       "phase": "fundamentals",
       "question": "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
       "expected_score": 42.0,
-      "actual_score": 43.8,
-      "score_error": 1.8,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
         " B+ 树叶子节点有序链表适合范围查询",
         "回表、覆盖索引、最左前缀和选择性等边界",
@@ -443,8 +432,8 @@
       "phase": "fundamentals",
       "question": "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
       "expected_score": 58.0,
-      "actual_score": 66.9,
-      "score_error": 8.9,
+      "actual_score": 50.9,
+      "score_error": 7.1,
       "expected_gaps": [
         "回表、覆盖索引、最左前缀和选择性等边界",
         "能结合 explain、慢查询或压测验证优化效果"
@@ -468,8 +457,8 @@
       "phase": "fundamentals",
       "question": "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
       "expected_score": 70.0,
-      "actual_score": 92.1,
-      "score_error": 22.1,
+      "actual_score": 82,
+      "score_error": 12.0,
       "expected_gaps": [
         "能结合 explain、慢查询或压测验证优化效果"
       ],
@@ -513,8 +502,8 @@
       "phase": "fundamentals",
       "question": "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
       "expected_score": 38.0,
-      "actual_score": 46.6,
-      "score_error": 8.6,
+      "actual_score": 25,
+      "score_error": 13.0,
       "expected_gaps": [
         " B+ 树叶子节点有序链表适合范围查询",
         "回表、覆盖索引、最左前缀和选择性等边界",
@@ -538,24 +527,24 @@
       "phase": "fundamentals",
       "question": "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
       "expected_score": 45.0,
-      "actual_score": 74.3,
-      "score_error": 29.3,
+      "actual_score": 38,
+      "score_error": 7.0,
       "expected_gaps": [
         "索引减少扫描行数和随机查找成本",
         " B+ 树叶子节点有序链表适合范围查询",
         "回表、覆盖索引、最左前缀和选择性等边界",
         "能结合 explain、慢查询或压测验证优化效果"
       ],
-      "actual_gaps": [],
-      "actual_hits": [
+      "actual_gaps": [
         "索引减少扫描行数和随机查找成本",
         " B+ 树叶子节点有序链表适合范围查询",
         "回表、覆盖索引、最左前缀和选择性等边界",
         "能结合 explain、慢查询或压测验证优化效果"
       ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：索引减少扫描行数和随机查找成本、 B+ 树叶子节点有序链表适合范围查询。 可以补充方案取舍，而不只是描述做了什么。",
+      "actual_hits": [],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的回答已经覆盖了一部分关键信息。 建议补充索引减少扫描行数和随机查找成本；可以补充方案取舍，而不只是描述做了什么。",
       "note": "关键词堆砌不应高分。"
     },
     {
@@ -585,8 +574,8 @@
       "phase": "fundamentals",
       "question": "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
       "expected_score": 72.0,
-      "actual_score": 78.5,
-      "score_error": 6.5,
+      "actual_score": 70.5,
+      "score_error": 1.5,
       "expected_gaps": [
         "能结合 explain、慢查询或压测验证优化效果"
       ],
@@ -630,8 +619,8 @@
       "phase": "fundamentals",
       "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
       "expected_score": 25.0,
-      "actual_score": 30,
-      "score_error": 5.0,
+      "actual_score": 25,
+      "score_error": 0.0,
       "expected_gaps": [
         "缓存穿透、击穿、雪崩和缓存数据库不一致",
         "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
@@ -656,8 +645,8 @@
       "phase": "fundamentals",
       "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
       "expected_score": 42.0,
-      "actual_score": 43.8,
-      "score_error": 1.8,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
         "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
         " TTL、互斥锁、降级、重试和幂等",
@@ -681,8 +670,8 @@
       "phase": "fundamentals",
       "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
       "expected_score": 58.0,
-      "actual_score": 75.6,
-      "score_error": 17.6,
+      "actual_score": 59.6,
+      "score_error": 1.6,
       "expected_gaps": [
         " TTL、互斥锁、降级、重试和幂等",
         "监控、告警和数据修复手段"
@@ -706,8 +695,8 @@
       "phase": "fundamentals",
       "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
       "expected_score": 70.0,
-      "actual_score": 95,
-      "score_error": 25.0,
+      "actual_score": 82,
+      "score_error": 12.0,
       "expected_gaps": [
         "监控、告警和数据修复手段"
       ],
@@ -751,8 +740,8 @@
       "phase": "fundamentals",
       "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
       "expected_score": 38.0,
-      "actual_score": 46.6,
-      "score_error": 8.6,
+      "actual_score": 25,
+      "score_error": 13.0,
       "expected_gaps": [
         "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
         " TTL、互斥锁、降级、重试和幂等",
@@ -776,24 +765,24 @@
       "phase": "fundamentals",
       "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
       "expected_score": 45.0,
-      "actual_score": 76.0,
-      "score_error": 31.0,
+      "actual_score": 38,
+      "score_error": 7.0,
       "expected_gaps": [
         "缓存穿透、击穿、雪崩和缓存数据库不一致",
         "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
         " TTL、互斥锁、降级、重试和幂等",
         "监控、告警和数据修复手段"
       ],
-      "actual_gaps": [],
-      "actual_hits": [
+      "actual_gaps": [
         "缓存穿透、击穿、雪崩和缓存数据库不一致",
         "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
         " TTL、互斥锁、降级、重试和幂等",
         "监控、告警和数据修复手段"
       ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：缓存穿透、击穿、雪崩和缓存数据库不一致、先更新数据库再删缓存、延迟双删、订阅 binlog 等方。 可以补充方案取舍，而不只是描述做了什么。",
+      "actual_hits": [],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的回答已经覆盖了一部分关键信息。 建议补充缓存穿透、击穿、雪崩和缓存数据库不一致；可以补充方案取舍，而不只是描述做了什么。",
       "note": "关键词堆砌不应高分。"
     },
     {
@@ -823,8 +812,8 @@
       "phase": "fundamentals",
       "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
       "expected_score": 72.0,
-      "actual_score": 78.6,
-      "score_error": 6.6,
+      "actual_score": 70.6,
+      "score_error": 1.4,
       "expected_gaps": [
         "监控、告警和数据修复手段"
       ],
@@ -868,8 +857,8 @@
       "phase": "fundamentals",
       "question": "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
       "expected_score": 25.0,
-      "actual_score": 30,
-      "score_error": 5.0,
+      "actual_score": 25,
+      "score_error": 0.0,
       "expected_gaps": [
         "进程资源隔离、线程共享进程资源、协程用户态调度",
         "上下文切换成本、通信方式和故障隔离",
@@ -894,8 +883,8 @@
       "phase": "fundamentals",
       "question": "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
       "expected_score": 42.0,
-      "actual_score": 49.9,
-      "score_error": 7.9,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
         "上下文切换成本、通信方式和故障隔离",
         "能结合 IO 密集、CPU 密集和异步服务场景选型",
@@ -919,8 +908,8 @@
       "phase": "fundamentals",
       "question": "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
       "expected_score": 58.0,
-      "actual_score": 76.6,
-      "score_error": 18.6,
+      "actual_score": 60.6,
+      "score_error": 2.6,
       "expected_gaps": [
         "能结合 IO 密集、CPU 密集和异步服务场景选型",
         "线程池、阻塞调用和上下文传递风险"
@@ -944,8 +933,8 @@
       "phase": "fundamentals",
       "question": "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
       "expected_score": 70.0,
-      "actual_score": 95,
-      "score_error": 25.0,
+      "actual_score": 82,
+      "score_error": 12.0,
       "expected_gaps": [
         "线程池、阻塞调用和上下文传递风险"
       ],
@@ -989,8 +978,8 @@
       "phase": "fundamentals",
       "question": "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
       "expected_score": 38.0,
-      "actual_score": 52.7,
-      "score_error": 14.7,
+      "actual_score": 25,
+      "score_error": 13.0,
       "expected_gaps": [
         "上下文切换成本、通信方式和故障隔离",
         "能结合 IO 密集、CPU 密集和异步服务场景选型",
@@ -1014,24 +1003,24 @@
       "phase": "fundamentals",
       "question": "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
       "expected_score": 45.0,
-      "actual_score": 78.5,
-      "score_error": 33.5,
+      "actual_score": 38,
+      "score_error": 7.0,
       "expected_gaps": [
         "进程资源隔离、线程共享进程资源、协程用户态调度",
         "上下文切换成本、通信方式和故障隔离",
         "能结合 IO 密集、CPU 密集和异步服务场景选型",
         "线程池、阻塞调用和上下文传递风险"
       ],
-      "actual_gaps": [],
-      "actual_hits": [
+      "actual_gaps": [
         "进程资源隔离、线程共享进程资源、协程用户态调度",
         "上下文切换成本、通信方式和故障隔离",
         "能结合 IO 密集、CPU 密集和异步服务场景选型",
         "线程池、阻塞调用和上下文传递风险"
       ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：进程资源隔离、线程共享进程资源、协程用户态调度、上下文切换成本、通信方式和故障隔离。 可以补充方案取舍，而不只是描述做了什么。",
+      "actual_hits": [],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的回答已经覆盖了一部分关键信息。 建议补充进程资源隔离、线程共享进程资源、协程用户态调度；可以补充方案取舍，而不只是描述做了什么。",
       "note": "关键词堆砌不应高分。"
     },
     {
@@ -1061,8 +1050,8 @@
       "phase": "fundamentals",
       "question": "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
       "expected_score": 72.0,
-      "actual_score": 81.9,
-      "score_error": 9.9,
+      "actual_score": 73.9,
+      "score_error": 1.9,
       "expected_gaps": [
         "线程池、阻塞调用和上下文传递风险"
       ],
@@ -1106,8 +1095,8 @@
       "phase": "project",
       "question": "请讲清项目背景、你的个人贡献、核心方案和结果。",
       "expected_score": 25.0,
-      "actual_score": 30,
-      "score_error": 5.0,
+      "actual_score": 25,
+      "score_error": 0.0,
       "expected_gaps": [
         "讲清业务背景和目标",
         "说明个人贡献和关键技术方案",
@@ -1132,8 +1121,8 @@
       "phase": "project",
       "question": "请讲清项目背景、你的个人贡献、核心方案和结果。",
       "expected_score": 42.0,
-      "actual_score": 44.3,
-      "score_error": 2.3,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
         "说明个人贡献和关键技术方案",
         "给出指标结果、验证方式和复盘",
@@ -1157,8 +1146,8 @@
       "phase": "project",
       "question": "请讲清项目背景、你的个人贡献、核心方案和结果。",
       "expected_score": 58.0,
-      "actual_score": 78.5,
-      "score_error": 20.5,
+      "actual_score": 70.5,
+      "score_error": 12.5,
       "expected_gaps": [
         "给出指标结果、验证方式和复盘",
         "能解释技术选型依据、故障风险和项目真实性"
@@ -1182,8 +1171,8 @@
       "phase": "project",
       "question": "请讲清项目背景、你的个人贡献、核心方案和结果。",
       "expected_score": 70.0,
-      "actual_score": 82.3,
-      "score_error": 12.3,
+      "actual_score": 74.3,
+      "score_error": 4.3,
       "expected_gaps": [
         "能解释技术选型依据、故障风险和项目真实性"
       ],
@@ -1227,8 +1216,8 @@
       "phase": "project",
       "question": "请讲清项目背景、你的个人贡献、核心方案和结果。",
       "expected_score": 38.0,
-      "actual_score": 47.2,
-      "score_error": 9.2,
+      "actual_score": 25,
+      "score_error": 13.0,
       "expected_gaps": [
         "说明个人贡献和关键技术方案",
         "给出指标结果、验证方式和复盘",
@@ -1252,24 +1241,24 @@
       "phase": "project",
       "question": "请讲清项目背景、你的个人贡献、核心方案和结果。",
       "expected_score": 45.0,
-      "actual_score": 79.9,
-      "score_error": 34.9,
+      "actual_score": 38,
+      "score_error": 7.0,
       "expected_gaps": [
         "讲清业务背景和目标",
         "说明个人贡献和关键技术方案",
         "给出指标结果、验证方式和复盘",
         "能解释技术选型依据、故障风险和项目真实性"
       ],
-      "actual_gaps": [],
-      "actual_hits": [
+      "actual_gaps": [
         "讲清业务背景和目标",
         "说明个人贡献和关键技术方案",
         "给出指标结果、验证方式和复盘",
         "能解释技术选型依据、故障风险和项目真实性"
       ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：讲清业务背景和目标、说明个人贡献和关键技术方案。 建议补充更具体的例子或技术细节。",
+      "actual_hits": [],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按项目真实性拷打标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充讲清业务背景和目标；建议补充更具体的例子或技术细节。",
       "note": "关键词堆砌不应高分。"
     },
     {
@@ -1299,8 +1288,8 @@
       "phase": "project",
       "question": "请讲清项目背景、你的个人贡献、核心方案和结果。",
       "expected_score": 72.0,
-      "actual_score": 84.7,
-      "score_error": 12.7,
+      "actual_score": 76.7,
+      "score_error": 4.7,
       "expected_gaps": [
         "能解释技术选型依据、故障风险和项目真实性"
       ],
@@ -1344,8 +1333,8 @@
       "phase": "system_design",
       "question": "如果要支持万人同时在线模拟面试，你会如何考虑会话状态、消息队列和服务扩缩容？",
       "expected_score": 25.0,
-      "actual_score": 30,
-      "score_error": 5.0,
+      "actual_score": 25,
+      "score_error": 0.0,
       "expected_gaps": [
         "能澄清用户规模、读写比例、延迟目标和一致性要求",
         "能拆分接入层、会话状态、题库、评分和报告模块",
@@ -1370,8 +1359,8 @@
       "phase": "system_design",
       "question": "如果要支持万人同时在线模拟面试，你会如何考虑会话状态、消息队列和服务扩缩容？",
       "expected_score": 42.0,
-      "actual_score": 46.0,
-      "score_error": 4.0,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
         "能拆分接入层、会话状态、题库、评分和报告模块",
         " Redis/Postgres、消息队列、幂等和重试设计",
@@ -1395,8 +1384,8 @@
       "phase": "system_design",
       "question": "如果要支持万人同时在线模拟面试，你会如何考虑会话状态、消息队列和服务扩缩容？",
       "expected_score": 58.0,
-      "actual_score": 75.0,
-      "score_error": 17.0,
+      "actual_score": 59.0,
+      "score_error": 1.0,
       "expected_gaps": [
         " Redis/Postgres、消息队列、幂等和重试设计",
         "监控、限流、降级、故障恢复和压测验证"
@@ -1420,8 +1409,8 @@
       "phase": "system_design",
       "question": "如果要支持万人同时在线模拟面试，你会如何考虑会话状态、消息队列和服务扩缩容？",
       "expected_score": 70.0,
-      "actual_score": 95,
-      "score_error": 25.0,
+      "actual_score": 82,
+      "score_error": 12.0,
       "expected_gaps": [
         "监控、限流、降级、故障恢复和压测验证"
       ],
@@ -1465,8 +1454,8 @@
       "phase": "system_design",
       "question": "如果要支持万人同时在线模拟面试，你会如何考虑会话状态、消息队列和服务扩缩容？",
       "expected_score": 38.0,
-      "actual_score": 48.8,
-      "score_error": 10.8,
+      "actual_score": 25,
+      "score_error": 13.0,
       "expected_gaps": [
         "能拆分接入层、会话状态、题库、评分和报告模块",
         " Redis/Postgres、消息队列、幂等和重试设计",
@@ -1490,24 +1479,24 @@
       "phase": "system_design",
       "question": "如果要支持万人同时在线模拟面试，你会如何考虑会话状态、消息队列和服务扩缩容？",
       "expected_score": 45.0,
-      "actual_score": 82.5,
-      "score_error": 37.5,
+      "actual_score": 38,
+      "score_error": 7.0,
       "expected_gaps": [
         "能澄清用户规模、读写比例、延迟目标和一致性要求",
         "能拆分接入层、会话状态、题库、评分和报告模块",
         " Redis/Postgres、消息队列、幂等和重试设计",
         "监控、限流、降级、故障恢复和压测验证"
       ],
-      "actual_gaps": [],
-      "actual_hits": [
+      "actual_gaps": [
         "能澄清用户规模、读写比例、延迟目标和一致性要求",
         "能拆分接入层、会话状态、题库、评分和报告模块",
         " Redis/Postgres、消息队列、幂等和重试设计",
         "监控、限流、降级、故障恢复和压测验证"
       ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按系统设计面试标准看，你的回答已经覆盖：能澄清用户规模、读写比例、延迟目标和一致性要求、能拆分接入层、会话状态、题库、评分和报告模块。 项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "actual_hits": [],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按系统设计面试标准看，你的回答已经覆盖了一部分关键信息。 建议补充能澄清用户规模、读写比例、延迟目标和一致性要求；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
       "note": "关键词堆砌不应高分。"
     },
     {
@@ -1537,8 +1526,8 @@
       "phase": "system_design",
       "question": "如果要支持万人同时在线模拟面试，你会如何考虑会话状态、消息队列和服务扩缩容？",
       "expected_score": 72.0,
-      "actual_score": 81.1,
-      "score_error": 9.1,
+      "actual_score": 73.1,
+      "score_error": 1.1,
       "expected_gaps": [
         "监控、限流、降级、故障恢复和压测验证"
       ],
@@ -1582,8 +1571,8 @@
       "phase": "fundamentals",
       "question": "请解释 Token、上下文窗口和采样参数会怎样影响 LLM 应用的质量、成本和稳定性。",
       "expected_score": 25.0,
-      "actual_score": 30,
-      "score_error": 5.0,
+      "actual_score": 25,
+      "score_error": 0.0,
       "expected_gaps": [
         " token 数影响上下文长度、延迟和成本",
         " temperature、top_p 等采样参数影响随机",
@@ -1608,8 +1597,8 @@
       "phase": "fundamentals",
       "question": "请解释 Token、上下文窗口和采样参数会怎样影响 LLM 应用的质量、成本和稳定性。",
       "expected_score": 42.0,
-      "actual_score": 48.2,
-      "score_error": 6.2,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
         " temperature、top_p 等采样参数影响随机",
         "上下文截断、幻觉、重复和格式漂移风险",
@@ -1633,8 +1622,8 @@
       "phase": "fundamentals",
       "question": "请解释 Token、上下文窗口和采样参数会怎样影响 LLM 应用的质量、成本和稳定性。",
       "expected_score": 58.0,
-      "actual_score": 74.1,
-      "score_error": 16.1,
+      "actual_score": 58.1,
+      "score_error": 0.1,
       "expected_gaps": [
         "上下文截断、幻觉、重复和格式漂移风险",
         "能结合评测集、日志和线上指标调参"
@@ -1658,8 +1647,8 @@
       "phase": "fundamentals",
       "question": "请解释 Token、上下文窗口和采样参数会怎样影响 LLM 应用的质量、成本和稳定性。",
       "expected_score": 70.0,
-      "actual_score": 95,
-      "score_error": 25.0,
+      "actual_score": 82,
+      "score_error": 12.0,
       "expected_gaps": [
         "能结合评测集、日志和线上指标调参"
       ],
@@ -1703,7 +1692,7 @@
       "phase": "fundamentals",
       "question": "请解释 Token、上下文窗口和采样参数会怎样影响 LLM 应用的质量、成本和稳定性。",
       "expected_score": 38.0,
-      "actual_score": 51.0,
+      "actual_score": 25,
       "score_error": 13.0,
       "expected_gaps": [
         " temperature、top_p 等采样参数影响随机",
@@ -1728,24 +1717,24 @@
       "phase": "fundamentals",
       "question": "请解释 Token、上下文窗口和采样参数会怎样影响 LLM 应用的质量、成本和稳定性。",
       "expected_score": 45.0,
-      "actual_score": 72.4,
-      "score_error": 27.4,
+      "actual_score": 38,
+      "score_error": 7.0,
       "expected_gaps": [
         " token 数影响上下文长度、延迟和成本",
         " temperature、top_p 等采样参数影响随机",
         "上下文截断、幻觉、重复和格式漂移风险",
         "能结合评测集、日志和线上指标调参"
       ],
-      "actual_gaps": [],
-      "actual_hits": [
+      "actual_gaps": [
         " token 数影响上下文长度、延迟和成本",
         " temperature、top_p 等采样参数影响随机",
         "上下文截断、幻觉、重复和格式漂移风险",
         "能结合评测集、日志和线上指标调参"
       ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖： token 数影响上下文长度、延迟和成本、 temperature、top_p 等采样参数影响随机。 可以补充方案取舍，而不只是描述做了什么。",
+      "actual_hits": [],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的回答已经覆盖了一部分关键信息。 建议补充 token 数影响上下文长度、延迟和成本；可以补充方案取舍，而不只是描述做了什么。",
       "note": "关键词堆砌不应高分。"
     },
     {
@@ -1775,8 +1764,8 @@
       "phase": "fundamentals",
       "question": "请解释 Token、上下文窗口和采样参数会怎样影响 LLM 应用的质量、成本和稳定性。",
       "expected_score": 72.0,
-      "actual_score": 77.4,
-      "score_error": 5.4,
+      "actual_score": 69.4,
+      "score_error": 2.6,
       "expected_gaps": [
         "能结合评测集、日志和线上指标调参"
       ],
@@ -1820,8 +1809,8 @@
       "phase": "system_design",
       "question": "设计一个 RAG 问答链路时，文档切分、召回、Rerank 和上下文组装分别解决什么问题？",
       "expected_score": 25.0,
-      "actual_score": 30,
-      "score_error": 5.0,
+      "actual_score": 25,
+      "score_error": 0.0,
       "expected_gaps": [
         "文档切分粒度、元数据和召回召准权衡",
         "向量召回、关键词召回和 Rerank 的作用",
@@ -1846,8 +1835,8 @@
       "phase": "system_design",
       "question": "设计一个 RAG 问答链路时，文档切分、召回、Rerank 和上下文组装分别解决什么问题？",
       "expected_score": 42.0,
-      "actual_score": 43.2,
-      "score_error": 1.2,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
         "向量召回、关键词召回和 Rerank 的作用",
         "上下文组装、引用、去重和 token 预算",
@@ -1871,8 +1860,8 @@
       "phase": "system_design",
       "question": "设计一个 RAG 问答链路时，文档切分、召回、Rerank 和上下文组装分别解决什么问题？",
       "expected_score": 58.0,
-      "actual_score": 63.3,
-      "score_error": 5.3,
+      "actual_score": 47.3,
+      "score_error": 10.7,
       "expected_gaps": [
         "上下文组装、引用、去重和 token 预算",
         "离线评测、线上反馈和失败案例分析"
@@ -1896,8 +1885,8 @@
       "phase": "system_design",
       "question": "设计一个 RAG 问答链路时，文档切分、召回、Rerank 和上下文组装分别解决什么问题？",
       "expected_score": 70.0,
-      "actual_score": 89.1,
-      "score_error": 19.1,
+      "actual_score": 81.1,
+      "score_error": 11.1,
       "expected_gaps": [
         "离线评测、线上反馈和失败案例分析"
       ],
@@ -1941,8 +1930,8 @@
       "phase": "system_design",
       "question": "设计一个 RAG 问答链路时，文档切分、召回、Rerank 和上下文组装分别解决什么问题？",
       "expected_score": 38.0,
-      "actual_score": 46.0,
-      "score_error": 8.0,
+      "actual_score": 25,
+      "score_error": 13.0,
       "expected_gaps": [
         "向量召回、关键词召回和 Rerank 的作用",
         "上下文组装、引用、去重和 token 预算",
@@ -1966,24 +1955,24 @@
       "phase": "system_design",
       "question": "设计一个 RAG 问答链路时，文档切分、召回、Rerank 和上下文组装分别解决什么问题？",
       "expected_score": 45.0,
-      "actual_score": 60.4,
-      "score_error": 15.4,
+      "actual_score": 38,
+      "score_error": 7.0,
       "expected_gaps": [
         "文档切分粒度、元数据和召回召准权衡",
         "向量召回、关键词召回和 Rerank 的作用",
         "上下文组装、引用、去重和 token 预算",
         "离线评测、线上反馈和失败案例分析"
       ],
-      "actual_gaps": [],
-      "actual_hits": [
+      "actual_gaps": [
         "文档切分粒度、元数据和召回召准权衡",
         "向量召回、关键词召回和 Rerank 的作用",
         "上下文组装、引用、去重和 token 预算",
         "离线评测、线上反馈和失败案例分析"
       ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按系统设计面试标准看，你的回答已经覆盖：文档切分粒度、元数据和召回召准权衡、向量召回、关键词召回和 Rerank 的作用。 项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "actual_hits": [],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按系统设计面试标准看，你的回答已经覆盖了一部分关键信息。 建议补充文档切分粒度、元数据和召回召准权衡；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
       "note": "关键词堆砌不应高分。"
     },
     {
@@ -2013,8 +2002,8 @@
       "phase": "system_design",
       "question": "设计一个 RAG 问答链路时，文档切分、召回、Rerank 和上下文组装分别解决什么问题？",
       "expected_score": 72.0,
-      "actual_score": 67.5,
-      "score_error": 4.5,
+      "actual_score": 59.5,
+      "score_error": 12.5,
       "expected_gaps": [
         "离线评测、线上反馈和失败案例分析"
       ],
@@ -2058,8 +2047,8 @@
       "phase": "fundamentals",
       "question": "Agent 调用工具时，为什么需要参数校验、权限控制、审计和人工确认？",
       "expected_score": 25.0,
-      "actual_score": 30,
-      "score_error": 5.0,
+      "actual_score": 25,
+      "score_error": 0.0,
       "expected_gaps": [
         "工具调用会放大模型幻觉和越权风险",
         "参数 schema 校验、权限边界和最小授权",
@@ -2084,8 +2073,8 @@
       "phase": "fundamentals",
       "question": "Agent 调用工具时，为什么需要参数校验、权限控制、审计和人工确认？",
       "expected_score": 42.0,
-      "actual_score": 43.8,
-      "score_error": 1.8,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
         "参数 schema 校验、权限边界和最小授权",
         "审计日志、人工确认、回滚和幂等",
@@ -2109,8 +2098,8 @@
       "phase": "fundamentals",
       "question": "Agent 调用工具时，为什么需要参数校验、权限控制、审计和人工确认？",
       "expected_score": 58.0,
-      "actual_score": 68.0,
-      "score_error": 10.0,
+      "actual_score": 52.0,
+      "score_error": 6.0,
       "expected_gaps": [
         "审计日志、人工确认、回滚和幂等",
         "能结合高风险动作、沙箱和监控告警设计"
@@ -2134,8 +2123,8 @@
       "phase": "fundamentals",
       "question": "Agent 调用工具时，为什么需要参数校验、权限控制、审计和人工确认？",
       "expected_score": 70.0,
-      "actual_score": 92.1,
-      "score_error": 22.1,
+      "actual_score": 82,
+      "score_error": 12.0,
       "expected_gaps": [
         "能结合高风险动作、沙箱和监控告警设计"
       ],
@@ -2179,8 +2168,8 @@
       "phase": "fundamentals",
       "question": "Agent 调用工具时，为什么需要参数校验、权限控制、审计和人工确认？",
       "expected_score": 38.0,
-      "actual_score": 46.6,
-      "score_error": 8.6,
+      "actual_score": 25,
+      "score_error": 13.0,
       "expected_gaps": [
         "参数 schema 校验、权限边界和最小授权",
         "审计日志、人工确认、回滚和幂等",
@@ -2204,24 +2193,24 @@
       "phase": "fundamentals",
       "question": "Agent 调用工具时，为什么需要参数校验、权限控制、审计和人工确认？",
       "expected_score": 45.0,
-      "actual_score": 77.6,
-      "score_error": 32.6,
+      "actual_score": 38,
+      "score_error": 7.0,
       "expected_gaps": [
         "工具调用会放大模型幻觉和越权风险",
         "参数 schema 校验、权限边界和最小授权",
         "审计日志、人工确认、回滚和幂等",
         "能结合高风险动作、沙箱和监控告警设计"
       ],
-      "actual_gaps": [],
-      "actual_hits": [
+      "actual_gaps": [
         "工具调用会放大模型幻觉和越权风险",
         "参数 schema 校验、权限边界和最小授权",
         "审计日志、人工确认、回滚和幂等",
         "能结合高风险动作、沙箱和监控告警设计"
       ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：工具调用会放大模型幻觉和越权风险、参数 schema 校验、权限边界和最小授权。 可以补充方案取舍，而不只是描述做了什么。",
+      "actual_hits": [],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按八股连环追问标准看，你的回答已经覆盖了一部分关键信息。 建议补充工具调用会放大模型幻觉和越权风险；可以补充方案取舍，而不只是描述做了什么。",
       "note": "关键词堆砌不应高分。"
     },
     {
@@ -2251,8 +2240,8 @@
       "phase": "fundamentals",
       "question": "Agent 调用工具时，为什么需要参数校验、权限控制、审计和人工确认？",
       "expected_score": 72.0,
-      "actual_score": 78.5,
-      "score_error": 6.5,
+      "actual_score": 70.5,
+      "score_error": 1.5,
       "expected_gaps": [
         "能结合高风险动作、沙箱和监控告警设计"
       ],
@@ -2296,8 +2285,8 @@
       "phase": "project",
       "question": "你做过的 AI 应用如何证明效果？请说明评测集、指标、误判和迭代方式。",
       "expected_score": 25.0,
-      "actual_score": 30,
-      "score_error": 5.0,
+      "actual_score": 25,
+      "score_error": 0.0,
       "expected_gaps": [
         "说明业务目标、基线和评测集来源",
         "覆盖准确率、召回率、幻觉率、延迟和成本指标",
@@ -2322,8 +2311,8 @@
       "phase": "project",
       "question": "你做过的 AI 应用如何证明效果？请说明评测集、指标、误判和迭代方式。",
       "expected_score": 42.0,
-      "actual_score": 46.3,
-      "score_error": 4.3,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
         "覆盖准确率、召回率、幻觉率、延迟和成本指标",
         "分析误判案例、人工复核和灰度策略",
@@ -2347,8 +2336,8 @@
       "phase": "project",
       "question": "你做过的 AI 应用如何证明效果？请说明评测集、指标、误判和迭代方式。",
       "expected_score": 58.0,
-      "actual_score": 67.5,
-      "score_error": 9.5,
+      "actual_score": 51.5,
+      "score_error": 6.5,
       "expected_gaps": [
         "分析误判案例、人工复核和灰度策略",
         "能解释 Prompt、RAG、模型选择和监控迭代"
@@ -2372,8 +2361,8 @@
       "phase": "project",
       "question": "你做过的 AI 应用如何证明效果？请说明评测集、指标、误判和迭代方式。",
       "expected_score": 70.0,
-      "actual_score": 91.8,
-      "score_error": 21.8,
+      "actual_score": 82,
+      "score_error": 12.0,
       "expected_gaps": [
         "能解释 Prompt、RAG、模型选择和监控迭代"
       ],
@@ -2417,8 +2406,8 @@
       "phase": "project",
       "question": "你做过的 AI 应用如何证明效果？请说明评测集、指标、误判和迭代方式。",
       "expected_score": 38.0,
-      "actual_score": 49.1,
-      "score_error": 11.1,
+      "actual_score": 25,
+      "score_error": 13.0,
       "expected_gaps": [
         "覆盖准确率、召回率、幻觉率、延迟和成本指标",
         "分析误判案例、人工复核和灰度策略",
@@ -2442,24 +2431,24 @@
       "phase": "project",
       "question": "你做过的 AI 应用如何证明效果？请说明评测集、指标、误判和迭代方式。",
       "expected_score": 45.0,
-      "actual_score": 78.5,
-      "score_error": 33.5,
+      "actual_score": 38,
+      "score_error": 7.0,
       "expected_gaps": [
         "说明业务目标、基线和评测集来源",
         "覆盖准确率、召回率、幻觉率、延迟和成本指标",
         "分析误判案例、人工复核和灰度策略",
         "能解释 Prompt、RAG、模型选择和监控迭代"
       ],
-      "actual_gaps": [],
-      "actual_hits": [
+      "actual_gaps": [
         "说明业务目标、基线和评测集来源",
         "覆盖准确率、召回率、幻觉率、延迟和成本指标",
         "分析误判案例、人工复核和灰度策略",
         "能解释 Prompt、RAG、模型选择和监控迭代"
       ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：说明业务目标、基线和评测集来源、覆盖准确率、召回率、幻觉率、延迟和成本指标。 项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "actual_hits": [],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖了一部分关键信息。 建议补充说明业务目标、基线和评测集来源；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
       "note": "关键词堆砌不应高分。"
     },
     {
@@ -2489,8 +2478,8 @@
       "phase": "project",
       "question": "你做过的 AI 应用如何证明效果？请说明评测集、指标、误判和迭代方式。",
       "expected_score": 72.0,
-      "actual_score": 70.2,
-      "score_error": 1.8,
+      "actual_score": 62.2,
+      "score_error": 9.8,
       "expected_gaps": [
         "能解释 Prompt、RAG、模型选择和监控迭代"
       ],
@@ -2534,8 +2523,8 @@
       "phase": "system_design",
       "question": "你会如何给一个面试系统设计日志、指标和 trace 观测体系？",
       "expected_score": 25.0,
-      "actual_score": 30,
-      "score_error": 5.0,
+      "actual_score": 25,
+      "score_error": 0.0,
       "expected_gaps": [
         "日志、指标、trace 分别解决什么问题",
         "延迟、错误率、吞吐、队列积压和资源使用指标",
@@ -2560,8 +2549,8 @@
       "phase": "system_design",
       "question": "你会如何给一个面试系统设计日志、指标和 trace 观测体系？",
       "expected_score": 42.0,
-      "actual_score": 46.0,
-      "score_error": 4.0,
+      "actual_score": 25,
+      "score_error": 17.0,
       "expected_gaps": [
         "延迟、错误率、吞吐、队列积压和资源使用指标",
         "能设计 traceId、结构化日志、采样和脱敏",
@@ -2585,8 +2574,8 @@
       "phase": "system_design",
       "question": "你会如何给一个面试系统设计日志、指标和 trace 观测体系？",
       "expected_score": 58.0,
-      "actual_score": 73.9,
-      "score_error": 15.9,
+      "actual_score": 57.9,
+      "score_error": 0.1,
       "expected_gaps": [
         "能设计 traceId、结构化日志、采样和脱敏",
         "告警阈值、看板、SLO 和故障复盘"
@@ -2610,8 +2599,8 @@
       "phase": "system_design",
       "question": "你会如何给一个面试系统设计日志、指标和 trace 观测体系？",
       "expected_score": 70.0,
-      "actual_score": 95,
-      "score_error": 25.0,
+      "actual_score": 82,
+      "score_error": 12.0,
       "expected_gaps": [
         "告警阈值、看板、SLO 和故障复盘"
       ],
@@ -2655,8 +2644,8 @@
       "phase": "system_design",
       "question": "你会如何给一个面试系统设计日志、指标和 trace 观测体系？",
       "expected_score": 38.0,
-      "actual_score": 56.8,
-      "score_error": 18.8,
+      "actual_score": 25,
+      "score_error": 13.0,
       "expected_gaps": [
         "延迟、错误率、吞吐、队列积压和资源使用指标",
         "能设计 traceId、结构化日志、采样和脱敏",
@@ -2681,24 +2670,24 @@
       "phase": "system_design",
       "question": "你会如何给一个面试系统设计日志、指标和 trace 观测体系？",
       "expected_score": 45.0,
-      "actual_score": 74.7,
-      "score_error": 29.7,
+      "actual_score": 38,
+      "score_error": 7.0,
       "expected_gaps": [
         "日志、指标、trace 分别解决什么问题",
         "延迟、错误率、吞吐、队列积压和资源使用指标",
         "能设计 traceId、结构化日志、采样和脱敏",
         "告警阈值、看板、SLO 和故障复盘"
       ],
-      "actual_gaps": [],
-      "actual_hits": [
+      "actual_gaps": [
         "日志、指标、trace 分别解决什么问题",
         "延迟、错误率、吞吐、队列积压和资源使用指标",
         "能设计 traceId、结构化日志、采样和脱敏",
         "告警阈值、看板、SLO 和故障复盘"
       ],
-      "gap_precision": 0.0,
-      "gap_recall": 0.0,
-      "feedback": "按系统设计面试标准看，你的回答已经覆盖：日志、指标、trace 分别解决什么问题、延迟、错误率、吞吐、队列积压和资源使用指标。 项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "actual_hits": [],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按系统设计面试标准看，你的回答已经覆盖了一部分关键信息。 建议补充日志、指标、trace 分别解决什么问题；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
       "note": "关键词堆砌不应高分。"
     },
     {
@@ -2728,8 +2717,8 @@
       "phase": "system_design",
       "question": "你会如何给一个面试系统设计日志、指标和 trace 观测体系？",
       "expected_score": 72.0,
-      "actual_score": 78.6,
-      "score_error": 6.6,
+      "actual_score": 70.6,
+      "score_error": 1.4,
       "expected_gaps": [
         "告警阈值、看板、SLO 和故障复盘"
       ],

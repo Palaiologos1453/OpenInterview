@@ -601,7 +601,7 @@ class CampusInterviewEngine:
 
         rubric_hits, rubric_gaps = self._rubric_coverage(answer, session.current_question_meta)
         pressure = session.difficulty["pressure"] + int(session.interviewer_style.get("pressure_bias") or 0)
-        score = self._score_answer(answer, pressure, rubric_hits)
+        score = self._score_answer(answer, pressure, rubric_hits, session.current_question_meta)
         positive = "你的回答已经覆盖了一部分关键信息。"
         if len(answer) >= 120:
             positive = "你的回答信息量比较足，适合继续做细节追问。"
@@ -626,7 +626,13 @@ class CampusInterviewEngine:
             return "按系统设计面试标准看，"
         return ""
 
-    def _score_answer(self, answer: str, pressure: int, rubric_hits: list[str] | None = None) -> float:
+    def _score_answer(
+        self,
+        answer: str,
+        pressure: int,
+        rubric_hits: list[str] | None = None,
+        question_meta: dict | None = None,
+    ) -> float:
         length_score = min(len(answer) / 160 * 45, 45)
         structure_markers = ["首先", "其次", "最后", "背景", "方案", "结果", "复杂度", "边界"]
         structure_score = min(sum(marker in answer for marker in structure_markers) * 8, 25)
@@ -647,17 +653,64 @@ class CampusInterviewEngine:
         ]
         technical_score = min(sum(marker in answer for marker in technical_markers) * 5, 25)
         rubric_score = min(len(rubric_hits or []) * 8, 20)
+        rubric_gap_penalty = self._rubric_gap_penalty(rubric_hits or [], question_meta)
+        quality_penalty = self._quality_penalty(answer, question_meta)
         pressure_penalty = max(pressure - 2, 0) * 3
+        raw_score = (
+            20
+            + length_score
+            + structure_score
+            + technical_score
+            + rubric_score
+            - rubric_gap_penalty
+            - pressure_penalty
+            - quality_penalty
+        )
+        score_cap = self._rubric_score_cap(rubric_hits or [], question_meta)
+        min_score = 38 if self._looks_like_keyword_stuffing(answer, question_meta) else 25
         return round(
             max(
-                30,
+                min_score,
                 min(
-                    95,
-                    20 + length_score + structure_score + technical_score + rubric_score - pressure_penalty,
+                    score_cap,
+                    raw_score,
                 ),
             ),
             1,
         )
+
+    def _rubric_gap_penalty(self, rubric_hits: list[str], question_meta: dict | None) -> int:
+        rubrics = list((question_meta or {}).get("rubric") or [])
+        if not rubrics:
+            return 0
+        missing = max(len(rubrics) - len(rubric_hits), 0)
+        return missing * 8
+
+    def _rubric_score_cap(self, rubric_hits: list[str], question_meta: dict | None) -> int:
+        rubrics = list((question_meta or {}).get("rubric") or [])
+        if not rubrics:
+            return 95
+        missing = max(len(rubrics) - len(rubric_hits), 0)
+        if missing <= 0:
+            return 95
+        if missing == 1:
+            return 82
+        if missing == 2:
+            return 68
+        if missing == 3:
+            return 52
+        return 42
+
+    def _quality_penalty(self, answer: str, question_meta: dict | None) -> int:
+        penalty = 0
+        if self._looks_like_keyword_stuffing(answer, question_meta):
+            penalty += 22
+        absolute_markers = ["一定", "肯定", "自然会", "不需要考虑", "不用考虑", "必然"]
+        if any(marker in answer for marker in absolute_markers):
+            penalty += 15
+        if "不需要考虑" in answer and any(word in answer for word in ["边界", "失败", "验证", "风险"]):
+            penalty += 10
+        return min(penalty, 45)
 
     def _closing_feedback(self, answer: str) -> str:
         if any(word in answer for word in ["团队", "培养", "成长", "代码", "业务", "技术栈", "owner", "ownership"]):
@@ -692,6 +745,8 @@ class CampusInterviewEngine:
         rubrics = list((question_meta or {}).get("rubric") or [])
         if not rubrics:
             return [], []
+        if self._looks_like_keyword_stuffing(answer, question_meta):
+            return [], [self._rubric_label(str(rubric)) for rubric in rubrics]
 
         normalized_answer = answer.lower()
         followup_keywords = self._followup_keywords(question_meta or {})
@@ -707,6 +762,38 @@ class CampusInterviewEngine:
             else:
                 gaps.append(label)
         return hits, gaps
+
+    def _looks_like_keyword_stuffing(self, answer: str, question_meta: dict | None) -> bool:
+        text = answer.strip()
+        if not text:
+            return False
+        rubrics = list((question_meta or {}).get("rubric") or [])
+        labels = [self._rubric_label(str(rubric)) for rubric in rubrics]
+        literal_hits = sum(1 for label in labels if len(label) >= 6 and label in text)
+        if literal_hits >= 3 and any(marker in text for marker in ["这些关键词", "关键词都", "关键词很重要"]):
+            return True
+        if literal_hits >= 3 and "这些" in text and "重要" in text and len(text) < 120:
+            return True
+        explanatory_markers = [
+            "因为",
+            "所以",
+            "例如",
+            "比如",
+            "首先",
+            "其次",
+            "最后",
+            "我会",
+            "通过",
+            "验证",
+            "取舍",
+            "边界",
+            "风险",
+            "原因",
+        ]
+        punctuation_count = sum(text.count(mark) for mark in ["，", "。", "；", "：", ",", ".", ";", ":"])
+        if literal_hits >= 4 and punctuation_count <= 2 and not any(marker in text for marker in explanatory_markers):
+            return True
+        return False
 
     def _followup_keywords(self, question_meta: dict) -> list[str]:
         keywords: list[str] = []

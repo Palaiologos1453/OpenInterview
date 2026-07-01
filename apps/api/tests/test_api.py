@@ -25,7 +25,10 @@ from openinterview_api.services.voice_config import (  # noqa: E402
     vad_model_path,
 )
 from openinterview_api.services.evaluation import evaluate_scoring_cases, expand_seed_cases  # noqa: E402
+from openinterview_api.services.local_diagnostics import local_diagnostics_report  # noqa: E402
+from openinterview_api.services.session_store import SQLiteBackedSessionStore  # noqa: E402
 from openinterview_api.storage import Storage  # noqa: E402
+from openinterview_api.interview_engine import CampusInterviewEngine, InterviewConfig  # noqa: E402
 from openinterview_api.voice.voice_profiles import load_voice_profiles  # noqa: E402
 
 
@@ -655,6 +658,54 @@ voice_profiles:
 
             self.assertEqual(storage.get_turn_by_request_id("s1", "r1")["turn_index"], 1)
 
+    def test_session_store_restores_from_sqlite_after_cache_clear(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            storage = Storage(Path(temp_dir) / "test.sqlite")
+            engine = CampusInterviewEngine()
+            result = engine.start(
+                InterviewConfig(
+                    direction_id="backend",
+                    difficulty_id="campus",
+                    mode_id="fundamentals",
+                    provider_config={
+                        "llm": {"provider": "mock"},
+                        "asr": {"provider": "browser"},
+                        "tts": {"provider": "browser"},
+                    },
+                )
+            )
+            session = result["session"]
+            storage.create_interview(
+                session.session_id,
+                {
+                    "direction_id": "backend",
+                    "difficulty_id": "campus",
+                    "mode_id": "fundamentals",
+                    "provider_config": {"llm": {"provider": "mock"}},
+                },
+            )
+            payload = engine.answer(session, "首先说明背景，再讲方案、结果、边界和验证方式。")
+            turn = session.history[-1]
+            storage.save_turn(
+                session.session_id,
+                turn_index=payload["turn_index"],
+                question=turn.question,
+                answer=turn.answer,
+                feedback=turn.feedback,
+                tags=turn.tags,
+                score=turn.score,
+                question_meta=turn.question_meta,
+                payload=payload,
+            )
+            store = SQLiteBackedSessionStore(storage=storage, engine=engine)
+
+            restored = store.get(session.session_id)
+
+            self.assertIsNotNone(restored)
+            self.assertEqual(restored.turn_index, 1)
+            self.assertEqual(len(restored.history), 1)
+            self.assertTrue(restored.current_question)
+
     def test_metrics_endpoints_include_runtime_and_prometheus(self):
         client.post(
             "/v1/interviews",
@@ -678,13 +729,24 @@ voice_profiles:
         self.assertEqual(prometheus.status_code, 200)
         self.assertIn("openinterview_operation_total", prometheus.text)
 
+    def test_local_diagnostics_report(self):
+        with tempfile.TemporaryDirectory(ignore_cleanup_errors=True) as temp_dir:
+            storage = Storage(Path(temp_dir) / "test.sqlite")
+            report = local_diagnostics_report(storage)
+
+        self.assertTrue(report["ok"])
+        self.assertEqual(report["scope"], "local-first")
+        self.assertIn("database", report["checks"])
+        self.assertIn("backup_export", report["checks"])
+
     def test_scoring_evaluation_dataset(self):
         cases = expand_seed_cases()
         result = evaluate_scoring_cases(cases)
 
         self.assertEqual(len(cases), 100)
         self.assertEqual(result["case_count"], 100)
-        self.assertIn("score_mae", result)
+        self.assertLessEqual(result["score_mae"], 10.0)
+        self.assertGreaterEqual(result["gap_recall"], 0.9)
         self.assertIn("misjudgments", result)
 
     def test_review_items_and_markdown_export(self):

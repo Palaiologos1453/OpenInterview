@@ -23,8 +23,8 @@ def main() -> int:
     parser.add_argument("--seed", type=Path, default=DEFAULT_EVAL_SEED_PATH)
     parser.add_argument("--output", type=Path, default=ROOT / "apps" / "api" / "eval" / "scoring-report.md")
     parser.add_argument("--json-output", type=Path, default=None)
-    parser.add_argument("--max-mae", type=float, default=18.0)
-    parser.add_argument("--min-gap-recall", type=float, default=0.45)
+    parser.add_argument("--max-mae", type=float, default=10.0)
+    parser.add_argument("--min-gap-recall", type=float, default=0.9)
     args = parser.parse_args()
 
     cases = expand_seed_cases(args.seed)

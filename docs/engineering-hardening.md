@@ -1,6 +1,6 @@
 # Engineering Hardening Notes
 
-这份文档记录 OpenInterview 从本地 Demo 走向更可解释工程项目的三条改造线。
+这份文档记录 OpenInterview 作为本地优先工具的三条工程化改造线：评分可评测、本地数据可靠、本地环境可诊断。
 
 ## Scoring Evaluation
 
@@ -18,38 +18,40 @@ python .\scripts\evaluate_scoring.py --output apps/api/eval/scoring-report.md --
 - 规则评分和人工期望分的 MAE。
 - 分数误差在阈值内的比例。
 - 缺失评分点 precision/recall。
-- Top 误判案例，方便继续调评分规则或引入 LLM judge 对照。
+- Top 误判案例，方便继续调评分规则。
 
-当前评测集是可审阅 seed，不声称代表真实用户分布。后续更严谨的做法是加入真实模拟面试回答、人工双标注和仲裁标注。
+当前重点关注关键词堆砌、自信但错误、答非所问和模板废话。评测集是可审阅 seed，不声称代表真实用户分布。后续更严谨的做法是加入真实模拟面试回答、人工双标注和仲裁标注。
 
-## Session State
+## Local Reliability
 
-API 层不再直接使用裸 `dict` 管理面试会话，而是通过 `SQLiteBackedSessionStore` 访问会话。当前实现仍保留进程内热缓存，但会在缓存 miss 时从 SQLite 恢复历史 turn，并重新计算下一题。
+API 层不再直接使用裸 `dict` 管理面试会话，而是通过 `SQLiteBackedSessionStore` 访问会话。当前实现保留进程内热缓存，但会在缓存 miss 时从 SQLite 恢复历史 turn，并重新计算下一题。这个设计服务于本地可靠性：API 重启、前端刷新或临时中断后，用户历史回答不丢。
 
 `TurnRequest` 支持可选 `request_id`。客户端重试同一个 turn 时，服务端会根据 `(interview_id, request_id)` 返回首次保存的 payload，避免重复推进面试状态。
 
-当前边界：
+本地可靠性覆盖：
 
-- 本地模式默认使用 SQLite-backed store。
-- `SessionStore` 接口可以替换为 Redis/Postgres 实现。
-- `RealtimeSessionStore` 已抽象，当前默认实现是线程安全的内存 store。
+- SQLite schema 轻量迁移。
+- 重复提交幂等。
+- 进程内会话缓存 miss 后从本地 SQLite 恢复。
+- 历史 JSON 导出/导入用于本地备份。
+- realtime session store 使用线程安全内存实现，符合单机本地使用边界。
 
-多实例部署时需要把面试 session 和 realtime session 都迁移到外部状态存储，并给 WebSocket 接入层加连接路由或共享状态。
+## Local Diagnostics
 
-## Metrics
-
-`Trace.span` 会自动把耗时写入 runtime metrics。JSON 指标和 Prometheus 风格文本分别由下面接口暴露：
+`Trace.span` 会自动把耗时写入 runtime metrics。JSON 指标和 Prometheus 风格文本分别由下面接口暴露，用于本地排障和性能观察：
 
 ```text
 GET /v1/metrics
 GET /v1/metrics/prometheus
+GET /v1/local/diagnostics
 ```
 
-已覆盖的关键指标：
+已覆盖的关键指标和诊断：
 
 - `interview.start`、`interview.turn`、`interview.report` 等核心链路耗时。
 - `vad.detect`、`asr.transcribe`、`realtime.*` 语音链路耗时。
 - LLM 调用成功率、延迟和错误分类。
 - SQLite 中持久化的 trace 聚合。
+- 本地 data 目录可写性、SQLite integrity_check、schema 版本、历史导出能力和评分评测集可用性。
 
 错误分类包括 auth、model_or_endpoint、quota_or_rate_limit、timeout、network、response_shape、tls、validation、conflict、not_implemented 和 unknown。
