@@ -77,6 +77,14 @@ class OpenInterviewAPITest(unittest.TestCase):
         self.assertTrue(payload["metric_questions"])
         self.assertTrue(payload["tech_choice_questions"])
         self.assertTrue(payload["incident_questions"])
+        self.assertTrue(payload["evidence_questions"])
+
+        risky = client.post(
+            "/v1/resume/analyze",
+            json={"text": "项目：高并发平台。负责后端开发，优化了性能，效果很好。"},
+        )
+        self.assertEqual(risky.status_code, 200)
+        self.assertTrue(risky.json()["project_risk_flags"])
 
     def test_start_does_not_require_llm_config_by_default(self):
         response = client.post(
@@ -743,10 +751,11 @@ voice_profiles:
         cases = expand_seed_cases()
         result = evaluate_scoring_cases(cases)
 
-        self.assertEqual(len(cases), 100)
-        self.assertEqual(result["case_count"], 100)
+        self.assertGreaterEqual(len(cases), 108)
+        self.assertEqual(result["case_count"], len(cases))
         self.assertLessEqual(result["score_mae"], 10.0)
         self.assertGreaterEqual(result["gap_recall"], 0.9)
+        self.assertTrue(any(item["name"] == "realistic" for item in result["breakdown"]))
         self.assertIn("misjudgments", result)
 
     def test_review_items_and_markdown_export(self):

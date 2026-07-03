@@ -4,7 +4,7 @@
 
 ## Scoring Evaluation
 
-评分评测集位于 `apps/api/eval/scoring_seed.yaml`。文件包含 10 个代表性题目和 10 个回答 profile，展开后形成 100 条带人工期望分数和缺失评分点的样本。
+评分评测集位于 `apps/api/eval/scoring_seed.yaml`。文件包含模板 profile 样本和真实场景样本，覆盖 Java 后端项目深挖、AI 应用评测、RAG、Agent 工具风险和本地优先隐私边界。
 
 运行：
 
@@ -20,7 +20,7 @@ python .\scripts\evaluate_scoring.py --output apps/api/eval/scoring-report.md --
 - 缺失评分点 precision/recall。
 - Top 误判案例，方便继续调评分规则。
 
-当前重点关注关键词堆砌、自信但错误、答非所问和模板废话。评测集是可审阅 seed，不声称代表真实用户分布。后续更严谨的做法是加入真实模拟面试回答、人工双标注和仲裁标注。
+当前重点关注关键词堆砌、自信但错误、答非所问、模板废话、指标口径缺失和项目贡献边界不清。详细方法见 [Scoring Evaluation](scoring-evaluation.md)。评测集是可审阅 seed，不声称代表真实用户分布。
 
 ## Local Reliability
 

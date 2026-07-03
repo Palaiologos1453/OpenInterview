@@ -1,13 +1,57 @@
 # OpenInterview Scoring Evaluation
 
-- Cases: 100
-- Score MAE: 8.8
-- Within +/-12 rate: 0.68
-- Gap precision: 0.932
-- Gap recall: 0.993
-- Misjudgments: 32
+- Cases: 109
+- Score MAE: 9.29
+- Within +/-12 rate: 0.67
+- Gap precision: 0.894
+- Gap recall: 0.972
+- Misjudgments: 37
+
+## Breakdown
+
+- all: cases=109, MAE=9.29, gap_recall=0.972
+- project: cases=27, MAE=10.44, gap_recall=0.94
+- system_design: cases=31, MAE=9.36, gap_recall=1.0
+- fundamentals: cases=51, MAE=8.63, gap_recall=0.972
+- realistic: cases=9, MAE=8.22, gap_recall=0.683
 
 ## Top Misjudgments
+
+### ai-evaluation-missing-validation
+
+- Expected score: 72.0
+- Actual score: 34.2
+- Score error: 37.8
+- Expected gaps: 能解释 Prompt、RAG、模型选择和监控迭代
+- Actual gaps: 说明业务目标、基线和评测集来源, 覆盖准确率、召回率、幻觉率、延迟和成本指标, 能解释 Prompt、RAG、模型选择和监控迭代
+- Note: none
+
+### backend-observability-missing-validation
+
+- Expected score: 72.0
+- Actual score: 42.6
+- Score error: 29.4
+- Expected gaps: 告警阈值、看板、SLO 和故障复盘
+- Actual gaps: 日志、指标、trace 分别解决什么问题, 延迟、错误率、吞吐、队列积压和资源使用指标, 告警阈值、看板、SLO 和故障复盘
+- Note: none
+
+### real-ai-rag-eval-vague
+
+- Expected score: 44.0
+- Actual score: 25
+- Score error: 19.0
+- Expected gaps: 说明业务目标、基线和评测集来源, 覆盖召回率、答案正确率、引用准确率、幻觉率、延迟和成本, 分析误判案例、人工复核和灰度策略, 能解释切分、召回、Rerank、Prompt 和监控迭代
+- Actual gaps: 说明业务目标、基线和评测集来源, 覆盖召回率、答案正确率、引用准确率、幻觉率、延迟和成本, 分析误判案例、人工复核和灰度策略
+- Note: none
+
+### real-backend-cache-project-vague
+
+- Expected score: 42.0
+- Actual score: 25
+- Score error: 17.0
+- Expected gaps: 区分个人贡献和团队成果, 说明技术选型、替代方案和取舍, 给出指标口径、验证方式、故障风险和复盘
+- Actual gaps: 讲清业务背景、瓶颈和目标, 说明技术选型、替代方案和取舍, 给出指标口径、验证方式、故障风险和复盘
+- Note: 典型包装式项目回答。
 
 ### backend-index-vague
 
@@ -106,40 +150,4 @@
 - Score error: 13.0
 - Expected gaps:  B+ 树叶子节点有序链表适合范围查询, 回表、覆盖索引、最左前缀和选择性等边界, 能结合 explain、慢查询或压测验证优化效果
 - Actual gaps: 索引减少扫描行数和随机查找成本,  B+ 树叶子节点有序链表适合范围查询, 回表、覆盖索引、最左前缀和选择性等边界, 能结合 explain、慢查询或压测验证优化效果
-- Note: 自信但错误，规则评分容易因语气和关键词虚高。
-
-### backend-index-project-linked
-
-- Expected score: 82.0
-- Actual score: 95
-- Score error: 13.0
-- Expected gaps: none
-- Actual gaps: none
-- Note: none
-
-### backend-cache-consistency-wrong-confident
-
-- Expected score: 38.0
-- Actual score: 25
-- Score error: 13.0
-- Expected gaps: 先更新数据库再删缓存、延迟双删、订阅 binlog 等方,  TTL、互斥锁、降级、重试和幂等, 监控、告警和数据修复手段
-- Actual gaps: 缓存穿透、击穿、雪崩和缓存数据库不一致, 先更新数据库再删缓存、延迟双删、订阅 binlog 等方,  TTL、互斥锁、降级、重试和幂等, 监控、告警和数据修复手段
-- Note: 自信但错误，规则评分容易因语气和关键词虚高。
-
-### backend-cache-consistency-project-linked
-
-- Expected score: 82.0
-- Actual score: 95
-- Score error: 13.0
-- Expected gaps: none
-- Actual gaps: none
-- Note: none
-
-### backend-thread-process-wrong-confident
-
-- Expected score: 38.0
-- Actual score: 25
-- Score error: 13.0
-- Expected gaps: 上下文切换成本、通信方式和故障隔离, 能结合 IO 密集、CPU 密集和异步服务场景选型, 线程池、阻塞调用和上下文传递风险
-- Actual gaps: 进程资源隔离、线程共享进程资源、协程用户态调度, 上下文切换成本、通信方式和故障隔离, 能结合 IO 密集、CPU 密集和异步服务场景选型, 线程池、阻塞调用和上下文传递风险
 - Note: 自信但错误，规则评分容易因语气和关键词虚高。

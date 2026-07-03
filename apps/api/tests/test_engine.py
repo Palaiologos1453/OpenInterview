@@ -153,10 +153,47 @@ class CampusInterviewEngineTest(unittest.TestCase):
 
         self.assertIn("围绕上一题继续追问", turn["next_question"])
         self.assertTrue(
-            any(keyword in turn["next_question"] for keyword in ["本人做的吗", "指标从哪里来", "统计口径", "故障"])
+            any(keyword in turn["next_question"] for keyword in ["本人做的吗", "指标从哪里来", "统计口径", "故障", "PR", "日志", "监控"])
         )
         self.assertEqual(session.current_question_meta["phase"], "project")
         self.assertEqual(turn["interviewer_message"], "")
+
+    def test_project_deep_dive_prompt_uses_real_interview_evidence_chain(self):
+        engine = CampusInterviewEngine()
+        result = engine.start(
+            InterviewConfig(
+                direction_id="backend",
+                difficulty_id="bigtech",
+                mode_id="project_deep_dive",
+                interviewer_style_id="resume_truth_probe",
+                resume_text=(
+                    "项目：订单系统\n"
+                    "负责 Redis 缓存、MySQL 索引和接口性能优化，P95 延迟降低 30%。"
+                    "使用 Spring Boot、Redis、MySQL，线上压测发现缓存击穿问题。"
+                ),
+                provider_config=MOCK_PROVIDER,
+            )
+        )
+        session = result["session"]
+
+        self.assertIn("业务背景和瓶颈", session.current_question)
+        self.assertIn("指标怎么验证", session.current_question)
+
+        prompts = engine._project_card_prompts(
+            {
+                "name": "订单系统",
+                "contribution_signals": ["负责 Redis 缓存、MySQL 索引和接口性能优化"],
+                "metrics": ["P95 延迟降低 30%"],
+                "vague_claims": ["性能优化"],
+                "tech_choices": ["使用 Spring Boot、Redis、MySQL"],
+                "incident_signals": ["线上压测发现缓存击穿问题"],
+            },
+            {},
+        )
+        joined = "\n".join(prompts)
+        self.assertIn("统计口径", joined)
+        self.assertIn("PR、日志、压测报告或监控看板", joined)
+        self.assertIn("现象、影响范围、排查路径", joined)
 
     def test_interviewer_styles_change_followup_pressure(self):
         engine = CampusInterviewEngine()

@@ -58,6 +58,28 @@ def expand_seed_cases(path: Path = DEFAULT_EVAL_SEED_PATH) -> list[EvaluationCas
                     note=str(answer.get("note") or ""),
                 )
             )
+    for item in data.get("realistic_cases", []):
+        rubrics = list(item.get("rubric") or [])
+        rubric_labels = [engine._rubric_label(str(rubric)) for rubric in rubrics]
+        question_meta = dict(item.get("question_meta") or {})
+        question_meta.setdefault("phase", item.get("phase") or "project")
+        question_meta.setdefault("rubric", rubrics)
+        expected_gaps = _expected_gaps(item, rubric_labels)
+        cases.append(
+            EvaluationCase(
+                id=str(item["id"]),
+                direction_id=str(item.get("direction_id") or "backend"),
+                difficulty_id=str(item.get("difficulty_id") or "bigtech"),
+                interviewer_style_id=str(item.get("interviewer_style_id") or "resume_truth_probe"),
+                phase=str(item.get("phase") or "project"),
+                question=str(item["prompt"]),
+                question_meta=question_meta,
+                answer=str(item["answer"]),
+                expected_score=float(item["score"]),
+                expected_gaps=expected_gaps,
+                note=str(item.get("note") or ""),
+            )
+        )
     return cases
 
 
@@ -92,6 +114,7 @@ def evaluate_scoring_cases(cases: list[EvaluationCase] | None = None) -> dict:
         "gap_precision": round(mean(gap_precision_values or [1.0]), 3),
         "gap_recall": round(mean(gap_recall_values or [1.0]), 3),
         "misjudgment_count": len(misjudgments),
+        "breakdown": _breakdown(evaluated),
         "misjudgments": misjudgments[:15],
         "cases": evaluated,
     }
@@ -112,9 +135,21 @@ def write_evaluation_report(output_path: Path, result: dict) -> None:
         f"- Gap recall: {result['gap_recall']}",
         f"- Misjudgments: {result.get('misjudgment_count', 0)}",
         "",
-        "## Top Misjudgments",
+        "## Breakdown",
         "",
     ]
+    for bucket in result.get("breakdown", []):
+        lines.append(
+            f"- {bucket['name']}: cases={bucket['case_count']}, "
+            f"MAE={bucket['score_mae']}, gap_recall={bucket['gap_recall']}"
+        )
+    lines.extend(
+        [
+            "",
+            "## Top Misjudgments",
+            "",
+        ]
+    )
     for item in result.get("misjudgments", []):
         lines.extend(
             [
@@ -176,6 +211,30 @@ def _mode_for_phase(phase: str) -> str:
     if phase == "system_design":
         return "system_design_intro"
     return "fundamentals"
+
+
+def _breakdown(items: list[dict]) -> list[dict]:
+    buckets = {
+        "all": items,
+        "project": [item for item in items if item["phase"] == "project"],
+        "system_design": [item for item in items if item["phase"] == "system_design"],
+        "fundamentals": [item for item in items if item["phase"] == "fundamentals"],
+        "realistic": [item for item in items if item["id"].startswith("real-")],
+    }
+    rows = []
+    for name, bucket in buckets.items():
+        if not bucket:
+            continue
+        gap_values = [item["gap_recall"] for item in bucket if item["expected_gaps"] or item["actual_gaps"]]
+        rows.append(
+            {
+                "name": name,
+                "case_count": len(bucket),
+                "score_mae": round(mean(abs(item["actual_score"] - item["expected_score"]) for item in bucket), 2),
+                "gap_recall": round(mean(gap_values or [1.0]), 3),
+            }
+        )
+    return rows
 
 
 def _expected_gaps(answer: dict, rubric_labels: list[str]) -> list[str]:

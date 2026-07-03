@@ -87,6 +87,8 @@ class ResumeAnalysis:
     metric_questions: list[str]
     tech_choice_questions: list[str]
     incident_questions: list[str]
+    evidence_questions: list[str]
+    project_risk_flags: list[str]
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -104,6 +106,8 @@ def analyze_resume(text: str) -> ResumeAnalysis:
     metric_questions = _metric_questions(normalized, project_cards)
     tech_choice_questions = _tech_choice_questions(normalized, project_cards)
     incident_questions = _incident_questions(normalized, project_cards)
+    evidence_questions = _evidence_questions(project_cards)
+    project_risk_flags = _project_risk_flags(project_cards, vague_claims, contributions)
     risks = _extract_risks(normalized, tech_stack, projects, vague_claims, contributions)
     return ResumeAnalysis(
         tech_stack=tech_stack,
@@ -117,6 +121,8 @@ def analyze_resume(text: str) -> ResumeAnalysis:
         metric_questions=metric_questions,
         tech_choice_questions=tech_choice_questions,
         incident_questions=incident_questions,
+        evidence_questions=evidence_questions,
+        project_risk_flags=project_risk_flags,
     )
 
 
@@ -314,6 +320,39 @@ def _incident_questions(text: str, cards: list[dict]) -> list[str]:
     ]
     questions.extend(f"简历里提到「{item}」，当时根因、恢复动作、长期改进分别是什么？" for item in incidents[:4])
     return _dedupe(questions)[:6]
+
+
+def _evidence_questions(cards: list[dict]) -> list[str]:
+    questions: list[str] = []
+    for card in cards[:4]:
+        name = card["name"]
+        questions.extend(
+            [
+                f"{name} 如果让我看代码或日志，你会指给我哪一段来证明这是你做的？",
+                f"{name} 的核心改动上线前后，PR、压测报告、监控看板或告警记录分别能提供什么证据？",
+                f"{name} 里你最怕被追问穿帮的点是什么？请把它改成可验证事实。",
+            ]
+        )
+    return _dedupe(questions)[:8]
+
+
+def _project_risk_flags(cards: list[dict], vague_claims: list[str], contributions: list[str]) -> list[str]:
+    flags: list[str] = []
+    for card in cards[:5]:
+        name = card["name"]
+        if not card.get("metrics"):
+            flags.append(f"{name} 缺少量化指标或指标口径。")
+        if not card.get("contribution_signals"):
+            flags.append(f"{name} 个人贡献边界不清。")
+        if not card.get("tech_choices"):
+            flags.append(f"{name} 技术选型缺少替代方案和取舍。")
+        if not card.get("incident_signals"):
+            flags.append(f"{name} 没有故障、风险或复盘证据。")
+    if vague_claims:
+        flags.append("存在模糊表述，建议改成数据、代码、日志或 PR 可验证事实。")
+    if cards and not contributions:
+        flags.append("项目存在但缺少明确个人动作，容易被追问团队成果和个人成果边界。")
+    return _dedupe(flags)[:10]
 
 
 def _project_card_questions(

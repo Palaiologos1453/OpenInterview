@@ -223,3 +223,182 @@ questions:
       - "能覆盖延迟、错误率、吞吐、队列积压和资源使用指标。"
       - "能设计 traceId、结构化日志、采样和脱敏。"
       - "能说明告警阈值、看板、SLO 和故障复盘。"
+
+realistic_cases:
+  - id: real-backend-cache-project-strong
+    direction_id: backend
+    difficulty_id: bigtech
+    interviewer_style_id: resume_truth_probe
+    phase: project
+    prompt: "你简历里写订单系统接口 P95 延迟下降 30%，请说明你本人做了什么、指标怎么来的、为什么选这个方案。"
+    question_meta:
+      id: real-backend-cache-project-strong
+      phase: project
+      topic: project-cache
+      type: project
+      tags: ["项目", "Redis", "指标"]
+    rubric: &project_truth_rubric
+      - "是否讲清业务背景、瓶颈和目标。"
+      - "是否区分个人贡献和团队成果。"
+      - "是否说明技术选型、替代方案和取舍。"
+      - "是否给出指标口径、验证方式、故障风险和复盘。"
+    score: 88
+    missing_rubric_indexes: []
+    answer: "背景是订单列表接口在活动期 P95 到 420ms，慢查询和缓存命中率都不稳定。我本人负责接口链路排查、Redis 缓存设计、MySQL 联合索引调整和上线监控，不把前端改造算成自己的贡献。方案上比较过只改 SQL、加本地缓存和 Redis 分布式缓存，最后选 Redis 是因为多实例部署下本地缓存一致性更差。指标来自压测报告和线上 Prometheus，窗口是上线前后各 3 天同一时间段，P95 从 420ms 降到 290ms。风险是缓存击穿和脏读，所以加了 TTL 抖动、互斥锁、删除缓存失败重试和告警。"
+
+  - id: real-backend-cache-project-vague
+    direction_id: backend
+    difficulty_id: bigtech
+    interviewer_style_id: resume_truth_probe
+    phase: project
+    prompt: "你简历里写高并发缓存优化，请说明个人贡献和效果。"
+    question_meta:
+      id: real-backend-cache-project-vague
+      phase: project
+      topic: project-cache
+      type: project
+      tags: ["项目", "Redis", "真实性"]
+    rubric: *project_truth_rubric
+    score: 42
+    missing_rubric_indexes: [1, 2, 3]
+    answer: "这个项目主要就是用了 Redis 做缓存，提升了高并发能力。我参与了后端开发，团队一起把接口优化了，效果还不错，具体指标当时没有特别记录，主要是上线之后用户反馈更快了。"
+    note: "典型包装式项目回答。"
+
+  - id: real-backend-cache-project-missing-metric
+    direction_id: backend
+    difficulty_id: bigtech
+    interviewer_style_id: resume_truth_probe
+    phase: project
+    prompt: "缓存优化效果如何证明？"
+    question_meta:
+      id: real-backend-cache-project-missing-metric
+      phase: project
+      topic: project-cache
+      type: project
+      tags: ["项目", "指标"]
+    rubric: *project_truth_rubric
+    score: 68
+    missing_rubric_indexes: [3]
+    answer: "当时订单查询压力比较大，我负责了缓存 key 设计、过期策略和数据库索引优化。方案上比较过直接扩容 MySQL 和加 Redis，最后因为读多写少所以选 Redis。个人贡献主要是代码实现、联调和灰度发布。指标这一块我只能说体感和日志里慢请求少了，但没有整理出明确的基线、时间窗口和 P95 对比。"
+
+  - id: real-backend-incident-strong
+    direction_id: backend
+    difficulty_id: bigtech
+    interviewer_style_id: resume_truth_probe
+    phase: project
+    prompt: "项目有没有线上故障？请讲根因、恢复动作和长期改进。"
+    question_meta:
+      id: real-backend-incident-strong
+      phase: project
+      topic: incident-review
+      type: project
+      tags: ["故障复盘", "项目"]
+    rubric:
+      - "是否说明故障现象、影响范围和发现方式。"
+      - "是否定位根因并说明个人排查动作。"
+      - "是否讲清恢复、回滚、降级或补偿。"
+      - "是否形成长期改进、监控告警和复盘结论。"
+    score: 86
+    missing_rubric_indexes: []
+    answer: "有一次缓存预热脚本把热点 key 的 TTL 设置成同一时间过期，活动开始后 Redis miss 暴涨，MySQL QPS 被打高，告警先从慢 SQL 和接口 P99 触发。我负责排查缓存命中率、Redis key 过期分布和数据库连接池指标，确认是集中失效。恢复上先临时限流非核心查询，同时手动预热热点 key，之后回滚脚本配置。长期改进是 TTL 加随机抖动、预热任务分批、核心接口加降级兜底，并把缓存命中率和 DB QPS 加到看板。"
+
+  - id: real-backend-incident-weak
+    direction_id: backend
+    difficulty_id: bigtech
+    interviewer_style_id: resume_truth_probe
+    phase: project
+    prompt: "项目有没有线上故障？"
+    question_meta:
+      id: real-backend-incident-weak
+      phase: project
+      topic: incident-review
+      type: project
+      tags: ["故障复盘", "项目"]
+    rubric:
+      - "是否说明故障现象、影响范围和发现方式。"
+      - "是否定位根因并说明个人排查动作。"
+      - "是否讲清恢复、回滚、降级或补偿。"
+      - "是否形成长期改进、监控告警和复盘结论。"
+    score: 36
+    missing_rubric_indexes: [0, 1, 2, 3]
+    answer: "项目整体比较稳定，没什么大的故障。就算有问题一般也是看日志解决，后面注意一下就好了。"
+
+  - id: real-ai-rag-eval-strong
+    direction_id: ai_application
+    difficulty_id: bigtech
+    interviewer_style_id: resume_truth_probe
+    phase: project
+    prompt: "你做的 RAG 项目怎么证明效果？评测集、指标和误判怎么处理？"
+    question_meta:
+      id: real-ai-rag-eval-strong
+      phase: project
+      topic: rag-evaluation
+      type: project
+      tags: ["RAG", "评测", "项目"]
+    rubric: &ai_eval_rubric
+      - "是否说明业务目标、基线和评测集来源。"
+      - "是否覆盖召回率、答案正确率、引用准确率、幻觉率、延迟和成本。"
+      - "是否分析误判案例、人工复核和灰度策略。"
+      - "是否能解释切分、召回、Rerank、Prompt 和监控迭代。"
+    score: 90
+    missing_rubric_indexes: []
+    answer: "业务目标是客服知识库问答，基线是关键词检索加人工复制答案。评测集来自 300 条历史工单和 80 条人工构造边界问题，按产品、售后和账号问题分层。指标看 Top5 召回率、答案正确率、引用准确率、幻觉率、P95 延迟和单次 token 成本。误判分三类：召回不到、召回到了但 Rerank 排低、上下文正确但模型编答案。对应改了按标题层级切分、BM25+向量混合召回、Rerank 阈值和引用约束 Prompt。上线先灰度 10%，低置信度转人工，并把无引用回答和用户点踩纳入复盘集。"
+
+  - id: real-ai-rag-eval-vague
+    direction_id: ai_application
+    difficulty_id: bigtech
+    interviewer_style_id: resume_truth_probe
+    phase: project
+    prompt: "RAG 项目怎么证明效果？"
+    question_meta:
+      id: real-ai-rag-eval-vague
+      phase: project
+      topic: rag-evaluation
+      type: project
+      tags: ["RAG", "评测", "项目"]
+    rubric: *ai_eval_rubric
+    score: 44
+    missing_rubric_indexes: [0, 1, 2, 3]
+    answer: "我们用了向量数据库和大模型，效果比原来好很多。主要是 prompt 调了一下，然后回答更智能。具体评测没有做得很复杂，基本看几个问题回答得还可以。"
+
+  - id: real-ai-agent-tool-risk
+    direction_id: ai_application
+    difficulty_id: bigtech
+    interviewer_style_id: fundamental_chain
+    phase: fundamentals
+    prompt: "Agent 调接口下单、退款或发消息时，你会怎么控制风险？"
+    question_meta:
+      id: real-ai-agent-tool-risk
+      phase: fundamentals
+      topic: agent
+      type: fundamentals
+      tags: ["Agent", "工具调用", "安全"]
+    rubric:
+      - "能说明工具调用会放大幻觉、越权和误操作风险。"
+      - "能设计参数 schema 校验、权限边界和最小授权。"
+      - "能覆盖高风险动作的人审、二次确认、幂等和回滚。"
+      - "能说明审计日志、沙箱、监控告警和降级策略。"
+    score: 84
+    missing_rubric_indexes: []
+    answer: "工具调用的风险是模型一旦幻觉或理解错意图，就可能把错误动作变成真实副作用，比如误退款。我的做法是先把工具按风险分级，查询类可以自动执行，退款、下单、发消息必须二次确认或人工审核。参数用 schema 校验，用户身份和资源权限在服务端重新校验，模型不能自己传 user_id 越权。写操作要有 request_id 幂等和可回滚记录，所有工具调用记录 trace、参数摘要和操作者。异常时降级为只给建议不执行。"
+
+  - id: real-system-design-local-tool
+    direction_id: backend
+    difficulty_id: bigtech
+    interviewer_style_id: system_design
+    phase: system_design
+    prompt: "如果这是一个本地优先的模拟面试工具，你会怎么设计数据可靠性和隐私边界？"
+    question_meta:
+      id: real-system-design-local-tool
+      phase: system_design
+      topic: local-first
+      type: scenario
+      tags: ["本地优先", "隐私", "可靠性"]
+    rubric:
+      - "能说明本地存储、隐私边界和第三方调用条件。"
+      - "能设计 SQLite schema 迁移、备份导出和恢复。"
+      - "能覆盖幂等提交、重启恢复和损坏诊断。"
+      - "能说明敏感字段脱敏、清理、诊断报告和用户提示。"
+    score: 86
+    missing_rubric_indexes: []
+    answer: "我会先明确边界：简历、转写和报告默认只在本机 SQLite，只有用户显式配置云端 LLM/ASR/TTS 时才发给第三方。可靠性上用 SQLite WAL、schema_migrations、历史 JSON 导出和导入。turn 提交带 request_id，前端重试不会重复推进。API 重启后从 SQLite 恢复历史 turn 和下一题。诊断上做 data 目录权限、integrity_check、schema 版本、备份导出能力检查。隐私上导出时脱敏 API key，提供清空历史，并在界面提示哪些 provider 会离开本机。"

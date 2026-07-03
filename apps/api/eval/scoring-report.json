@@ -1,11 +1,144 @@
 {
-  "case_count": 100,
-  "score_mae": 8.8,
-  "within_tolerance_rate": 0.68,
-  "gap_precision": 0.932,
-  "gap_recall": 0.993,
-  "misjudgment_count": 32,
+  "case_count": 109,
+  "score_mae": 9.29,
+  "within_tolerance_rate": 0.67,
+  "gap_precision": 0.894,
+  "gap_recall": 0.972,
+  "misjudgment_count": 37,
+  "breakdown": [
+    {
+      "name": "all",
+      "case_count": 109,
+      "score_mae": 9.29,
+      "gap_recall": 0.972
+    },
+    {
+      "name": "project",
+      "case_count": 27,
+      "score_mae": 10.44,
+      "gap_recall": 0.94
+    },
+    {
+      "name": "system_design",
+      "case_count": 31,
+      "score_mae": 9.36,
+      "gap_recall": 1.0
+    },
+    {
+      "name": "fundamentals",
+      "case_count": 51,
+      "score_mae": 8.63,
+      "gap_recall": 0.972
+    },
+    {
+      "name": "realistic",
+      "case_count": 9,
+      "score_mae": 8.22,
+      "gap_recall": 0.683
+    }
+  ],
   "misjudgments": [
+    {
+      "id": "ai-evaluation-missing-validation",
+      "direction_id": "ai_application",
+      "phase": "project",
+      "question": "你做过的 AI 应用如何证明效果？请说明评测集、指标、误判和迭代方式。",
+      "expected_score": 72.0,
+      "actual_score": 34.2,
+      "score_error": 37.8,
+      "expected_gaps": [
+        "能解释 Prompt、RAG、模型选择和监控迭代"
+      ],
+      "actual_gaps": [
+        "说明业务目标、基线和评测集来源",
+        "覆盖准确率、召回率、幻觉率、延迟和成本指标",
+        "能解释 Prompt、RAG、模型选择和监控迭代"
+      ],
+      "actual_hits": [
+        "分析误判案例、人工复核和灰度策略"
+      ],
+      "gap_precision": 0.333,
+      "gap_recall": 1.0,
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：分析误判案例、人工复核和灰度策略。 建议补充说明业务目标、基线和评测集来源；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "note": ""
+    },
+    {
+      "id": "backend-observability-missing-validation",
+      "direction_id": "backend",
+      "phase": "system_design",
+      "question": "你会如何给一个面试系统设计日志、指标和 trace 观测体系？",
+      "expected_score": 72.0,
+      "actual_score": 42.6,
+      "score_error": 29.4,
+      "expected_gaps": [
+        "告警阈值、看板、SLO 和故障复盘"
+      ],
+      "actual_gaps": [
+        "日志、指标、trace 分别解决什么问题",
+        "延迟、错误率、吞吐、队列积压和资源使用指标",
+        "告警阈值、看板、SLO 和故障复盘"
+      ],
+      "actual_hits": [
+        "能设计 traceId、结构化日志、采样和脱敏"
+      ],
+      "gap_precision": 0.333,
+      "gap_recall": 1.0,
+      "feedback": "按系统设计面试标准看，你的回答已经覆盖：能设计 traceId、结构化日志、采样和脱敏。 建议补充日志、指标、trace 分别解决什么问题；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "note": ""
+    },
+    {
+      "id": "real-ai-rag-eval-vague",
+      "direction_id": "ai_application",
+      "phase": "project",
+      "question": "RAG 项目怎么证明效果？",
+      "expected_score": 44.0,
+      "actual_score": 25,
+      "score_error": 19.0,
+      "expected_gaps": [
+        "说明业务目标、基线和评测集来源",
+        "覆盖召回率、答案正确率、引用准确率、幻觉率、延迟和成本",
+        "分析误判案例、人工复核和灰度策略",
+        "能解释切分、召回、Rerank、Prompt 和监控迭代"
+      ],
+      "actual_gaps": [
+        "说明业务目标、基线和评测集来源",
+        "覆盖召回率、答案正确率、引用准确率、幻觉率、延迟和成本",
+        "分析误判案例、人工复核和灰度策略"
+      ],
+      "actual_hits": [
+        "能解释切分、召回、Rerank、Prompt 和监控迭代"
+      ],
+      "gap_precision": 1.0,
+      "gap_recall": 0.75,
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：能解释切分、召回、Rerank、Prompt 和监控迭代。 建议补充说明业务目标、基线和评测集来源；建议补充更具体的例子或技术细节；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "note": ""
+    },
+    {
+      "id": "real-backend-cache-project-vague",
+      "direction_id": "backend",
+      "phase": "project",
+      "question": "你简历里写高并发缓存优化，请说明个人贡献和效果。",
+      "expected_score": 42.0,
+      "actual_score": 25,
+      "score_error": 17.0,
+      "expected_gaps": [
+        "区分个人贡献和团队成果",
+        "说明技术选型、替代方案和取舍",
+        "给出指标口径、验证方式、故障风险和复盘"
+      ],
+      "actual_gaps": [
+        "讲清业务背景、瓶颈和目标",
+        "说明技术选型、替代方案和取舍",
+        "给出指标口径、验证方式、故障风险和复盘"
+      ],
+      "actual_hits": [
+        "区分个人贡献和团队成果"
+      ],
+      "gap_precision": 0.667,
+      "gap_recall": 0.667,
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：区分个人贡献和团队成果。 建议补充讲清业务背景、瓶颈和目标；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "note": "典型包装式项目回答。"
+    },
     {
       "id": "backend-index-vague",
       "direction_id": "backend",
@@ -279,98 +412,6 @@
       "gap_precision": 0.75,
       "gap_recall": 1.0,
       "feedback": "按八股连环追问标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充索引减少扫描行数和随机查找成本；建议补充更具体的例子或技术细节。",
-      "note": "自信但错误，规则评分容易因语气和关键词虚高。"
-    },
-    {
-      "id": "backend-index-project-linked",
-      "direction_id": "backend",
-      "phase": "fundamentals",
-      "question": "请解释数据库索引为什么能加速查询，并说明 B+ 树索引在范围查询上的优势。",
-      "expected_score": 82.0,
-      "actual_score": 95,
-      "score_error": 13.0,
-      "expected_gaps": [],
-      "actual_gaps": [],
-      "actual_hits": [
-        "索引减少扫描行数和随机查找成本",
-        " B+ 树叶子节点有序链表适合范围查询",
-        "回表、覆盖索引、最左前缀和选择性等边界",
-        "能结合 explain、慢查询或压测验证优化效果"
-      ],
-      "gap_precision": 1.0,
-      "gap_recall": 1.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：索引减少扫描行数和随机查找成本、 B+ 树叶子节点有序链表适合范围查询。 下一步可以继续展开边界条件和失败场景。",
-      "note": ""
-    },
-    {
-      "id": "backend-cache-consistency-wrong-confident",
-      "direction_id": "backend",
-      "phase": "fundamentals",
-      "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
-      "expected_score": 38.0,
-      "actual_score": 25,
-      "score_error": 13.0,
-      "expected_gaps": [
-        "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
-        " TTL、互斥锁、降级、重试和幂等",
-        "监控、告警和数据修复手段"
-      ],
-      "actual_gaps": [
-        "缓存穿透、击穿、雪崩和缓存数据库不一致",
-        "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
-        " TTL、互斥锁、降级、重试和幂等",
-        "监控、告警和数据修复手段"
-      ],
-      "actual_hits": [],
-      "gap_precision": 0.75,
-      "gap_recall": 1.0,
-      "feedback": "按八股连环追问标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充缓存穿透、击穿、雪崩和缓存数据库不一致；建议补充更具体的例子或技术细节。",
-      "note": "自信但错误，规则评分容易因语气和关键词虚高。"
-    },
-    {
-      "id": "backend-cache-consistency-project-linked",
-      "direction_id": "backend",
-      "phase": "fundamentals",
-      "question": "Redis 缓存和数据库之间可能出现哪些一致性问题？你会怎么降低风险？",
-      "expected_score": 82.0,
-      "actual_score": 95,
-      "score_error": 13.0,
-      "expected_gaps": [],
-      "actual_gaps": [],
-      "actual_hits": [
-        "缓存穿透、击穿、雪崩和缓存数据库不一致",
-        "先更新数据库再删缓存、延迟双删、订阅 binlog 等方",
-        " TTL、互斥锁、降级、重试和幂等",
-        "监控、告警和数据修复手段"
-      ],
-      "gap_precision": 1.0,
-      "gap_recall": 1.0,
-      "feedback": "按八股连环追问标准看，你的回答已经覆盖：缓存穿透、击穿、雪崩和缓存数据库不一致、先更新数据库再删缓存、延迟双删、订阅 binlog 等方。 下一步可以继续展开边界条件和失败场景。",
-      "note": ""
-    },
-    {
-      "id": "backend-thread-process-wrong-confident",
-      "direction_id": "backend",
-      "phase": "fundamentals",
-      "question": "讲一下进程、线程和协程的区别，以及它们在后端服务中的适用场景。",
-      "expected_score": 38.0,
-      "actual_score": 25,
-      "score_error": 13.0,
-      "expected_gaps": [
-        "上下文切换成本、通信方式和故障隔离",
-        "能结合 IO 密集、CPU 密集和异步服务场景选型",
-        "线程池、阻塞调用和上下文传递风险"
-      ],
-      "actual_gaps": [
-        "进程资源隔离、线程共享进程资源、协程用户态调度",
-        "上下文切换成本、通信方式和故障隔离",
-        "能结合 IO 密集、CPU 密集和异步服务场景选型",
-        "线程池、阻塞调用和上下文传递风险"
-      ],
-      "actual_hits": [],
-      "gap_precision": 0.75,
-      "gap_recall": 1.0,
-      "feedback": "按八股连环追问标准看，你的表达有一定结构，这在校招技术面里是加分项。 建议补充进程资源隔离、线程共享进程资源、协程用户态调度；建议补充更具体的例子或技术细节。",
       "note": "自信但错误，规则评分容易因语气和关键词虚高。"
     }
   ],
@@ -1288,22 +1329,22 @@
       "phase": "project",
       "question": "请讲清项目背景、你的个人贡献、核心方案和结果。",
       "expected_score": 72.0,
-      "actual_score": 76.7,
-      "score_error": 4.7,
+      "actual_score": 64.7,
+      "score_error": 7.3,
       "expected_gaps": [
         "能解释技术选型依据、故障风险和项目真实性"
       ],
       "actual_gaps": [
+        "给出指标结果、验证方式和复盘",
         "能解释技术选型依据、故障风险和项目真实性"
       ],
       "actual_hits": [
         "讲清业务背景和目标",
-        "说明个人贡献和关键技术方案",
-        "给出指标结果、验证方式和复盘"
+        "说明个人贡献和关键技术方案"
       ],
-      "gap_precision": 1.0,
+      "gap_precision": 0.5,
       "gap_recall": 1.0,
-      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：讲清业务背景和目标、说明个人贡献和关键技术方案。 建议补充能解释技术选型依据、故障风险和项目真实性。",
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：讲清业务背景和目标、说明个人贡献和关键技术方案。 建议补充给出指标结果、验证方式和复盘。",
       "note": ""
     },
     {
@@ -2478,22 +2519,22 @@
       "phase": "project",
       "question": "你做过的 AI 应用如何证明效果？请说明评测集、指标、误判和迭代方式。",
       "expected_score": 72.0,
-      "actual_score": 62.2,
-      "score_error": 9.8,
+      "actual_score": 34.2,
+      "score_error": 37.8,
       "expected_gaps": [
         "能解释 Prompt、RAG、模型选择和监控迭代"
       ],
       "actual_gaps": [
+        "说明业务目标、基线和评测集来源",
+        "覆盖准确率、召回率、幻觉率、延迟和成本指标",
         "能解释 Prompt、RAG、模型选择和监控迭代"
       ],
       "actual_hits": [
-        "说明业务目标、基线和评测集来源",
-        "覆盖准确率、召回率、幻觉率、延迟和成本指标",
         "分析误判案例、人工复核和灰度策略"
       ],
-      "gap_precision": 1.0,
+      "gap_precision": 0.333,
       "gap_recall": 1.0,
-      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：说明业务目标、基线和评测集来源、覆盖准确率、召回率、幻觉率、延迟和成本指标。 建议补充能解释 Prompt、RAG、模型选择和监控迭代；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：分析误判案例、人工复核和灰度策略。 建议补充说明业务目标、基线和评测集来源；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
       "note": ""
     },
     {
@@ -2717,22 +2758,22 @@
       "phase": "system_design",
       "question": "你会如何给一个面试系统设计日志、指标和 trace 观测体系？",
       "expected_score": 72.0,
-      "actual_score": 70.6,
-      "score_error": 1.4,
+      "actual_score": 42.6,
+      "score_error": 29.4,
       "expected_gaps": [
         "告警阈值、看板、SLO 和故障复盘"
       ],
       "actual_gaps": [
+        "日志、指标、trace 分别解决什么问题",
+        "延迟、错误率、吞吐、队列积压和资源使用指标",
         "告警阈值、看板、SLO 和故障复盘"
       ],
       "actual_hits": [
-        "日志、指标、trace 分别解决什么问题",
-        "延迟、错误率、吞吐、队列积压和资源使用指标",
         "能设计 traceId、结构化日志、采样和脱敏"
       ],
-      "gap_precision": 1.0,
+      "gap_precision": 0.333,
       "gap_recall": 1.0,
-      "feedback": "按系统设计面试标准看，你的回答已经覆盖：日志、指标、trace 分别解决什么问题、延迟、错误率、吞吐、队列积压和资源使用指标。 建议补充告警阈值、看板、SLO 和故障复盘；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "feedback": "按系统设计面试标准看，你的回答已经覆盖：能设计 traceId、结构化日志、采样和脱敏。 建议补充日志、指标、trace 分别解决什么问题；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
       "note": ""
     },
     {
@@ -2754,6 +2795,215 @@
       "gap_precision": 1.0,
       "gap_recall": 1.0,
       "feedback": "按系统设计面试标准看，你的回答已经覆盖：日志、指标、trace 分别解决什么问题、延迟、错误率、吞吐、队列积压和资源使用指标。 项目题最好量化结果或说明验证方式。",
+      "note": ""
+    },
+    {
+      "id": "real-backend-cache-project-strong",
+      "direction_id": "backend",
+      "phase": "project",
+      "question": "你简历里写订单系统接口 P95 延迟下降 30%，请说明你本人做了什么、指标怎么来的、为什么选这个方案。",
+      "expected_score": 88.0,
+      "actual_score": 95,
+      "score_error": 7.0,
+      "expected_gaps": [],
+      "actual_gaps": [],
+      "actual_hits": [
+        "讲清业务背景、瓶颈和目标",
+        "区分个人贡献和团队成果",
+        "说明技术选型、替代方案和取舍",
+        "给出指标口径、验证方式、故障风险和复盘"
+      ],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：讲清业务背景、瓶颈和目标、区分个人贡献和团队成果。 项目题最好量化结果或说明验证方式。",
+      "note": ""
+    },
+    {
+      "id": "real-backend-cache-project-vague",
+      "direction_id": "backend",
+      "phase": "project",
+      "question": "你简历里写高并发缓存优化，请说明个人贡献和效果。",
+      "expected_score": 42.0,
+      "actual_score": 25,
+      "score_error": 17.0,
+      "expected_gaps": [
+        "区分个人贡献和团队成果",
+        "说明技术选型、替代方案和取舍",
+        "给出指标口径、验证方式、故障风险和复盘"
+      ],
+      "actual_gaps": [
+        "讲清业务背景、瓶颈和目标",
+        "说明技术选型、替代方案和取舍",
+        "给出指标口径、验证方式、故障风险和复盘"
+      ],
+      "actual_hits": [
+        "区分个人贡献和团队成果"
+      ],
+      "gap_precision": 0.667,
+      "gap_recall": 0.667,
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：区分个人贡献和团队成果。 建议补充讲清业务背景、瓶颈和目标；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "note": "典型包装式项目回答。"
+    },
+    {
+      "id": "real-backend-cache-project-missing-metric",
+      "direction_id": "backend",
+      "phase": "project",
+      "question": "缓存优化效果如何证明？",
+      "expected_score": 68.0,
+      "actual_score": 72,
+      "score_error": 4.0,
+      "expected_gaps": [
+        "给出指标口径、验证方式、故障风险和复盘"
+      ],
+      "actual_gaps": [
+        "给出指标口径、验证方式、故障风险和复盘"
+      ],
+      "actual_hits": [
+        "讲清业务背景、瓶颈和目标",
+        "区分个人贡献和团队成果",
+        "说明技术选型、替代方案和取舍"
+      ],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：讲清业务背景、瓶颈和目标、区分个人贡献和团队成果。 建议补充给出指标口径、验证方式、故障风险和复盘；项目题最好量化结果或说明验证方式。",
+      "note": ""
+    },
+    {
+      "id": "real-backend-incident-strong",
+      "direction_id": "backend",
+      "phase": "project",
+      "question": "项目有没有线上故障？请讲根因、恢复动作和长期改进。",
+      "expected_score": 86.0,
+      "actual_score": 84,
+      "score_error": 2.0,
+      "expected_gaps": [],
+      "actual_gaps": [],
+      "actual_hits": [
+        "说明故障现象、影响范围和发现方式",
+        "定位根因并说明个人排查动作",
+        "讲清恢复、回滚、降级或补偿",
+        "形成长期改进、监控告警和复盘结论"
+      ],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：说明故障现象、影响范围和发现方式、定位根因并说明个人排查动作。 项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "note": ""
+    },
+    {
+      "id": "real-backend-incident-weak",
+      "direction_id": "backend",
+      "phase": "project",
+      "question": "项目有没有线上故障？",
+      "expected_score": 36.0,
+      "actual_score": 25,
+      "score_error": 11.0,
+      "expected_gaps": [
+        "说明故障现象、影响范围和发现方式",
+        "定位根因并说明个人排查动作",
+        "讲清恢复、回滚、降级或补偿",
+        "形成长期改进、监控告警和复盘结论"
+      ],
+      "actual_gaps": [
+        "说明故障现象、影响范围和发现方式",
+        "定位根因并说明个人排查动作",
+        "讲清恢复、回滚、降级或补偿",
+        "形成长期改进、监控告警和复盘结论"
+      ],
+      "actual_hits": [],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖了一部分关键信息。 建议补充说明故障现象、影响范围和发现方式；建议补充更具体的例子或技术细节；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "note": ""
+    },
+    {
+      "id": "real-ai-rag-eval-strong",
+      "direction_id": "ai_application",
+      "phase": "project",
+      "question": "你做的 RAG 项目怎么证明效果？评测集、指标和误判怎么处理？",
+      "expected_score": 90.0,
+      "actual_score": 95,
+      "score_error": 5.0,
+      "expected_gaps": [],
+      "actual_gaps": [],
+      "actual_hits": [
+        "说明业务目标、基线和评测集来源",
+        "覆盖召回率、答案正确率、引用准确率、幻觉率、延迟和成本",
+        "分析误判案例、人工复核和灰度策略",
+        "能解释切分、召回、Rerank、Prompt 和监控迭代"
+      ],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：说明业务目标、基线和评测集来源、覆盖召回率、答案正确率、引用准确率、幻觉率、延迟和成本。 项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "note": ""
+    },
+    {
+      "id": "real-ai-rag-eval-vague",
+      "direction_id": "ai_application",
+      "phase": "project",
+      "question": "RAG 项目怎么证明效果？",
+      "expected_score": 44.0,
+      "actual_score": 25,
+      "score_error": 19.0,
+      "expected_gaps": [
+        "说明业务目标、基线和评测集来源",
+        "覆盖召回率、答案正确率、引用准确率、幻觉率、延迟和成本",
+        "分析误判案例、人工复核和灰度策略",
+        "能解释切分、召回、Rerank、Prompt 和监控迭代"
+      ],
+      "actual_gaps": [
+        "说明业务目标、基线和评测集来源",
+        "覆盖召回率、答案正确率、引用准确率、幻觉率、延迟和成本",
+        "分析误判案例、人工复核和灰度策略"
+      ],
+      "actual_hits": [
+        "能解释切分、召回、Rerank、Prompt 和监控迭代"
+      ],
+      "gap_precision": 1.0,
+      "gap_recall": 0.75,
+      "feedback": "按项目真实性拷打标准看，你的回答已经覆盖：能解释切分、召回、Rerank、Prompt 和监控迭代。 建议补充说明业务目标、基线和评测集来源；建议补充更具体的例子或技术细节；项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
+      "note": ""
+    },
+    {
+      "id": "real-ai-agent-tool-risk",
+      "direction_id": "ai_application",
+      "phase": "fundamentals",
+      "question": "Agent 调接口下单、退款或发消息时，你会怎么控制风险？",
+      "expected_score": 84.0,
+      "actual_score": 76,
+      "score_error": 8.0,
+      "expected_gaps": [],
+      "actual_gaps": [
+        "审计日志、沙箱、监控告警和降级策略"
+      ],
+      "actual_hits": [
+        "工具调用会放大幻觉、越权和误操作风险",
+        "能设计参数 schema 校验、权限边界和最小授权",
+        "高风险动作的人审、二次确认、幂等和回滚"
+      ],
+      "gap_precision": 0.0,
+      "gap_recall": 0.0,
+      "feedback": "按八股连环追问标准看，你的回答已经覆盖：工具调用会放大幻觉、越权和误操作风险、能设计参数 schema 校验、权限边界和最小授权。 建议补充审计日志、沙箱、监控告警和降级策略；可以补充方案取舍，而不只是描述做了什么。",
+      "note": ""
+    },
+    {
+      "id": "real-system-design-local-tool",
+      "direction_id": "backend",
+      "phase": "system_design",
+      "question": "如果这是一个本地优先的模拟面试工具，你会怎么设计数据可靠性和隐私边界？",
+      "expected_score": 86.0,
+      "actual_score": 87,
+      "score_error": 1.0,
+      "expected_gaps": [],
+      "actual_gaps": [],
+      "actual_hits": [
+        "本地存储、隐私边界和第三方调用条件",
+        "能设计 SQLite schema 迁移、备份导出和恢复",
+        "幂等提交、重启恢复和损坏诊断",
+        "敏感字段脱敏、清理、诊断报告和用户提示"
+      ],
+      "gap_precision": 1.0,
+      "gap_recall": 1.0,
+      "feedback": "按系统设计面试标准看，你的回答已经覆盖：本地存储、隐私边界和第三方调用条件、能设计 SQLite schema 迁移、备份导出和恢复。 项目题最好量化结果或说明验证方式；可以补充方案取舍，而不只是描述做了什么。",
       "note": ""
     }
   ]

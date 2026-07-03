@@ -473,7 +473,8 @@ class CampusInterviewEngine:
             if step == 0:
                 return (
                     f"我把你的简历先拆成项目卡片，第一张是「{card_name}」。"
-                    f"请用 2 分钟讲清它的背景、你的个人贡献、核心方案和结果。"
+                    "请按真实技术一面来讲：先说明业务背景和瓶颈，再明确你本人负责的模块，"
+                    "接着讲核心方案、为什么这么选、上线后指标怎么验证。"
                     f"{' 简历片段：' + summary if summary else ''}"
                 )
             prompt_pool = self._project_card_prompts(card, resume_analysis)
@@ -496,16 +497,21 @@ class CampusInterviewEngine:
         targeted.extend(str(item) for item in resume_analysis.get("metric_questions") or [])
         targeted.extend(str(item) for item in resume_analysis.get("tech_choice_questions") or [])
         targeted.extend(str(item) for item in resume_analysis.get("incident_questions") or [])
+        targeted.extend(str(item) for item in resume_analysis.get("evidence_questions") or [])
         targeted.extend(
             f"你简历里的「{item}」比较模糊，请用事实、指标或代码细节解释它到底代表什么。"
             for item in resume_analysis.get("vague_claims") or []
         )
+        targeted.extend(
+            f"我会把这个当成风险点追问：{item}"
+            for item in resume_analysis.get("project_risk_flags") or []
+        )
         followups = [
-            "你在这个项目中的个人贡献和不可替代部分是什么？请区分团队成果和你自己的工作。",
-            f"围绕{focus[0]}和{focus[1]}，当时还有哪些备选方案？为什么没有选它们？",
-            "这个项目上线或验收后，核心指标怎么变化？你如何证明变化来自你的方案？",
-            f"如果面试官质疑{focus[2]}或{focus[3]}，你会怎么解释边界条件和风险兜底？",
-            "项目中有没有线上故障、压测瓶颈或需求变更？你当时怎么定位、恢复和复盘？",
+            "先别讲团队整体成果。这个项目里你本人独立负责的设计、编码、联调、上线动作分别是什么？",
+            f"围绕{focus[0]}和{focus[1]}，当时有哪些备选方案？请说清为什么放弃更简单或更稳的方案。",
+            "你说的效果怎么证明？请给出指标来源、统计窗口、上线前基线、上线后对比和归因方式。",
+            f"如果我质疑{focus[2]}或{focus[3]}是包装出来的，你能拿什么事实、日志、代码或监控证明？",
+            "项目有没有线上故障、压测瓶颈或需求变更？请按现象、根因、恢复、长期改进复盘。",
         ]
         followups = list(dict.fromkeys(self._style_followups(session, {"phase": "project"}) + targeted + followups))
         return followups[step % len(followups):] + followups[:step % len(followups)]
@@ -521,9 +527,10 @@ class CampusInterviewEngine:
             ]
         if style == "resume_truth_probe":
             return [
-                "这部分是你本人做的吗？请拆成设计、编码、联调、上线和复盘动作。",
-                "指标从哪里来？统计口径、基线、上线后对比和归因方式分别是什么？",
-                "当时有没有故障或负反馈？请说根因、恢复动作和长期改进。",
+                "这部分是你本人做的吗？请拆成设计、编码、联调、上线和复盘动作，别把团队成果混进来。",
+                "指标从哪里来？统计口径、时间窗口、基线、上线后对比和归因方式分别是什么？",
+                "如果我让你打开 PR、日志、监控或压测报告，你会用哪一项证明这个结论？",
+                "当时有没有故障或负反馈？请说现象、影响范围、根因、恢复动作和长期改进。",
             ]
         if style == "system_design":
             return [
@@ -560,27 +567,27 @@ class CampusInterviewEngine:
             (
                 f"继续深挖「{name}」："
                 f"{'你写到「' + contribution + '」，' if contribution else ''}"
-                "请拆出你自己的设计、编码、联调、上线和复盘动作，哪些不是团队其他人完成的？"
+                "请按时间线拆出你自己的设计、编码、联调、上线和复盘动作，哪些不是团队其他人完成的？"
             ),
             (
                 f"「{name}」的技术选型依据是什么？"
                 f"{'简历里相关表述是「' + choice + '」。' if choice else ''}"
-                "当时至少有哪些替代方案，分别为什么没选？"
+                "当时至少有哪些替代方案？请比较复杂度、稳定性、交付成本和可回滚性，分别说明为什么没选。"
             ),
             (
                 f"「{name}」的效果怎么证明？"
                 f"{'你写到「' + metric + '」，' if metric else ''}"
-                "请说明指标来源、统计口径、上线前基线、上线后对比和归因方式。"
+                "请说明指标来源、统计口径、时间窗口、上线前基线、上线后对比和归因方式。"
             ),
             (
                 f"「{name}」如果在真实线上环境出问题，最可能的故障点是什么？"
                 f"{'你简历里提到「' + incident + '」，' if incident else ''}"
-                "请讲一次排查、恢复、兜底和复盘改进。"
+                "请按现象、影响范围、排查路径、恢复动作、兜底和长期改进讲一次复盘。"
             ),
             (
                 f"「{name}」里有没有包装过度或边界不清的表述？"
                 f"{'比如「' + vague + '」。' if vague else ''}"
-                "请把它改成面试官可验证的事实、证据和代码/数据细节。"
+                "请把它改成面试官可验证的事实、证据和代码/数据细节，比如 PR、日志、压测报告或监控看板。"
             ),
         ]
 
@@ -666,7 +673,7 @@ class CampusInterviewEngine:
             - pressure_penalty
             - quality_penalty
         )
-        score_cap = self._rubric_score_cap(rubric_hits or [], question_meta)
+        score_cap = self._rubric_score_cap(answer, rubric_hits or [], question_meta)
         min_score = 38 if self._looks_like_keyword_stuffing(answer, question_meta) else 25
         return round(
             max(
@@ -686,7 +693,7 @@ class CampusInterviewEngine:
         missing = max(len(rubrics) - len(rubric_hits), 0)
         return missing * 8
 
-    def _rubric_score_cap(self, rubric_hits: list[str], question_meta: dict | None) -> int:
+    def _rubric_score_cap(self, answer: str, rubric_hits: list[str], question_meta: dict | None) -> int:
         rubrics = list((question_meta or {}).get("rubric") or [])
         if not rubrics:
             return 95
@@ -694,6 +701,8 @@ class CampusInterviewEngine:
         if missing <= 0:
             return 95
         if missing == 1:
+            if any(marker in answer for marker in ["没有整理出明确的基线", "没有特别记录", "只能说体感"]):
+                return 72
             return 82
         if missing == 2:
             return 68
@@ -710,6 +719,9 @@ class CampusInterviewEngine:
             penalty += 15
         if "不需要考虑" in answer and any(word in answer for word in ["边界", "失败", "验证", "风险"]):
             penalty += 10
+        weak_evidence_markers = ["没有特别记录", "只能说体感", "用户反馈更快", "看几个问题回答得还可以"]
+        if any(marker in answer for marker in weak_evidence_markers):
+            penalty += 12
         return min(penalty, 45)
 
     def _closing_feedback(self, answer: str) -> str:
@@ -757,11 +769,31 @@ class CampusInterviewEngine:
             keywords = self._rubric_keywords(str(rubric))
             if len(keywords) <= 3 or any(word in str(rubric) for word in ["场景", "举出", "方案"]):
                 keywords += followup_keywords
-            if keywords and any(keyword.lower() in normalized_answer for keyword in keywords):
+            if keywords and any(keyword.lower() in normalized_answer for keyword in keywords) and not self._negates_rubric(answer, label):
                 hits.append(label)
             else:
                 gaps.append(label)
         return hits, gaps
+
+    def _negates_rubric(self, answer: str, label: str) -> bool:
+        negation_markers = ["没有", "没", "缺少", "只能说", "还缺少", "没有整理", "没有特别记录", "不清楚"]
+        if not any(marker in answer for marker in negation_markers):
+            return False
+        if any(token in label for token in ["指标", "口径", "验证", "基线", "对比", "评测"]):
+            return any(
+                phrase in answer
+                for phrase in [
+                    "没有整理出明确的基线",
+                    "没有特别记录",
+                    "没有做得很复杂",
+                    "缺少具体指标",
+                    "还缺少具体指标",
+                    "只能说体感",
+                ]
+            )
+        if any(token in label for token in ["故障", "复盘", "风险"]):
+            return "没什么大的故障" in answer or "后面注意一下" in answer
+        return False
 
     def _looks_like_keyword_stuffing(self, answer: str, question_meta: dict | None) -> bool:
         text = answer.strip()
@@ -854,7 +886,50 @@ class CampusInterviewEngine:
             "问题",
             "影响",
         }
-        return [item for item in keywords if item not in stop_words][:8]
+        enriched: list[str] = []
+        for item in keywords:
+            if item not in stop_words:
+                enriched.append(item)
+        enriched.extend(self._rubric_synonyms(rubric))
+        return list(dict.fromkeys(enriched))[:18]
+
+    def _rubric_synonyms(self, rubric: str) -> list[str]:
+        mapping = {
+            "业务背景": ["背景", "目标", "瓶颈", "活动期", "慢查询", "P95", "P99"],
+            "瓶颈": ["慢查询", "命中率", "P95", "P99", "QPS", "连接池"],
+            "个人贡献": ["本人负责", "我负责", "个人贡献", "设计", "实现", "联调", "上线", "不把", "团队成果"],
+            "团队成果": ["团队", "本人", "我负责", "不是", "不把"],
+            "技术选型": ["比较过", "替代方案", "最后选", "取舍", "复杂度", "稳定性", "交付成本"],
+            "替代方案": ["比较过", "只改", "本地缓存", "分布式缓存", "扩容", "为什么"],
+            "指标口径": ["指标来自", "统计口径", "窗口", "基线", "上线前", "上线后", "P95", "P99", "Prometheus"],
+            "验证方式": ["压测", "监控", "日志", "看板", "上线前", "上线后", "对比"],
+            "故障风险": ["风险", "击穿", "脏读", "告警", "降级", "兜底", "重试"],
+            "复盘": ["复盘", "长期改进", "恢复", "回滚", "根因"],
+            "故障现象": ["现象", "告警", "miss", "暴涨", "慢 SQL", "P99", "影响"],
+            "影响范围": ["影响范围", "QPS", "连接池", "接口", "MySQL"],
+            "发现方式": ["告警", "慢 SQL", "监控", "看板"],
+            "根因": ["根因", "确认", "集中失效", "过期", "TTL"],
+            "排查动作": ["排查", "命中率", "过期分布", "连接池", "指标"],
+            "恢复": ["恢复", "限流", "预热", "回滚", "降级", "补偿"],
+            "长期改进": ["长期改进", "抖动", "分批", "看板", "告警", "复盘"],
+            "评测集来源": ["历史工单", "人工构造", "分层", "基线"],
+            "召回率": ["Top5", "召回率", "正确率", "引用准确率", "幻觉率", "P95", "token 成本"],
+            "误判案例": ["误判", "召回不到", "Rerank", "编答案", "灰度", "人工", "点踩"],
+            "人工复核": ["人工", "灰度", "低置信度", "复盘集"],
+            "切分": ["切分", "BM25", "向量", "混合召回", "Rerank", "Prompt", "引用"],
+            "本地存储": ["本机", "SQLite", "本地", "第三方", "显式配置"],
+            "隐私边界": ["边界", "本机", "第三方", "provider", "离开本机"],
+            "幂等提交": ["request_id", "重试", "重复推进", "恢复"],
+            "重启恢复": ["重启", "恢复", "SQLite", "历史 turn"],
+            "损坏诊断": ["integrity_check", "schema", "诊断", "data 目录"],
+            "敏感字段": ["API key", "脱敏", "清空历史", "提示"],
+            "诊断报告": ["诊断", "报告", "权限", "schema"],
+        }
+        synonyms: list[str] = []
+        for key, values in mapping.items():
+            if key in rubric:
+                synonyms.extend(values)
+        return synonyms
 
     def _focus_tags(self, session: InterviewSession) -> list[str]:
         meta_tags = (session.current_question_meta or {}).get("tags") or []
@@ -962,7 +1037,8 @@ class CampusInterviewEngine:
             return [
                 "用一句话说明业务目标和你负责的模块。",
                 "把团队成果拆成你自己的设计、编码、联调、上线动作。",
-                f"补充“{focus}”，并给出指标来源、基线和上线后对比。",
+                f"补充“{focus}”，并给出指标来源、统计窗口、基线和上线后对比。",
+                "用 PR、日志、压测报告或监控看板说明这个贡献可验证。",
                 "最后说明一次故障、风险兜底或复盘改进。",
             ]
         if phase == "system_design":
@@ -1094,7 +1170,7 @@ class CampusInterviewEngine:
                 "一句话说明项目目标和业务背景",
                 "明确自己的职责和关键贡献",
                 "讲清核心方案、备选方案和取舍原因",
-                "给出量化结果、验证方式和复盘改进",
+                "给出量化结果、统计口径、证据来源和复盘改进",
             ]
         if phase == "system_design":
             return [
@@ -1119,7 +1195,8 @@ class CampusInterviewEngine:
                 "可以这样答：这个项目的目标是解决一个明确的业务或效率问题。"
                 "我负责其中的核心链路，包括方案设计、关键实现和上线验证。"
                 "当时比较过至少两种方案，最终选择当前方案是因为它在复杂度、稳定性和交付成本之间更平衡。"
-                f"针对“{focus}”，我会补充具体指标，例如延迟、错误率、吞吐或人工成本变化，并说明如何监控和复盘。"
+                f"针对“{focus}”，我会补充具体指标，例如延迟、错误率、吞吐或人工成本变化，"
+                "说明统计窗口、基线、上线后对比，以及能验证个人贡献的 PR、日志或监控证据。"
             )
         if phase == "system_design":
             return (
@@ -1218,7 +1295,8 @@ class CampusInterviewEngine:
             return (
                 "参考结构：先用一句话说明项目背景和目标，再明确自己负责的模块、关键动作和交付边界。"
                 "接着对比至少两个技术方案，解释选择依据和放弃原因。"
-                f"围绕“{rubric_text}”补充核心实现、指标来源、上线验证、故障风险和复盘改进。"
+                f"围绕“{rubric_text}”补充核心实现、指标来源、统计口径、上线验证、"
+                "可验证证据、故障风险和复盘改进。"
             )
         if phase == "system_design":
             return (
