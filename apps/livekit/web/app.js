@@ -3,6 +3,7 @@ let room = null;
 let sessionId = null;
 let muted = false;
 let micTracks = [];
+let utterance = null;
 const status = (text) => { $("status").textContent = text; };
 const message = (who, text) => {
   const p = document.createElement("p");
@@ -23,6 +24,8 @@ async function disconnect() {
   micTracks.forEach((track) => track.stop());
   micTracks = [];
   $("audio").replaceChildren();
+  $("live-transcript").textContent = "";
+  utterance = null;
   $("start").disabled = false;
   $("leave").disabled = true;
   $("mute").disabled = true;
@@ -50,6 +53,15 @@ $("start").onclick = async () => {
       }
     });
     next.on(LivekitClient.RoomEvent.DataReceived, (data, participant, kind, topic) => {
+      if (room !== next) return;
+      if (topic === "openinterview.transcript") {
+        const event = JSON.parse(new TextDecoder().decode(data));
+        if (event.type === "speech_start") utterance = event.utterance;
+        if (event.utterance !== utterance) return;
+        $("live-transcript").textContent = event.text
+          ? `${event.type === "partial" ? "识别中（可能修正）" : "已识别"}：${event.text}` : "正在听……";
+        return;
+      }
       if (topic !== "openinterview.turn") return;
       const event = JSON.parse(new TextDecoder().decode(data));
       message("我", event.answer);

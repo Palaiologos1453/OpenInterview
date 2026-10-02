@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import binascii
+from copy import deepcopy
 import json
 from pathlib import Path
 from time import perf_counter
@@ -48,6 +49,7 @@ from .schemas import (
     ResumeAnalyzeRequest,
     TTSRequest,
     TurnRequest,
+    TurnPreviewRequest,
     TurnResponse,
     UserCreateRequest,
     VADRequest,
@@ -240,6 +242,22 @@ def answer_turn(session_id: str, request: TurnRequest) -> dict:
         return payload
 
 
+@app.post("/v1/interviews/{session_id}/preview")
+def preview_turn(session_id: str, request: TurnPreviewRequest) -> dict:
+    # Speculative answers never advance the real session or persist scores.
+    with session_store.session_lock(session_id):
+        session = _get_session(session_id)
+        if session.turn_index != request.expected_turn_index:
+            raise HTTPException(409, "Interview changed; discard speculative work.")
+        snapshot = deepcopy(session)
+    try:
+        result = engine.answer(snapshot, request.answer)
+    except RuntimeError as exc:
+        raise HTTPException(409, str(exc)) from exc
+    return {"base_turn_index": request.expected_turn_index,
+            "next_question": result["next_question"], "is_finished": result["is_finished"]}
+
+
 @app.get("/v1/interviews/{session_id}/report", response_model=ReportResponse)
 def report(session_id: str) -> dict:
     record = storage.get_interview(session_id)
@@ -420,8 +438,9 @@ def speech_to_text(request: ASRRequest) -> dict:
         with trace.span("asr.transcribe", provider=request.provider_config.asr.provider):
             text = adapter.transcribe(model_input, language=request.provider_config.asr.language)
         timings["asr_ms"] = _elapsed_ms(span_started)
-        storage.save_transcript(text, source=request.provider_config.asr.provider)
-        storage.save_trace(trace.as_dict())
+        if request.persist:
+            storage.save_transcript(text, source=request.provider_config.asr.provider)
+            storage.save_trace(trace.as_dict())
     except HTTPException:
         raise
     except NotImplementedError as exc:

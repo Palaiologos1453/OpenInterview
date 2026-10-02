@@ -23,19 +23,28 @@ class InterviewBackend:
             "answer": text, "request_id": request_id,
         })
 
-    async def recognize(self, data: bytes, sample_rate: int, channels: int) -> str:
+    async def preview(self, interview_id, text, turn_index):
+        return await self.post(f"/v1/interviews/{interview_id}/preview", {
+            "answer": text, "expected_turn_index": turn_index,
+        })
+
+    async def recognize(self, data: bytes, sample_rate: int, channels: int, *, persist=True) -> str:
         result = await self.post("/v1/asr/transcribe", {
             "audio_base64": base64.b64encode(data).decode("ascii"),
             "filename": "speech.pcm", "audio_encoding": "pcm_s16le",
             "sample_rate": sample_rate, "channels": channels,
             "provider_config": LOCAL_PROVIDERS,
+            "persist": persist,
         })
         return result["text"]
 
     async def speech(self, text):
         completed = False
+        # Bank prompts append optional follow-up directions on later lines.
+        # Ask the main question first instead of reading every hint at once.
+        spoken_text = text.strip().split("\n", 1)[0]
         async with self.client.stream("POST", "/v1/tts/speech/stream", json={
-            "text": text, "provider_config": LOCAL_PROVIDERS,
+            "text": spoken_text, "provider_config": LOCAL_PROVIDERS,
         }) as response:
             response.raise_for_status()
             async for line in response.aiter_lines():

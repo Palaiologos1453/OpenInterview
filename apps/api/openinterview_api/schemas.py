@@ -71,6 +71,11 @@ class TurnRequest(BaseModel):
     request_id: str | None = Field(default=None, min_length=1, max_length=120)
 
 
+class TurnPreviewRequest(BaseModel):
+    answer: str = Field(min_length=1, max_length=20000)
+    expected_turn_index: int = Field(ge=0)
+
+
 class TurnResponse(BaseModel):
     session_id: str
     turn_index: int
@@ -111,6 +116,7 @@ class ASRRequest(BaseModel):
     sample_rate: int = Field(default=16000, ge=8000, le=48000)
     channels: int = Field(default=1, ge=1, le=2)
     provider_config: ProviderSettings = Field(default_factory=ProviderSettings)
+    persist: bool = True
 
 
 class ASRResponse(BaseModel):

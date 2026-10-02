@@ -14,6 +14,8 @@ from livekit.agents.voice import room_io  # noqa: E402
 from backend import InterviewBackend  # noqa: E402
 from local_config import AGENT_NAME, load_config  # noqa: E402
 from local_plugins import LocalCosyVoice, LocalSenseVoice  # noqa: E402
+from incremental_stt import IncrementalSenseVoice  # noqa: E402
+from speculation import ReplyPreparation  # noqa: E402
 
 logger = logging.getLogger("openinterview.livekit")
 
@@ -25,7 +27,21 @@ class InterviewAgent(Agent):
         self.metadata = metadata
         self.room = room
         self.finished = False
+        self.output_tts = LocalCosyVoice(backend)
         self.turn_lock = asyncio.Lock()
+        self.preparation = ReplyPreparation(backend, metadata["session_id"],
+            enabled=os.environ.get("OPENINTERVIEW_VOICE_PREFETCH", "1") != "0")
+
+    async def observe_transcript(self, event):
+        if event["type"] == "partial" and not self.finished:
+            self.preparation.observe(event["text"])
+        await self.room.local_participant.publish_data(json.dumps(event, ensure_ascii=False),
+            reliable=True, topic="openinterview.transcript")
+
+    async def close(self):
+        await self.preparation.close()
+        if self.output_tts.prepared:
+            await self.output_tts.prepared.close()
 
     async def on_enter(self):
         self.session.say(self.metadata["next_question"])
@@ -45,14 +61,20 @@ class InterviewAgent(Agent):
         if not text or self.finished:
             raise StopResponse()
         async with self.turn_lock:
+            await self.preparation.seal()
             result = await self.backend.answer(self.metadata["session_id"], text, new_message.id)
+            prepared = await self.preparation.take(result)
+            if self.session.tts.prepared:
+                await self.session.tts.prepared.close()
+            self.session.tts.prepared = prepared
             self.finished = result["is_finished"]
             await self.room.local_participant.publish_data(
-                json.dumps({"type": "turn", "answer": text, "turn": result}, ensure_ascii=False),
+                json.dumps({"type": "turn", "answer": text, "turn": result,
+                    "pipeline_metrics": self.preparation.metrics}, ensure_ascii=False),
                 reliable=True, topic="openinterview.turn",
             )
             self.session.say(result["next_question"] or "本次面试已结束，可以查看报告。")
-        # No cloud model, no extra inference or speculative scoring.
+        # Only the final answer advances the interview; previews used a copy.
         raise StopResponse()
 
 
@@ -60,12 +82,19 @@ async def entrypoint(ctx: JobContext):
     config = load_config()
     metadata = json.loads(ctx.job.metadata)
     backend = InterviewBackend(config["api_url"])
-    ctx.add_shutdown_callback(backend.close)
     await ctx.connect()
     await ctx.wait_for_participant()
-    vad = silero.VAD.load(min_silence_duration=0.8, force_cpu=True)
+    vad = silero.VAD.load(min_silence_duration=0.8, max_buffered_speech=120, force_cpu=True)
+    agent = InterviewAgent(backend, metadata, ctx.room)
+    async def cleanup():
+        await agent.close()
+        await backend.close()
+
+    ctx.add_shutdown_callback(cleanup)
+    recognizer = (IncrementalSenseVoice(backend, vad, agent.observe_transcript)
+        if os.environ.get("OPENINTERVIEW_INCREMENTAL_ASR", "1") != "0" else LocalSenseVoice(backend))
     session = AgentSession(
-        stt=LocalSenseVoice(backend), tts=LocalCosyVoice(backend), vad=vad,
+        stt=recognizer, tts=agent.output_tts, vad=vad,
         # SDK AEC warmup otherwise replaces early overlapping speech with
         # silence, clipping the beginning of an immediate candidate answer.
         # Browser capture requests AEC; headset input requires no discard window.
@@ -75,7 +104,7 @@ async def entrypoint(ctx: JobContext):
             "preemptive_generation": {"enabled": False}},
     )
     session.on("error", lambda event: logger.error("Local voice error: %s", event))
-    await session.start(agent=InterviewAgent(backend, metadata, ctx.room), room=ctx.room, record=False, session_host=False,
+    await session.start(agent=agent, room=ctx.room, record=False, session_host=False,
         room_options=room_io.RoomOptions(audio_input=room_io.AudioInputOptions(sample_rate=16000), text_input=False))
 
 

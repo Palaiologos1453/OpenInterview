@@ -10,6 +10,7 @@ from ..settings import default_asr_model_dir
 
 _MODEL_CACHE: dict[tuple[str, str], object] = {}
 _MODEL_LOCK = threading.Lock()
+_INFERENCE_LOCKS: dict[int, threading.Lock] = {}
 
 
 @dataclass
@@ -65,13 +66,15 @@ class SenseVoiceASR:
 
     def _transcribe_with_device(self, auto_model, model_dir: Path, audio_path: Path, language: str, device: str) -> str:
         model = _cached_model(auto_model, model_dir, device)
-        result = model.generate(
-            input=str(audio_path),
-            language=_sensevoice_language(language),
-            use_itn=True,
-            batch_size_s=60,
-            merge_vad=True,
-        )
+        with _MODEL_LOCK:
+            inference_lock = _INFERENCE_LOCKS.setdefault(id(model), threading.Lock())
+        # FunASR's shared model/frontend is not assumed reentrant. Partial and
+        # final requests may overlap even after an HTTP client cancels a request.
+        with inference_lock:
+            result = model.generate(
+                input=str(audio_path), language=_sensevoice_language(language),
+                use_itn=True, batch_size_s=60, merge_vad=True,
+            )
         return _extract_text(result)
 
 

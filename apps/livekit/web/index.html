@@ -23,6 +23,7 @@
   <textarea id="resume" placeholder="可选：粘贴简历或项目描述，仅在本机处理"></textarea>
   <div><button id="start">开始本地面试</button><button id="mute" disabled>暂停麦克风</button><button id="leave" disabled>结束通话</button><button id="get-report" disabled>查看报告</button></div>
   <p id="status" role="status">正在检查本地服务……</p>
+  <p id="live-transcript" aria-live="polite"></p>
   <section id="conversation" aria-live="polite"></section><pre id="report"></pre><div id="audio"></div>
 </main>
 <script src="/vendor/livekit-client.umd.js"></script><script src="/app.js"></script>

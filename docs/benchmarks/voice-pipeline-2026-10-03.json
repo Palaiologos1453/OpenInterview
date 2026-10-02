@@ -1,0 +1,186 @@
+{
+  "date": "2026-10-03",
+  "fixture_sha256": "f5d4fecab90e2dfa495f944af288edfce227b71410d774436e138ec68b3b0276",
+  "scope": "Same synthetic candidate recording, local WebRTC, warmed models, interruption during initial question. Event receipt timestamps; not physical audible latency. Small sequential comparison, no p95.",
+  "full_question_control": [
+    {
+      "ok": true,
+      "transport": "real local WebRTC",
+      "model_calls": "local SenseVoice and CosyVoice",
+      "first_agent_audio_after_join_ms": 3645.25,
+      "turn_result_after_candidate_playout_ms": 910.94,
+      "reply_audio_after_candidate_playout_ms": 5478.78,
+      "received_non_silent_audio_frames": 129,
+      "first_partial_after_speech_start_ms": null,
+      "partials_before_speech_end": 0,
+      "pipeline_metrics": {
+        "preview_calls": 0,
+        "prefetch_started": 0,
+        "prefetch_hits": 0,
+        "prefetch_misses": 0
+      },
+      "recognized_answer": "我负责订单系统的缓存优化，使用radis和myql，通过压测验证延迟降低30%。",
+      "persisted_turns": 1
+    },
+    {
+      "ok": true,
+      "transport": "real local WebRTC",
+      "model_calls": "local SenseVoice and CosyVoice",
+      "first_agent_audio_after_join_ms": 3031.03,
+      "turn_result_after_candidate_playout_ms": 930.46,
+      "reply_audio_after_candidate_playout_ms": 7297.86,
+      "received_non_silent_audio_frames": 121,
+      "first_partial_after_speech_start_ms": null,
+      "partials_before_speech_end": 0,
+      "pipeline_metrics": {
+        "preview_calls": 0,
+        "prefetch_started": 0,
+        "prefetch_hits": 0,
+        "prefetch_misses": 0
+      },
+      "recognized_answer": "我负责订单系统的缓存优化，使用radis和myCql，通过压测验证延迟降低30%。",
+      "persisted_turns": 1
+    }
+  ],
+  "full_question_pipeline": [
+    {
+      "ok": true,
+      "transport": "real local WebRTC",
+      "model_calls": "local SenseVoice and CosyVoice",
+      "first_agent_audio_after_join_ms": 3350.66,
+      "turn_result_after_candidate_playout_ms": 851.02,
+      "reply_audio_after_candidate_playout_ms": 3783.09,
+      "received_non_silent_audio_frames": 134,
+      "first_partial_after_speech_start_ms": 1996.24,
+      "partials_before_speech_end": 5,
+      "pipeline_metrics": {
+        "preview_calls": 2,
+        "prefetch_started": 1,
+        "prefetch_hits": 1,
+        "prefetch_misses": 0
+      },
+      "recognized_answer": "我负责订单系统的缓存优化，使用radis和myql，通过压测验证延迟降低30%。",
+      "persisted_turns": 1
+    },
+    {
+      "ok": true,
+      "transport": "real local WebRTC",
+      "model_calls": "local SenseVoice and CosyVoice",
+      "first_agent_audio_after_join_ms": 3658.72,
+      "turn_result_after_candidate_playout_ms": 916.58,
+      "reply_audio_after_candidate_playout_ms": 6743.09,
+      "received_non_silent_audio_frames": 117,
+      "first_partial_after_speech_start_ms": 1510.97,
+      "partials_before_speech_end": 5,
+      "pipeline_metrics": {
+        "preview_calls": 2,
+        "prefetch_started": 1,
+        "prefetch_hits": 1,
+        "prefetch_misses": 0
+      },
+      "recognized_answer": "我负责订单系统的缓存优化，使用radis和myCql，通过压测验证延迟降低30%。",
+      "persisted_turns": 1
+    },
+    {
+      "ok": true,
+      "transport": "real local WebRTC",
+      "model_calls": "local SenseVoice and CosyVoice",
+      "first_agent_audio_after_join_ms": 3034.63,
+      "turn_result_after_candidate_playout_ms": 878.88,
+      "reply_audio_after_candidate_playout_ms": 5497.34,
+      "received_non_silent_audio_frames": 118,
+      "first_partial_after_speech_start_ms": 1518.75,
+      "partials_before_speech_end": 5,
+      "pipeline_metrics": {
+        "preview_calls": 2,
+        "prefetch_started": 1,
+        "prefetch_hits": 1,
+        "prefetch_misses": 0
+      },
+      "recognized_answer": "我负责订单系统的缓存优化，使用radis和myCql，通过压测验证延迟降低30%。",
+      "persisted_turns": 1
+    }
+  ],
+  "main_question_control": [
+    {
+      "ok": true,
+      "transport": "real local WebRTC",
+      "model_calls": "local SenseVoice and CosyVoice",
+      "first_agent_audio_after_join_ms": 3331.19,
+      "turn_result_after_candidate_playout_ms": 841.87,
+      "reply_audio_after_candidate_playout_ms": 3090.71,
+      "received_non_silent_audio_frames": 115,
+      "first_partial_after_speech_start_ms": null,
+      "partials_before_speech_end": 0,
+      "pipeline_metrics": {
+        "preview_calls": 0,
+        "prefetch_started": 0,
+        "prefetch_hits": 0,
+        "prefetch_misses": 0
+      },
+      "recognized_answer": "我负责订单系统的缓存优化，使用radis和myql，通过压测验证延迟降低30%。",
+      "persisted_turns": 1
+    },
+    {
+      "ok": true,
+      "transport": "real local WebRTC",
+      "model_calls": "local SenseVoice and CosyVoice",
+      "first_agent_audio_after_join_ms": 3105.05,
+      "turn_result_after_candidate_playout_ms": 814.86,
+      "reply_audio_after_candidate_playout_ms": 3431.46,
+      "received_non_silent_audio_frames": 132,
+      "first_partial_after_speech_start_ms": null,
+      "partials_before_speech_end": 0,
+      "pipeline_metrics": {
+        "preview_calls": 0,
+        "prefetch_started": 0,
+        "prefetch_hits": 0,
+        "prefetch_misses": 0
+      },
+      "recognized_answer": "我负责订单系统的缓存优化，使用radis和myCql，通过压测验证延迟降低30%。",
+      "persisted_turns": 1
+    }
+  ],
+  "main_question_pipeline": [
+    {
+      "ok": true,
+      "transport": "real local WebRTC",
+      "model_calls": "local SenseVoice and CosyVoice",
+      "first_agent_audio_after_join_ms": 3646.06,
+      "turn_result_after_candidate_playout_ms": 847.98,
+      "reply_audio_after_candidate_playout_ms": 1051.38,
+      "received_non_silent_audio_frames": 225,
+      "first_partial_after_speech_start_ms": 1512.89,
+      "partials_before_speech_end": 5,
+      "pipeline_metrics": {
+        "preview_calls": 2,
+        "prefetch_started": 1,
+        "prefetch_hits": 1,
+        "prefetch_misses": 0
+      },
+      "recognized_answer": "我负责订单系统的缓存优化，使用radis和myCql，通过压测验证延迟降低30%。",
+      "persisted_turns": 1
+    },
+    {
+      "ok": true,
+      "transport": "real local WebRTC",
+      "model_calls": "local SenseVoice and CosyVoice",
+      "first_agent_audio_after_join_ms": 2962.55,
+      "turn_result_after_candidate_playout_ms": 856.01,
+      "reply_audio_after_candidate_playout_ms": 1005.58,
+      "received_non_silent_audio_frames": 218,
+      "first_partial_after_speech_start_ms": 1522.42,
+      "partials_before_speech_end": 5,
+      "pipeline_metrics": {
+        "preview_calls": 2,
+        "prefetch_started": 1,
+        "prefetch_hits": 1,
+        "prefetch_misses": 0
+      },
+      "recognized_answer": "我负责订单系统的缓存优化，使用radis和myCql，通过压测验证延迟降低30%。",
+      "persisted_turns": 1
+    }
+  ],
+  "interview_engine_sha256": "706072be7f02909196c6fb7f8c4c99966136c5eeab0e5410a0fc74a4aa96e2b4",
+  "preexisting_local_interview_engine_edits": true
+}

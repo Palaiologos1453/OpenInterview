@@ -23,6 +23,15 @@ class LocalOnlyTests(unittest.TestCase):
 
 
 class LocalPluginsTests(unittest.IsolatedAsyncioTestCase):
+    async def test_speech_reads_main_question_without_optional_followups(self):
+        def handle(request):
+            self.assertEqual(json.loads(request.content)["text"], "请解释事务隔离。")
+            return httpx.Response(200, text='{"type":"done"}\n')
+        backend = InterviewBackend("http://127.0.0.1", transport=httpx.MockTransport(handle))
+        try:
+            _ = [chunk async for chunk in backend.speech("请解释事务隔离。\n追问方向：并发与锁。")]
+        finally:
+            await backend.close()
     async def test_stt_forces_local_provider_and_sends_pcm(self):
         def handle(request):
             body = json.loads(request.content)

@@ -40,6 +40,7 @@ class LocalCosyVoice(tts.TTS):
         # emits audio immediately; it does not wait for a complete WAV file.
         super().__init__(capabilities=tts.TTSCapabilities(streaming=False), sample_rate=24000, num_channels=1)
         self.backend = backend
+        self.prepared = None
 
     @property
     def model(self):
@@ -50,14 +51,23 @@ class LocalCosyVoice(tts.TTS):
         return "local"
 
     def synthesize(self, text, *, conn_options=NO_RETRY):
-        return _Speech(tts=self, input_text=text, conn_options=NO_RETRY)
+        stream = _Speech(tts=self, input_text=text, conn_options=NO_RETRY)
+        if self.prepared and self.prepared.question == text:
+            stream.prepared, self.prepared = self.prepared, None
+        return stream
 
 
 class _Speech(tts.ChunkedStream):
+    prepared = None
+
     async def _run(self, output_emitter):
         output_emitter.initialize(request_id=uuid4().hex, sample_rate=24000,
             num_channels=1, mime_type="audio/pcm", frame_size_ms=20, stream=False)
-        async for event in self._tts.backend.speech(self._input_text):
-            if event["sample_rate"] != 24000:
-                raise ValueError("This adapter expects the CosyVoice3 24 kHz model")
-            output_emitter.push(base64.b64decode(event["data"], validate=True))
+        stream = self.prepared.events() if self.prepared else self._tts.backend.speech(self._input_text)
+        try:
+            async for event in stream:
+                if event["sample_rate"] != 24000:
+                    raise ValueError("This adapter expects the CosyVoice3 24 kHz model")
+                output_emitter.push(base64.b64decode(event["data"], validate=True))
+        finally:
+            await stream.aclose()
