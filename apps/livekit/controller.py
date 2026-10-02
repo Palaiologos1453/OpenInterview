@@ -4,6 +4,9 @@ from datetime import timedelta
 import json
 from pathlib import Path
 from uuid import uuid4
+from typing import Literal
+
+import httpx
 
 from fastapi import FastAPI, HTTPException
 from fastapi.staticfiles import StaticFiles
@@ -37,6 +40,8 @@ class JoinRequest(BaseModel):
     difficulty_id: str = "campus"
     mode_id: str = "fundamentals"
     resume_text: str = Field(default="", max_length=20000)
+    interview_strategy: Literal["rules", "semantic"] = "semantic"
+    llm: dict | None = None
 
 
 @app.get("/health")
@@ -45,7 +50,7 @@ async def health():
         await app.state.livekit.room.list_rooms(api.ListRoomsRequest())
         response = await app.state.backend.client.get("/health")
         response.raise_for_status()
-        return {"ok": True, "local_only": True}
+        return {"ok": True, "audio_local": True, "cloud_llm_optional": True}
     except Exception as exc:
         raise HTTPException(503, detail=str(exc)) from exc
 
@@ -59,14 +64,24 @@ async def join(request: JoinRequest):
                 raise HTTPException(409, "已有本地面试，请先结束当前连接。")
             app.state.active = None
         backend = app.state.backend
+        providers = {**LOCAL_PROVIDERS}
+        if request.interview_strategy == "semantic":
+            settings = request.llm or {}
+            if not all(str(settings.get(key) or "").strip() for key in ("api_base", "model", "api_key")):
+                raise HTTPException(400, "请填写云端 LLM 的 API Base、Model 和 API Key。")
+            providers["llm"] = {"provider": "openai_compatible", "temperature": 0.1,
+                **{key: settings[key] for key in ("api_base", "model", "api_key")}}
         # Prewarm before the timed conversation starts. No cloud calls.
         await asyncio.gather(
             backend.post("/v1/tts/warmup", {"text": "预热", "provider_config": LOCAL_PROVIDERS}),
             backend.post("/v1/asr/warmup", {}),
         )
-        interview = await backend.post("/v1/interviews", {
-            **request.model_dump(), "provider_config": LOCAL_PROVIDERS,
-        })
+        try:
+            interview = await backend.post("/v1/interviews", {
+                **request.model_dump(exclude={"llm"}), "provider_config": providers,
+            })
+        except httpx.HTTPStatusError as exc:
+            raise HTTPException(400, "创建面试失败，请检查方向、模式和云端模型配置。") from exc
         room_name = "openinterview-" + uuid4().hex
         try:
             await app.state.livekit.room.create_room(api.CreateRoomRequest(

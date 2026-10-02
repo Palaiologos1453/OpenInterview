@@ -5,6 +5,8 @@ OpenInterview 是一个面向 Java 后端和 AI 应用开发校招/实习准备�
 项目定位很明确：每个人把项目拉到自己的电脑上，启动本地 API 和静态前端，然后开始练习。文本面试默认使用本地题库和规则评分；模型 URL、模型名和 API Key 只用于可选 LLM 报告总结或语音 API。它默认不是公网 SaaS，不要求上传简历、语音或 API Key 到第三方服务端。
 
 新用户可以先看 [Quickstart](docs/quickstart.md)。
+现已提供[云端语义追问 + 本地语音](docs/cloud-semantic-interview.md)：八股与项目分别维护状态和评价，
+由用户配置的云端 LLM 决定追问。该模式会发送简历、最终回答及相关上下文；选择“离线规则练习”仍可完全本地运行。
 工程化补强说明见 [Engineering Hardening Notes](docs/engineering-hardening.md)。评分评测方法见 [Scoring Evaluation](docs/scoring-evaluation.md)，简历项目真实性追问设计见 [Resume Truth Probe](docs/resume-truth-probe.md)。
 
 当前公开入口先开放 Java 后端和 AI 应用开发。前端、测开、数据、算法、SRE、嵌入式等方向没有在目录里开放，避免题库深度不足时给用户错误预期；后续等题库质量跟上再恢复多方向入口。

@@ -36,6 +36,7 @@ configs/voice-models.local.yaml
 configs/voice-profiles.local.yaml
 configs/livekit.local.json
 configs/livekit.local.yaml
+configs/llm.local.json
 
 # Local scratch / accidental downloads
 4.10.0

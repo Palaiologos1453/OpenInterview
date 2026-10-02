@@ -15,8 +15,14 @@
   </style>
 </head>
 <body><main>
-  <h1>本地实时模拟面试</h1>
-  <p class="note">使用本机语音模型。开始后直接说话，停顿后自动提交；面试官说话时可以插话。建议佩戴耳机。</p>
+  <h1>实时模拟面试</h1>
+  <p class="note">语音在本机识别与合成；云端语义追问会向你配置的服务商发送简历、最终回答及相关上下文。建议佩戴耳机。</p>
+  <label>追问方式 <select id="strategy"><option value="semantic">云端语义追问</option><option value="rules">离线规则练习</option></select></label>
+  <fieldset><legend>云端 LLM（兼容 API，本页内存保存）</legend>
+    <label>API Base <input id="llm-base" type="url" placeholder="https://服务商地址/v1"></label>
+    <label>Model <input id="llm-model" placeholder="模型名称"></label>
+    <label>API Key <input id="llm-key" type="password" autocomplete="off"></label>
+  </fieldset>
   <label>方向 <select id="direction"><option value="backend">Java 后端</option><option value="ai_application">AI 应用开发</option></select></label>
   <label>难度 <select id="difficulty"><option value="campus">校招</option><option value="internship">实习</option><option value="bigtech">大厂</option></select></label>
   <label>模式 <select id="mode"><option value="fundamentals">单纯八股</option><option value="comprehensive">综合评估</option><option value="project_deep_dive">简历拷打</option></select></label>

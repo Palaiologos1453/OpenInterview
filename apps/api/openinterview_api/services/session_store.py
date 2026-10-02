@@ -90,7 +90,7 @@ class SQLiteBackedSessionStore:
                 if isinstance(group, dict) and group.get("api_key") == "***":
                     group["api_key"] = ""
                     redacted = True
-            if redacted:
+            if redacted and config.get("interview_strategy") != "semantic":
                 llm = provider_config.get("llm")
                 if isinstance(llm, dict):
                     llm["provider"] = "mock"
@@ -99,7 +99,8 @@ class SQLiteBackedSessionStore:
         except TypeError:
             return None
         session = InterviewSession(config=interview_config, session_id=session_id)
-        for item in self.storage.get_interview_turns(session_id):
+        stored_turns = self.storage.get_interview_turns(session_id)
+        for item in stored_turns:
             session.history.append(
                 Turn(
                     question=item["question"],
@@ -111,7 +112,18 @@ class SQLiteBackedSessionStore:
                 )
             )
         session.turn_index = len(session.history)
-        session.current_question = self.engine._select_question(session, step=session.turn_index)
+        if config.get("interview_strategy") == "semantic":
+            from .semantic_interview import initial_state
+            snapshot = (stored_turns[-1].get("payload") or {}).get("semantic_snapshot") if stored_turns else None
+            if snapshot:
+                session.semantic_state = snapshot["state"]
+                session.current_question = snapshot["question"]
+                session.current_question_meta = snapshot["question_meta"]
+            else:
+                session.semantic_state = initial_state()
+                session.current_question = self.engine._select_question(session, step=0)
+        else:
+            session.current_question = self.engine._select_question(session, step=session.turn_index)
         return session
 
 

@@ -44,6 +44,7 @@ from .schemas import (
     InterviewConfigRequest,
     InterviewStartResponse,
     LLMConnectionTestRequest,
+    LLMProviderSettings,
     ReportResponse,
     ResumeExtractResponse,
     ResumeAnalyzeRequest,
@@ -214,11 +215,13 @@ def answer_turn(session_id: str, request: TurnRequest) -> dict:
         if existing_turn and existing_turn.get("payload"):
             return existing_turn["payload"]
 
-        session = _get_session(session_id)
+        session = deepcopy(_get_session(session_id))
         trace = Trace()
         try:
             with trace.span("interview.turn", answer_chars=len(request.answer)):
                 payload = engine.answer(session, request.answer)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
         except RuntimeError as exc:
             storage.save_trace(trace.as_dict(), interview_id=session_id)
             if "already finished" in str(exc):
@@ -247,6 +250,8 @@ def preview_turn(session_id: str, request: TurnPreviewRequest) -> dict:
     # Speculative answers never advance the real session or persist scores.
     with session_store.session_lock(session_id):
         session = _get_session(session_id)
+        if session.config.interview_strategy == "semantic":
+            raise HTTPException(409, "云端语义追问只处理最终回答，不发送临时转录或预备付费调用。")
         if session.turn_index != request.expected_turn_index:
             raise HTTPException(409, "Interview changed; discard speculative work.")
         snapshot = deepcopy(session)
@@ -256,6 +261,23 @@ def preview_turn(session_id: str, request: TurnPreviewRequest) -> dict:
         raise HTTPException(409, str(exc)) from exc
     return {"base_turn_index": request.expected_turn_index,
             "next_question": result["next_question"], "is_finished": result["is_finished"]}
+
+
+@app.post("/v1/interviews/{session_id}/llm")
+def reconfigure_interview_llm(session_id: str, settings: LLMProviderSettings) -> dict:
+    from .services.semantic_interview import validate_cloud
+    config = {"llm": settings.model_dump()}
+    try:
+        validate_cloud(config)
+    except ValueError as exc:
+        raise HTTPException(400, detail=str(exc)) from exc
+    with session_store.session_lock(session_id):
+        from dataclasses import asdict
+        session = deepcopy(_get_session(session_id))
+        session.config.provider_config = {**(session.config.provider_config or {}), **config}
+        storage.update_interview_config(session_id, _redact_config(asdict(session.config)))
+        session_store.save(session)
+    return {"updated": True, "key_storage": "process_memory_only"}
 
 
 @app.get("/v1/interviews/{session_id}/report", response_model=ReportResponse)

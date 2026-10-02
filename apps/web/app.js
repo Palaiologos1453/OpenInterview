@@ -140,6 +140,7 @@ const elements = {
   difficulty: $("#difficulty"),
   mode: $("#mode"),
   interviewerStyle: $("#interviewer-style"),
+  interviewStrategy: $("#interview-strategy"),
   voiceProfile: $("#voice-profile"),
   candidateName: $("#candidate-name"),
   resume: $("#resume"),
@@ -213,7 +214,7 @@ async function init() {
     state.catalog = await fetchJson(`${API_BASE}/v1/catalog`, { timeoutMs: 3000 });
     state.voiceConfig = await fetchJson(`${API_BASE}/v1/voice/config`, { timeoutMs: 3000 });
     state.backendReady = true;
-    setStatus(`已连接本地后端：${API_BASE}。文本面试可直接开始；LLM 仅用于可选报告总结，语音为可选能力。`);
+    setStatus(`已连接本地后端：${API_BASE}。可选择云端语义追问或离线规则练习，语音单独配置。`);
   } catch (error) {
     state.backendReady = false;
     state.catalog = fallbackCatalog;
@@ -326,11 +327,16 @@ async function submitAnswer(event) {
   }
   const answer = elements.answer.value.trim();
   if (!answer) return;
-  addMessage("candidate", "候选人", answer);
-  elements.answer.value = "";
+  const pending = state.pendingAnswer;
+  const requestId = pending?.sessionId === state.sessionId && pending.answer === answer
+    ? pending.id : crypto.randomUUID();
+  state.pendingAnswer = {sessionId: state.sessionId, answer, id: requestId};
   elements.sendButton.disabled = true;
   try {
-    const payload = await postJson(`${API_BASE}/v1/interviews/${state.sessionId}/turn`, { answer });
+    const payload = await postJson(`${API_BASE}/v1/interviews/${state.sessionId}/turn`, { answer, request_id: requestId });
+    addMessage("candidate", "候选人", answer);
+    elements.answer.value = "";
+    state.pendingAnswer = null;
     addTurnQuestion(payload);
     showProviderNotice(payload.provider_notice);
     speak(payload.next_question);
@@ -672,7 +678,7 @@ async function openHistoryDrills(sessionId) {
   const report = await fetchJson(`${API_BASE}/v1/interviews/${sessionId}/report`);
   elements.report.hidden = false;
   elements.report.innerHTML = `
-    <h3>历史复练：${escapeHtml(String(report.overall_score))} / 100</h3>
+    <h3>历史复练：${report.overall_score == null ? "尚无可评分回答" : `${escapeHtml(String(report.overall_score))} / 100`}</h3>
     ${report.ai_summary ? `<p>${escapeHtml(report.ai_summary)}</p>` : ""}
     ${renderPracticeDrills(report.practice_drills || [])}
     ${renderAnswerGuides(report.answer_guides || [])}
@@ -687,6 +693,7 @@ function readConfig() {
     difficulty_id: elements.difficulty.value,
     mode_id: elements.mode.value,
     interviewer_style_id: elements.interviewerStyle.value || "small_company_basic",
+    interview_strategy: elements.interviewStrategy.value || "rules",
     candidate_name: elements.candidateName.value.trim() || null,
     resume_text: elements.resume.value.trim() || null,
     duration_minutes: 30,
@@ -1103,6 +1110,13 @@ function renderSetupChecklist() {
 }
 
 function llmChecklistItem(llm) {
+  if (elements.interviewStrategy?.value === "semantic") {
+    const supported = ["openai", "openai_compatible", "compatible"].includes(llm.provider);
+    const missing = llmMissingFields(llm);
+    return {label: "云端语义追问", status: supported && !missing.length ? "ok" : "warn",
+      detail: supported && !missing.length ? `${llm.model}；最终回答将发送给该服务商`
+        : "需要配置云端兼容 API、模型名和 Key；失败时不会自动改用规则评分"};
+  }
   if (llm.provider === "mock") {
     return { label: "LLM 报告总结", status: "warn", detail: "未接入 LLM；面试题库和本地报告仍可用" };
   }
@@ -2151,7 +2165,7 @@ function browserRecognitionErrorMessage(event) {
 function renderReport(report) {
   elements.report.hidden = false;
   elements.report.innerHTML = `
-    <h3>面试报告：${escapeHtml(String(report.overall_score))} / 100</h3>
+    <h3>面试报告：${report.overall_score == null ? "尚无可评分回答" : `${escapeHtml(String(report.overall_score))} / 100`}</h3>
     ${report.ai_summary ? `<p>${escapeHtml(report.ai_summary)}</p>` : ""}
     <div class="score-grid">
       ${report.dimensions.map((item) => `
@@ -2288,7 +2302,7 @@ function renderTurnReview(turns) {
           <div class="turn-review-item">
             <div class="turn-review-title">
               <strong>${escapeHtml(title)}</strong>
-              <span>${escapeHtml(String(turn.score || 0))} 分</span>
+              <span>${turn.score == null ? "待澄清，未评分" : `${escapeHtml(String(turn.score))} 分`}</span>
             </div>
             <p>${escapeHtml(shortText(turn.question, 120))}</p>
             ${hits.length ? `<div class="tags">${hits.slice(0, 3).map((hit) => `<span class="tag hit-tag">${escapeHtml(hit)}</span>`).join("")}</div>` : ""}

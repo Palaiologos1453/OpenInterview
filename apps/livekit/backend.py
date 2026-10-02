@@ -19,9 +19,16 @@ class InterviewBackend:
         return response.json()
 
     async def answer(self, interview_id, text, request_id):
-        return await self.post(f"/v1/interviews/{interview_id}/turn", {
-            "answer": text, "request_id": request_id,
-        })
+        # A lost local HTTP response may follow a committed turn. Retry with the
+        # same id so the backend can return the saved result without another LLM call.
+        for attempt in range(2):
+            try:
+                return await self.post(f"/v1/interviews/{interview_id}/turn", {
+                    "answer": text, "request_id": request_id,
+                })
+            except httpx.TransportError:
+                if attempt:
+                    raise
 
     async def preview(self, interview_id, text, turn_index):
         return await self.post(f"/v1/interviews/{interview_id}/preview", {

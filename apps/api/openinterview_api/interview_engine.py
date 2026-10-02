@@ -73,6 +73,7 @@ class InterviewConfig:
     duration_minutes: int = 30
     language: str = "zh-CN"
     provider_config: dict | None = None
+    interview_strategy: str = "rules"
 
 
 @dataclass
@@ -94,6 +95,7 @@ class InterviewSession:
     current_question_meta: dict | None = None
     history: list[Turn] = field(default_factory=list)
     provider_notice: str | None = None
+    semantic_state: dict = field(default_factory=dict)
 
     @property
     def direction(self) -> dict:
@@ -113,12 +115,7 @@ class InterviewSession:
 
 
 class CampusInterviewEngine:
-    """Deterministic MVP engine.
-
-    The interview path is intentionally deterministic: active interviews should
-    not block on LLM feedback or improvised LLM questions. LLMs are reserved for
-    optional post-interview report summaries.
-    """
+    """Interview director with explicit offline-rule and cloud-semantic modes."""
 
     def start(self, config: InterviewConfig) -> dict:
         find_direction(config.direction_id)
@@ -126,8 +123,16 @@ class CampusInterviewEngine:
         find_mode(config.mode_id)
         find_interviewer_style(config.interviewer_style_id)
         self._validate_provider_config(config)
+        if config.interview_strategy not in {"rules", "semantic"}:
+            raise ValueError("Unknown interview strategy")
+        if config.interview_strategy == "semantic":
+            from .services.semantic_interview import validate_cloud
+            validate_cloud(config.provider_config)
 
         session = InterviewSession(config=config)
+        if config.interview_strategy == "semantic":
+            from .services.semantic_interview import initial_state
+            session.semantic_state = initial_state()
         session.current_question = self._select_question(session, step=0)
         opening = self._opening_message(session)
         return {
@@ -138,10 +143,14 @@ class CampusInterviewEngine:
                 "next_question": session.current_question,
                 "rubric": RUBRIC,
                 "provider_notice": session.provider_notice,
+                "interview_strategy": config.interview_strategy,
             },
         }
 
     def answer(self, session: InterviewSession, answer: str) -> dict:
+        if session.config.interview_strategy == "semantic":
+            from .services.semantic_interview import answer_semantically
+            return answer_semantically(self, session, answer)
         if self._is_finished(session):
             raise RuntimeError("Interview is already finished. Generate a report or start a new interview.")
 
@@ -172,6 +181,9 @@ class CampusInterviewEngine:
         }
 
     def report(self, session: InterviewSession) -> dict:
+        if session.config.interview_strategy == "semantic":
+            from .services.semantic_interview import semantic_report
+            return semantic_report(session)
         scored_turns = [
             turn for turn in session.history
             if (turn.question_meta or {}).get("phase") != "closing"
@@ -240,7 +252,7 @@ class CampusInterviewEngine:
             return "本轮问题已经结束。你可以生成报告，或重新选择方向和难度开始下一轮。"
 
         phase = flow[step]
-        followup = self._select_followup_question(session, phase)
+        followup = self._select_followup_question(session, phase) if session.config.interview_strategy == "rules" else None
         if followup:
             session.current_question_meta = followup["meta"]
             return followup["prompt"]
@@ -945,12 +957,16 @@ class CampusInterviewEngine:
         return ["表达结构", "岗位匹配", "技术亮点"]
 
     def _current_phase(self, session: InterviewSession) -> str:
+        if session.config.interview_strategy == "semantic":
+            return (session.current_question_meta or {}).get("phase", "closing")
         flow = MODE_FLOW.get(session.config.mode_id, MODE_FLOW["comprehensive"])
         if session.turn_index >= len(flow):
             return "closing"
         return flow[session.turn_index]
 
     def _is_finished(self, session: InterviewSession) -> bool:
+        if session.config.interview_strategy == "semantic":
+            return bool(session.semantic_state.get("finished"))
         flow = MODE_FLOW.get(session.config.mode_id, MODE_FLOW["comprehensive"])
         return session.turn_index >= len(flow)
 

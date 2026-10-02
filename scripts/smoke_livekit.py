@@ -72,7 +72,7 @@ async def main():
                 got_turn.set()
 
         try:
-            joined = await client.post("http://127.0.0.1:5180/join", json={})
+            joined = await client.post("http://127.0.0.1:5180/join", json={"interview_strategy": "rules"})
             joined.raise_for_status()
             info = joined.json()
             started = time.perf_counter()

@@ -232,7 +232,7 @@ class Storage:
                 ),
             )
             connection.execute(
-                "UPDATE interviews SET updated_at = ? WHERE id = ?",
+                "UPDATE interviews SET updated_at = ?, report_json = NULL, status = 'active' WHERE id = ?",
                 (utc_now(), interview_id),
             )
 
@@ -244,6 +244,11 @@ class Storage:
                 """,
                 (json.dumps(report, ensure_ascii=False), "reported", utc_now(), interview_id),
             )
+
+    def update_interview_config(self, interview_id: str, redacted_config: dict) -> None:
+        with self.connect() as connection:
+            connection.execute("UPDATE interviews SET config_json = ?, updated_at = ? WHERE id = ?",
+                (json.dumps(redacted_config, ensure_ascii=False), utc_now(), interview_id))
 
     def save_trace(self, trace: dict, interview_id: str | None = None) -> None:
         with self.connect() as connection:

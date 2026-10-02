@@ -21,6 +21,8 @@
           <label>面试方向<select id="direction"></select></label>
           <label>难度<select id="difficulty"></select></label>
           <label>模式<select id="mode"></select></label>
+          <label>追问方式<select id="interview-strategy"><option value="semantic">云端语义追问</option><option value="rules">离线规则练习</option></select></label>
+          <p class="provider-note">云端语义追问会将最终回答、简历和相关上下文发送给下方配置的 LLM 服务商。</p>
           <label>面试官风格<select id="interviewer-style"></select></label>
           <label>本地 CosyVoice 音色 Profile<select id="voice-profile"></select></label>
           <p id="voice-profile-help" class="voice-profile-help"></p>
@@ -40,7 +42,7 @@
           <details class="provider-panel">
             <summary>模型配置（本机保存）</summary>
             <p class="provider-note">
-              文本面试默认走题库和本地规则，不需要等待 LLM。LLM 只用于可选报告总结；语音输入/播报默认走浏览器，本地 SenseVoice/CosyVoice 属于可选增强。
+              云端语义追问需要填写 API Base、Model、API Key。八股与项目使用独立的评价和追问工作流；不使用云端时可选择离线规则练习。语音可单独使用本地 SenseVoice/CosyVoice。
             </p>
             <div class="provider-grid">
               <h3>LLM</h3>

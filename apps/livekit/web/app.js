@@ -40,7 +40,11 @@ $("start").onclick = async () => {
     // Request permissions while the user gesture is active, before model warmup.
     micTracks = await LivekitClient.createLocalTracks({audio: {echoCancellation:true, noiseSuppression:true, autoGainControl:true}, video:false});
     status("正在准备本地语音模型，首次启动需要等待……");
-    const result = await request("/join", {direction_id:$("direction").value, difficulty_id:$("difficulty").value, mode_id:$("mode").value, resume_text:$("resume").value});
+    const result = await request("/join", {
+      direction_id:$("direction").value, difficulty_id:$("difficulty").value,
+      mode_id:$("mode").value, resume_text:$("resume").value, interview_strategy:$("strategy").value,
+      llm: {api_base:$("llm-base").value.trim(), model:$("llm-model").value.trim(), api_key:$("llm-key").value.trim()}
+    });
     joined = true;
     sessionId = result.session_id;
     const next = new LivekitClient.Room({adaptiveStream:false, dynacast:false});
@@ -54,6 +58,10 @@ $("start").onclick = async () => {
     });
     next.on(LivekitClient.RoomEvent.DataReceived, (data, participant, kind, topic) => {
       if (room !== next) return;
+      if (topic === "openinterview.error") {
+        status(JSON.parse(new TextDecoder().decode(data)).message);
+        return;
+      }
       if (topic === "openinterview.transcript") {
         const event = JSON.parse(new TextDecoder().decode(data));
         if (event.type === "speech_start") utterance = event.utterance;

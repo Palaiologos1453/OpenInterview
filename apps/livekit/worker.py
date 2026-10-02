@@ -30,7 +30,8 @@ class InterviewAgent(Agent):
         self.output_tts = LocalCosyVoice(backend)
         self.turn_lock = asyncio.Lock()
         self.preparation = ReplyPreparation(backend, metadata["session_id"],
-            enabled=os.environ.get("OPENINTERVIEW_VOICE_PREFETCH", "1") != "0")
+            enabled=(metadata.get("interview_strategy") != "semantic"
+                and os.environ.get("OPENINTERVIEW_VOICE_PREFETCH", "1") != "0"))
 
     async def observe_transcript(self, event):
         if event["type"] == "partial" and not self.finished:
@@ -62,7 +63,14 @@ class InterviewAgent(Agent):
             raise StopResponse()
         async with self.turn_lock:
             await self.preparation.seal()
-            result = await self.backend.answer(self.metadata["session_id"], text, new_message.id)
+            try:
+                result = await self.backend.answer(self.metadata["session_id"], text, new_message.id)
+            except Exception:
+                await self.room.local_participant.publish_data(
+                    json.dumps({"type": "error", "message": "未收到追问结果，请检查模型配置或稍后重试。"}, ensure_ascii=False),
+                    reliable=True, topic="openinterview.error")
+                self.session.say("暂时没有收到追问结果，请稍后再试。")
+                raise StopResponse()
             prepared = await self.preparation.take(result)
             if self.session.tts.prepared:
                 await self.session.tts.prepared.close()

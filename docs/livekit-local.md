@@ -1,5 +1,8 @@
 # LiveKit 本地实时面试
 
+更新：现在可选择[云端语义追问 + 本地语音](cloud-semantic-interview.md)。该模式的简历和最终回答会发送给用户配置的云端模型。
+下文“无需云端、全部本地”的描述仅适用于“离线规则练习”；语音模型与 LiveKit 传输仍在本机。
+
 本实现使用 **LiveKit Server 1.13.7 / Agents 1.8.3 / 浏览器 SDK 2.22.3**。
 Server、Agent、SenseVoice、CosyVoice、题库和 SQLite 均在本机。
 前端 SDK 已随项目保存，不使用 CDN。无需 LiveKit Cloud、云端推理账户或 API Key。

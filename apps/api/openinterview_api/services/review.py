@@ -6,6 +6,8 @@ import hashlib
 def review_items_from_report(report: dict) -> list[dict]:
     items: list[dict] = []
     for turn in report.get("turns") or []:
+        if turn.get("score") is None:
+            continue
         meta = turn.get("question_meta") or {}
         gaps = list(turn.get("rubric_gaps") or [])
         score = float(turn.get("score") or 0)
@@ -42,8 +44,10 @@ def review_items_from_report(report: dict) -> list[dict]:
 
 
 def report_to_markdown(report: dict) -> str:
+    overall = report.get("overall_score")
+    score_label = f"{overall} / 100" if overall is not None else "尚无可评分回答"
     lines = [
-        f"# OpenInterview 面试报告 {report.get('overall_score', 0)} / 100",
+        f"# OpenInterview 面试报告 {score_label}",
         "",
         f"- 方向：{report.get('direction', '')}",
         f"- 难度：{report.get('difficulty', '')}",

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from pydantic import BaseModel, Field
 
 MAX_AUDIO_BASE64_CHARS = 32 * 1024 * 1024
@@ -56,6 +58,7 @@ class InterviewConfigRequest(BaseModel):
     duration_minutes: int = Field(default=30, ge=5, le=120)
     language: str = Field(default="zh-CN")
     provider_config: ProviderSettings = Field(default_factory=ProviderSettings)
+    interview_strategy: Literal["rules", "semantic"] = "rules"
 
 
 class InterviewStartResponse(BaseModel):
@@ -64,6 +67,7 @@ class InterviewStartResponse(BaseModel):
     next_question: str
     rubric: list[dict]
     provider_notice: str | None = None
+    interview_strategy: str = "rules"
 
 
 class TurnRequest(BaseModel):
@@ -91,7 +95,7 @@ class ReportResponse(BaseModel):
     direction: str
     difficulty: str
     interviewer_style: str | None = None
-    overall_score: float
+    overall_score: float | None
     ai_summary: str | None = None
     dimensions: list[dict]
     strengths: list[str]
