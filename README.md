@@ -170,6 +170,16 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 
 ## 本地语音增强
 
+新增可选的 [LiveKit 本地实时面试](docs/livekit-local.md)：自托管 Windows Server + 独立 Agent，
+复用本机 SenseVoice/CosyVoice，支持说话后自动提交和插话。安装与启动：
+
+```powershell
+.\scripts\setup-livekit.ps1
+.\scripts\start-livekit.ps1
+```
+
+打开 `http://127.0.0.1:5180`。首次使用先准备下面的本地模型；无需 LiveKit Cloud 或云端模型 Key。
+
 本地语音不是核心路径。只有当你希望离线 ASR/TTS 时，才需要下载和配置模型。普通用户优先使用页面里的“语音配置向导”：浏览器语音不需要填写任何模型；云端语音只填 URL、Model、Key；本地模型只填 VAD、SenseVoice、CosyVoice 模型目录和 CosyVoice runtime 路径。
 
 当前适配的本地模型路径：
@@ -223,7 +233,10 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 - `POST /v1/realtime/sessions/{session_id}/events`
 - `POST /v1/vad/detect`
 - `POST /v1/asr/transcribe`
+- `POST /v1/asr/warmup`（本地识别预热）
 - `POST /v1/tts/speech`
+- `POST /v1/tts/speech/stream`（本地 CosyVoice PCM 流）
+- `POST /v1/tts/warmup`（本地语音预热）
 
 ## 升级和迁移
 
@@ -236,7 +249,8 @@ SQLite 会在 API 启动时自动做轻量迁移。当前迁移策略只做向�
 ```powershell
 cd OpenInterview
 $env:PYTHONPATH="D:\OpenInterview\apps\api"
-python -m unittest apps.api.tests.test_engine apps.api.tests.test_api
+python -m unittest discover -s apps/api/tests
+node --test apps/web/tests/*.test.cjs
 python .\scripts\evaluate_scoring.py --output apps/api/eval/scoring-report.md --json-output apps/api/eval/scoring-report.json
 node --check apps/web/app.js
 .\voice_venv\Scripts\python.exe -m ruff check apps\api\openinterview_api apps\api\tests

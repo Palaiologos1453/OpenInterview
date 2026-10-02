@@ -36,13 +36,23 @@ jobs:
       - name: Run API tests
         run: |
           $env:PYTHONPATH = "$PWD\apps\api"
-          python -m unittest apps.api.tests.test_engine apps.api.tests.test_api
+          python -m unittest discover -s apps/api/tests
 
       - name: Run scoring evaluation
         run: python scripts/evaluate_scoring.py --output apps/api/eval/scoring-report.md --json-output apps/api/eval/scoring-report.json
 
       - name: Check frontend syntax
-        run: node --check apps/web/app.js
+        run: |
+          node --check apps/web/app.js
+          node --check apps/web/audio-stream.js
+          node --test apps/web/tests/*.test.cjs
+          node --check apps/livekit/web/app.js
+
+      - name: Test isolated local LiveKit adapters
+        run: |
+          python -m venv apps/livekit/.venv
+          apps/livekit/.venv/Scripts/python.exe -m pip install -r apps/livekit/requirements.txt
+          apps/livekit/.venv/Scripts/python.exe -m unittest discover -s apps/livekit/tests -v
 
       - name: Check PowerShell scripts
         shell: pwsh
@@ -51,7 +61,10 @@ jobs:
             "scripts/start-local.ps1",
             "scripts/start-api.ps1",
             "scripts/start-web.ps1",
-            "scripts/start-api-production.ps1"
+            "scripts/start-api-production.ps1",
+            "scripts/setup-livekit.ps1",
+            "scripts/start-livekit.ps1",
+            "scripts/stop-livekit.ps1"
           )
           foreach ($script in $scripts) {
             $tokens = $null

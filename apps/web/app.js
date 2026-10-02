@@ -121,6 +121,9 @@ const state = {
   realtimeMode: "idle",
   ttsChunks: [],
   audioContext: null,
+  pcmPlayer: null,
+  serverTtsController: null,
+  ttsPlaybackPromise: null,
   pcmPlaybackTime: 0,
   pcmSampleRate: 16000,
   pcmChannels: 1,
@@ -227,7 +230,10 @@ async function init() {
   updateVoiceProfileHelp();
   wireEvents();
   renderSetupChecklist();
-  if (state.backendReady) refreshReadiness();
+  if (state.backendReady) {
+    refreshReadiness();
+    void warmupLocalTts();
+  }
 }
 
 function wireEvents() {
@@ -975,6 +981,7 @@ function applyVoiceMode(mode, options = {}) {
   updateVoiceModeUi();
   if (!options.silent) {
     setStatus(voiceModeStatus(nextMode));
+    if (nextMode === "local") void warmupLocalTts();
   }
 }
 
@@ -1373,6 +1380,7 @@ async function toggleDuplexStreaming(config) {
 }
 
 async function startDuplexStreaming(config) {
+  resetPcmPlayback();
   if (!navigator.mediaDevices?.getUserMedia) {
     throw new Error("当前浏览器不支持麦克风录音。请改用普通文本回答。");
   }
@@ -1403,10 +1411,12 @@ async function startDuplexStreaming(config) {
       setStatus(`实时语音启动失败：${error.message}`);
     }
   };
-  socket.onmessage = (event) => handleDuplexMessage(JSON.parse(event.data));
+  socket.onmessage = (event) => {
+    if (state.realtimeSocket === socket) handleDuplexMessage(JSON.parse(event.data));
+  };
   socket.onerror = () => setStatus("实时语音通道异常。可切换到普通录音或文本回答。");
   socket.onclose = () => {
-    resetRealtimeUi();
+    if (state.realtimeSocket === socket) resetRealtimeUi();
   };
 }
 
@@ -1619,14 +1629,12 @@ async function cancelDuplexTurn() {
     state.currentAudio.pause();
     state.currentAudio = null;
   }
-  resetPcmPlayback();
-  await stopDuplexCapture({ flush: false });
+  window.speechSynthesis?.cancel();
   if (state.realtimeSocket?.readyState === WebSocket.OPEN) {
     state.realtimeSocket.send(JSON.stringify({ type: "cancel" }));
   }
+  resetRealtimeUi();
   updateTranscriptStatus("已取消");
-  state.realtimeMode = "idle";
-  elements.listenButton.textContent = "语音输入";
   setStatus("已取消实时语音轮次。");
 }
 
@@ -1681,7 +1689,7 @@ function handleDuplexMessage(message) {
   }
   if (message.type === "tts_text") {
     updateVoiceTiming("tts_first_output_ms", elapsedSinceVoiceTurnStart());
-    void speakWithBrowser(message.text);
+    state.ttsPlaybackPromise = speakWithBrowser(message.text);
     return;
   }
   if (message.type === "tts_start") {
@@ -1691,7 +1699,9 @@ function handleDuplexMessage(message) {
     return;
   }
   if (message.type === "tts_pcm_start") {
-    updateVoiceTiming("tts_first_audio_ms", elapsedSinceVoiceTurnStart());
+    if (!("tts_first_chunk_received_ms" in state.voiceTimings)) {
+      updateVoiceTiming("tts_first_chunk_received_ms", elapsedSinceVoiceTurnStart());
+    }
     startPcmPlayback(message);
     setStatus("正在流式播放语音。");
     return;
@@ -1711,15 +1721,7 @@ function handleDuplexMessage(message) {
   }
   if (message.type === "done") {
     if (message.timings) mergeVoiceTimings(message.timings);
-    updateVoiceTiming("client_total_ms", elapsedSinceVoiceTurnStart());
-    resetRealtimeUi();
-    if (message.skipped) {
-      updateTranscriptStatus(message.reason === "no_speech" ? "未检测到有效语音" : "实时语音轮次已跳过");
-      setStatus(message.reason === "no_speech" ? "未检测到有效语音。" : "实时语音轮次已跳过。");
-    } else {
-      updateTranscriptStatus("实时语音轮次完成");
-      setStatus("实时语音轮次完成。");
-    }
+    void finishDuplexPlayback(message);
     return;
   }
   if (message.type === "cancelled") {
@@ -1735,6 +1737,17 @@ function handleDuplexMessage(message) {
   }
 }
 
+async function finishDuplexPlayback(message) {
+  const socket = state.realtimeSocket;
+  await (state.pcmPlayer?.finish() || state.ttsPlaybackPromise || Promise.resolve());
+  if (state.realtimeSocket !== socket) return;
+  updateVoiceTiming("client_total_ms", elapsedSinceVoiceTurnStart());
+  resetRealtimeUi();
+  const label = message.skipped ? "未检测到有效语音" : "实时语音轮次完成";
+  updateTranscriptStatus(label);
+  setStatus(`${label}。`);
+}
+
 function resetRealtimeUi() {
   if (state.browserRecognition) {
     state.browserRecognition.abort();
@@ -1742,8 +1755,11 @@ function resetRealtimeUi() {
   }
   void stopDuplexCapture({ flush: false });
   resetPcmPlayback();
+  state.ttsPlaybackPromise = null;
   state.realtimeMode = "idle";
+  const socket = state.realtimeSocket;
   state.realtimeSocket = null;
+  if (socket) socket.close();
   elements.listenButton.textContent = "语音输入";
   elements.listenButton.disabled = state.sessionFinished || !canUseVoiceInput();
   elements.sendButton.disabled = state.sessionFinished;
@@ -1776,32 +1792,23 @@ function playStreamedTts(format) {
 
 function startPcmPlayback(message) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
-  if (!AudioContextClass) return;
-  if (!state.audioContext) state.audioContext = new AudioContextClass();
+  if (!AudioContextClass) throw new Error("当前浏览器不支持 PCM 播放。");
+  if (!state.pcmPlayer) {
+    state.audioContext = new AudioContextClass();
+    state.pcmPlayer = new OpenInterviewAudioStream.PcmPlayer(state.audioContext, () => {
+      updateVoiceTiming("tts_first_audio_queued_ms", elapsedSinceVoiceTurnStart());
+    });
+  }
+  if (state.audioContext.state === "suspended") {
+    void state.audioContext.resume().catch((error) => setStatus(`请点击页面允许声音播放：${error.message}`));
+  }
   state.pcmSampleRate = message.sample_rate || 16000;
   state.pcmChannels = message.channels || 1;
-  state.pcmPlaybackTime = Math.max(state.audioContext.currentTime + 0.05, state.pcmPlaybackTime || 0);
 }
 
 function queuePcmChunk(base64Data) {
-  if (!state.audioContext) startPcmPlayback({});
-  if (!state.audioContext) return;
-  const pcm = base64ToInt16Array(base64Data);
-  const channels = Math.max(state.pcmChannels || 1, 1);
-  const frameCount = Math.floor(pcm.length / channels);
-  const buffer = state.audioContext.createBuffer(channels, frameCount, state.pcmSampleRate || 16000);
-  for (let channel = 0; channel < channels; channel += 1) {
-    const output = buffer.getChannelData(channel);
-    for (let i = 0; i < frameCount; i += 1) {
-      output[i] = pcm[i * channels + channel] / 32768;
-    }
-  }
-  const source = state.audioContext.createBufferSource();
-  source.buffer = buffer;
-  source.connect(state.audioContext.destination);
-  const startAt = Math.max(state.pcmPlaybackTime, state.audioContext.currentTime + 0.02);
-  source.start(startAt);
-  state.pcmPlaybackTime = startAt + buffer.duration;
+  if (!state.pcmPlayer) startPcmPlayback({});
+  state.pcmPlayer.enqueue(base64Data, state.pcmSampleRate, state.pcmChannels);
 }
 
 function startBrowserSpeechRecognition() {
@@ -2021,6 +2028,9 @@ function speakWithBrowser(text) {
 }
 
 async function speakWithServer(text, config) {
+  if (["cosyvoice", "local_cosyvoice"].includes(config.tts.provider)) {
+    return speakWithServerStream(text, config);
+  }
   const started = performance.now();
   const response = await authedFetch(`${API_BASE}/v1/tts/speech`, {
     method: "POST",
@@ -2054,6 +2064,71 @@ async function speakWithServer(text, config) {
     };
     audio.play().catch(reject);
   });
+}
+
+const ttsWarmups = new Map();
+async function warmupLocalTts() {
+  if (!state.backendReady) return;
+  const config = readProviderConfig();
+  if (!["cosyvoice", "local_cosyvoice"].includes(config.tts.provider)) return;
+  const profile = elements.voiceProfile.value;
+  const key = JSON.stringify([config.tts.model, profile]);
+  if (ttsWarmups.has(key)) return ttsWarmups.get(key);
+  const task = (async () => {
+    try {
+      const response = await authedFetch(`${API_BASE}/v1/tts/warmup`, {
+        method: "POST", headers: jsonHeaders(),
+        body: JSON.stringify({ text: "预热", provider_config: config, voice_profile_id: profile })
+      });
+      if (!response.ok) throw new Error(await response.text());
+      updateVoiceTiming("tts_warmup_ms", (await response.json()).warmup_ms);
+    } catch (error) {
+      ttsWarmups.delete(key);
+      console.warn("Local TTS warmup failed:", error.message);
+    }
+  })();
+  ttsWarmups.set(key, task);
+  return task;
+}
+
+async function speakWithServerStream(text, config) {
+  resetPcmPlayback();
+  startPcmPlayback({});
+  const player = state.pcmPlayer;
+  const controller = new AbortController();
+  state.serverTtsController = controller;
+  const started = performance.now();
+  let completed = false;
+  let first = true;
+  try {
+    const response = await authedFetch(`${API_BASE}/v1/tts/speech/stream`, {
+      method: "POST", headers: jsonHeaders(), signal: controller.signal,
+      body: JSON.stringify({ text, provider_config: config, voice_profile_id: elements.voiceProfile.value })
+    });
+    if (!response.ok) throw new Error(await response.text());
+    await OpenInterviewAudioStream.readEvents(response, (event) => {
+      if (event.type === "error") throw new Error(event.error);
+      if (event.type === "chunk") {
+        if (event.sample_width !== 2) throw new Error("Expected 16-bit PCM");
+        if (first) {
+          first = false;
+          updateVoiceTiming("server_tts_first_chunk_ms", Math.round(performance.now() - started));
+        }
+        player.enqueue(event.data, event.sample_rate, event.channels);
+      } else if (event.type === "done") {
+        completed = true;
+        updateVoiceTiming("server_tts_synthesize_ms", event.total_ms);
+      }
+    });
+    if (!completed) throw new Error("语音流意外中断，请重试。");
+    await player.finish();
+    updateVoiceTiming("server_tts_total_ms", Math.round(performance.now() - started));
+  } catch (error) {
+    if (error.name !== "AbortError") throw error;
+  } finally {
+    player.stop();
+    if (state.pcmPlayer === player) resetPcmPlayback();
+  }
 }
 
 function canUseVoiceInput() {
@@ -2336,7 +2411,10 @@ function voiceTimingEntries() {
     "turn_ms",
     "tts_start_ms",
     "tts_first_output_ms",
-    "tts_first_audio_ms",
+    "tts_first_chunk_received_ms",
+    "tts_first_chunk_ms",
+    "tts_first_audio_queued_ms",
+    "server_tts_first_chunk_ms",
     "tts_done_ms",
     "tts_total_ms",
     "browser_tts_start_ms",
@@ -2364,7 +2442,10 @@ function voiceTimingLabel(name) {
     turn_ms: "下一题",
     tts_start_ms: "TTS开始",
     tts_first_output_ms: "首个播报",
-    tts_first_audio_ms: "首段音频",
+    tts_first_chunk_received_ms: "收到首段音频",
+    tts_first_chunk_ms: "TTS首块生成",
+    tts_first_audio_queued_ms: "首音排入播放",
+    server_tts_first_chunk_ms: "服务端TTS首块",
     tts_done_ms: "TTS完成",
     tts_total_ms: "TTS总计",
     browser_tts_start_ms: "浏览器TTS首音",
@@ -2499,10 +2580,11 @@ function base64ToInt16Array(base64Data) {
 }
 
 function resetPcmPlayback() {
-  if (state.audioContext) {
-    state.audioContext.close().catch(() => {});
-    state.audioContext = null;
-  }
+  state.serverTtsController?.abort();
+  state.serverTtsController = null;
+  state.pcmPlayer?.stop();
+  state.pcmPlayer = null;
+  state.audioContext = null;
   state.pcmPlaybackTime = 0;
 }
 

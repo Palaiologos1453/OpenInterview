@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>OpenInterview 本地实时面试</title>
+  <style>
+    body { font-family: system-ui, sans-serif; background:#f3f5f9; color:#17233b; margin:0; }
+    main { max-width:850px; margin:40px auto; padding:28px; background:white; border-radius:16px; }
+    h1 { font-size:26px; } p { line-height:1.7; } select, button, textarea { font:inherit; padding:10px; margin:5px; }
+    button { background:#224fd4; color:white; border:0; border-radius:8px; cursor:pointer; }
+    button:disabled { opacity:.45; cursor:default; } textarea { box-sizing:border-box; width:98%; min-height:100px; }
+    #status { padding:16px; background:#eef3ff; border-radius:8px; }
+    #conversation p { padding:14px; border-bottom:1px solid #e0e6ef; white-space:pre-wrap; }
+    #report { white-space:pre-wrap; } .note { color:#53627b; }
+  </style>
+</head>
+<body><main>
+  <h1>本地实时模拟面试</h1>
+  <p class="note">使用本机语音模型。开始后直接说话，停顿后自动提交；面试官说话时可以插话。建议佩戴耳机。</p>
+  <label>方向 <select id="direction"><option value="backend">Java 后端</option><option value="ai_application">AI 应用开发</option></select></label>
+  <label>难度 <select id="difficulty"><option value="campus">校招</option><option value="internship">实习</option><option value="bigtech">大厂</option></select></label>
+  <label>模式 <select id="mode"><option value="fundamentals">单纯八股</option><option value="comprehensive">综合评估</option><option value="project_deep_dive">简历拷打</option></select></label>
+  <textarea id="resume" placeholder="可选：粘贴简历或项目描述，仅在本机处理"></textarea>
+  <div><button id="start">开始本地面试</button><button id="mute" disabled>暂停麦克风</button><button id="leave" disabled>结束通话</button><button id="get-report" disabled>查看报告</button></div>
+  <p id="status" role="status">正在检查本地服务……</p>
+  <section id="conversation" aria-live="polite"></section><pre id="report"></pre><div id="audio"></div>
+</main>
+<script src="/vendor/livekit-client.umd.js"></script><script src="/app.js"></script>
+</body></html>

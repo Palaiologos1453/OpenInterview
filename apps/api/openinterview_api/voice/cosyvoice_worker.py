@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 import argparse
+import base64
+from collections import OrderedDict
+import hashlib
 import json
 import logging
 import os
@@ -14,21 +17,26 @@ def main() -> None:
     parser.add_argument("--model-dir", required=True)
     parser.add_argument("--device", choices=["auto", "cpu", "cuda"], default="auto")
     args = parser.parse_args()
+    # Third-party imports and text frontends print to stdout. Keep that noise
+    # off the JSON protocol, including when inference runs on its own thread.
+    protocol = sys.stdout
+    sys.stdout = sys.stderr
+
+    def emit(payload):
+        print(json.dumps(payload, ensure_ascii=False), file=protocol, flush=True)
+
     runtime = _Runtime(args.model_dir, args.device)
-    print(json.dumps({"type": "ready"}, ensure_ascii=False), flush=True)
+    emit({"type": "ready"})
 
     for line in sys.stdin:
         try:
             request = json.loads(line)
             if request.get("type") == "shutdown":
                 break
-            output = runtime.synthesize(request)
-            print(json.dumps({"type": "result", "id": request.get("id"), "output": output}, ensure_ascii=False), flush=True)
+            output = runtime.synthesize(request, emit=emit)
+            emit({"type": "result", "id": request.get("id"), "output": output})
         except Exception as exc:
-            print(
-                json.dumps({"type": "error", "id": request.get("id") if "request" in locals() else None, "error": str(exc)}, ensure_ascii=False),
-                flush=True,
-            )
+            emit({"type": "error", "id": request.get("id") if "request" in locals() else None, "error": str(exc)})
 
 
 class _Runtime:
@@ -62,8 +70,10 @@ class _Runtime:
         self.sample_rate = self.model.sample_rate
         self.sf = sf
         self.cosyvoice_path = cosyvoice_path
+        self.prompt_cache = OrderedDict()
+        self.initial_token_hop_len = getattr(self.model.model, "token_hop_len", None)
 
-    def synthesize(self, request: dict) -> str:
+    def synthesize(self, request: dict, *, emit=None) -> str | None:
         text = request["text"]
         output_path = Path(request["output"])
         output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -77,25 +87,81 @@ class _Runtime:
                 reference_audio = str(default_prompt)
                 reference_text = reference_text or "You are a helpful assistant.<|endofprompt|>希望你以后能够做的比我还好呦。"
 
+        # Upstream grows this field during streaming and some releases retain
+        # it across requests. Restore the model's original first-chunk size.
+        if self.initial_token_hop_len is not None:
+            self.model.model.token_hop_len = self.initial_token_hop_len
+
         if style_prompt and reference_audio:
             instruct_text = f"You are a helpful assistant. {style_prompt}<|endofprompt|>"
-            generator = self.model.inference_instruct2(text, instruct_text, reference_audio, stream=True)
+            speaker = self._cached_prompt(reference_audio, instruct_text)
+            generator = self.model.inference_instruct2(
+                text, instruct_text, reference_audio, zero_shot_spk_id=speaker, stream=True)
         elif reference_audio and reference_text:
-            generator = self.model.inference_zero_shot(text, reference_text, reference_audio, stream=True)
+            # Cache the same normalized prompt used by inference_zero_shot.
+            normalized = self.model.frontend.text_normalize(reference_text, split=False)
+            speaker = self._cached_prompt(reference_audio, normalized)
+            generator = self.model.inference_zero_shot(
+                text, reference_text, reference_audio, zero_shot_spk_id=speaker, stream=True)
         else:
             raise RuntimeError("CosyVoice3 requires reference audio for zero-shot or instruct synthesis.")
 
         chunks = []
+        stream = bool(request.get("stream"))
+        index = 0
         for item in generator:
-            chunks.append(item["tts_speech"])
-        if not chunks:
+            speech = item["tts_speech"]
+            if stream:
+                pcm = _tensor_to_pcm16(speech)
+                if not pcm:
+                    continue
+                emit({
+                    "type": "chunk",
+                    "id": request.get("id"),
+                    "index": index,
+                    "sample_rate": self.sample_rate,
+                    "channels": 1,
+                    "sample_width": 2,
+                    "data": base64.b64encode(pcm).decode("ascii"),
+                })
+            else:
+                chunks.append(speech)
+            index += 1
+        if not index:
             raise RuntimeError("CosyVoice returned no audio.")
+        if stream:
+            return None
 
         import torch
 
         audio = torch.cat(chunks, dim=-1)
         _save_wav_with_soundfile(audio, output_path, self.sample_rate, self.sf)
         return str(output_path)
+
+    def _cached_prompt(self, reference_audio: str, prompt_text: str) -> str:
+        path = Path(reference_audio).resolve()
+        stat = path.stat()
+        key = hashlib.sha256(
+            f"{path}:{stat.st_mtime_ns}:{stat.st_size}:{prompt_text}".encode("utf-8")
+        ).hexdigest()
+        if key not in self.prompt_cache:
+            self.model.add_zero_shot_spk(prompt_text, str(path), key)
+            self.prompt_cache[key] = True
+            if len(self.prompt_cache) > 8:
+                expired, _ = self.prompt_cache.popitem(last=False)
+                self.model.frontend.spk2info.pop(expired, None)
+        self.prompt_cache.move_to_end(key)
+        return key
+
+
+def _tensor_to_pcm16(audio) -> bytes:
+    import torch
+
+    data = audio.detach().cpu().float()
+    if data.ndim == 2:
+        data = data[0]
+    data = torch.clamp(data, -1.0, 1.0)
+    return (data * 32767.0).to(torch.int16).numpy().tobytes()
 
 
 def _cuda_is_supported(torch_module) -> bool:

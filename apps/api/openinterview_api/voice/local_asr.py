@@ -17,6 +17,14 @@ class SenseVoiceASR:
     model_dir: Path | None = None
     device: str = "auto"
 
+    def warmup(self) -> None:
+        from funasr import AutoModel
+
+        model_dir = self.model_dir or default_asr_model_dir()
+        if not model_dir.exists():
+            raise FileNotFoundError(f"SenseVoice model directory not found: {model_dir}")
+        _cached_model(AutoModel, model_dir, self._resolve_device())
+
     def transcribe(self, audio_path: Path, *, language: str = "zh-CN") -> str:
         model_dir = self.model_dir or default_asr_model_dir()
         if not model_dir.exists():

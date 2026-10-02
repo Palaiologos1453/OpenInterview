@@ -1,0 +1,156 @@
+{
+  "date": "2026-09-29",
+  "hardware": "NVIDIA GeForce RTX 5080 Laptop GPU 16GB",
+  "torch": "2.13.0.dev20260603+cu132",
+  "os": "Windows",
+  "model": "Fun-CosyVoice3-0.5B-2512",
+  "cosyvoice_revision": "074ca6d",
+  "baseline_project_revision": "dcfd82a",
+  "scope": "Local worker and loopback HTTP first PCM receipt, not audible output latency; 3 warm repetitions each.",
+  "baseline": {
+    "text": "请介绍你负责的项目，说明业务背景、个人贡献、技术方案和验证结果。",
+    "worker": "logs\\tts-baseline-worker.py",
+    "worker_load_ms": 16939.26,
+    "summary": {
+      "batch_warm_first_audio_median_ms": 4956.01
+    },
+    "runs": [
+      {
+        "mode": "batch",
+        "cold": true,
+        "first_audio_ms": 7977.57,
+        "total_ms": 7977.57,
+        "audio_seconds": 5.6,
+        "chunks": 0,
+        "rtf": 1.425
+      },
+      {
+        "mode": "batch",
+        "cold": false,
+        "first_audio_ms": 4759.86,
+        "total_ms": 4759.86,
+        "audio_seconds": 5.4,
+        "chunks": 0,
+        "rtf": 0.881
+      },
+      {
+        "mode": "batch",
+        "cold": false,
+        "first_audio_ms": 5447.62,
+        "total_ms": 5447.62,
+        "audio_seconds": 6.08,
+        "chunks": 0,
+        "rtf": 0.896
+      },
+      {
+        "mode": "batch",
+        "cold": false,
+        "first_audio_ms": 4956.01,
+        "total_ms": 4956.01,
+        "audio_seconds": 5.44,
+        "chunks": 0,
+        "rtf": 0.911
+      }
+    ]
+  },
+  "optimized": {
+    "text": "请介绍你负责的项目，说明业务背景、个人贡献、技术方案和验证结果。",
+    "worker": "apps/api/openinterview_api/voice/cosyvoice_worker.py",
+    "worker_load_ms": 35178.72,
+    "summary": {
+      "batch_warm_first_audio_median_ms": 5707.57,
+      "stream_warm_first_audio_median_ms": 2245.95
+    },
+    "runs": [
+      {
+        "mode": "batch",
+        "cold": true,
+        "first_audio_ms": 7717.02,
+        "total_ms": 7717.02,
+        "audio_seconds": 5.6,
+        "chunks": 0,
+        "rtf": 1.378
+      },
+      {
+        "mode": "batch",
+        "cold": false,
+        "first_audio_ms": 5752.37,
+        "total_ms": 5752.37,
+        "audio_seconds": 5.4,
+        "chunks": 0,
+        "rtf": 1.065
+      },
+      {
+        "mode": "stream",
+        "cold": false,
+        "first_audio_ms": 2307.78,
+        "total_ms": 6099.99,
+        "audio_seconds": 6.08,
+        "chunks": 3,
+        "rtf": 1.003
+      },
+      {
+        "mode": "batch",
+        "cold": false,
+        "first_audio_ms": 5707.57,
+        "total_ms": 5707.57,
+        "audio_seconds": 5.44,
+        "chunks": 0,
+        "rtf": 1.049
+      },
+      {
+        "mode": "stream",
+        "cold": false,
+        "first_audio_ms": 2245.95,
+        "total_ms": 5607.39,
+        "audio_seconds": 5.4,
+        "chunks": 3,
+        "rtf": 1.038
+      },
+      {
+        "mode": "batch",
+        "cold": false,
+        "first_audio_ms": 5683.15,
+        "total_ms": 5683.15,
+        "audio_seconds": 5.64,
+        "chunks": 0,
+        "rtf": 1.008
+      },
+      {
+        "mode": "stream",
+        "cold": false,
+        "first_audio_ms": 2207.82,
+        "total_ms": 5543.56,
+        "audio_seconds": 5.36,
+        "chunks": 3,
+        "rtf": 1.034
+      }
+    ]
+  },
+  "http": {
+    "warmup": {
+      "ready": true,
+      "warmup_ms": 20361.96
+    },
+    "runs": [
+      {
+        "first_pcm_ms": 2307.76,
+        "total_ms": 6167.82,
+        "chunks": 3,
+        "audio_seconds": 5.92
+      },
+      {
+        "first_pcm_ms": 2311.68,
+        "total_ms": 6545.4,
+        "chunks": 3,
+        "audio_seconds": 6.32
+      },
+      {
+        "first_pcm_ms": 2422.51,
+        "total_ms": 5794.6,
+        "chunks": 3,
+        "audio_seconds": 5.24
+      }
+    ]
+  }
+}

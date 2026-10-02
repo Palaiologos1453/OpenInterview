@@ -1,5 +1,7 @@
 # Voice Setup
 
+本地 TTS 的流式链路、实测结果和复现方法见 [TTS 延迟优化与实测](tts-latency.md)。
+
 OpenInterview 的语音能力是可选增强。文本面试只需要 LLM；语音输入和播报可以按自己的机器条件选择。
 
 ## 推荐路线

@@ -1,5 +1,6 @@
 import base64
 import io
+import json
 import os
 from pathlib import Path
 import sqlite3
@@ -36,6 +37,59 @@ client = TestClient(app)
 
 
 class OpenInterviewAPITest(unittest.TestCase):
+    def test_local_asr_warmup_does_not_create_transcripts(self):
+        with patch("openinterview_api.voice.local_asr.SenseVoiceASR.warmup") as warmup:
+            response = client.post("/v1/asr/warmup")
+        self.assertEqual(response.status_code, 200)
+        self.assertTrue(response.json()["ready"])
+        warmup.assert_called_once()
+
+    def test_local_tts_http_stream_contains_pcm_and_terminal_timing(self):
+        class Adapter:
+            def synthesize_stream(self, text, output, **kwargs):
+                yield {"type": "chunk", "index": 0, "sample_rate": 24000,
+                       "channels": 1, "sample_width": 2, "data": "AAA="}
+
+        with patch("openinterview_api.main.build_tts_adapter", return_value=Adapter()):
+            response = client.post("/v1/tts/speech/stream", json={
+                "text": "你好", "provider_config": {"tts": {"provider": "cosyvoice"}}})
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("application/x-ndjson", response.headers["content-type"])
+        events = [json.loads(line) for line in response.text.splitlines()]
+        self.assertEqual([e["type"] for e in events], ["chunk", "done"])
+        self.assertLessEqual(events[1]["first_chunk_ms"], events[1]["total_ms"])
+
+    def test_tts_stream_error_does_not_replay_or_report_success(self):
+        class Adapter:
+            def synthesize_stream(self, text, output, **kwargs):
+                yield {"type": "chunk", "index": 0, "data": "AAA="}
+                raise RuntimeError("inference failed")
+
+        with patch("openinterview_api.main.build_tts_adapter", return_value=Adapter()):
+            response = client.post("/v1/tts/speech/stream", json={"text": "你好"})
+        events = [json.loads(line) for line in response.text.splitlines()]
+        self.assertEqual([e["type"] for e in events], ["chunk", "error"])
+
+    def test_tts_stream_rejects_batch_provider(self):
+        response = client.post("/v1/tts/speech/stream", json={"text": "你好"})
+        self.assertEqual(response.status_code, 400)
+
+    def test_local_tts_batch_labels_real_wav_format(self):
+        class Adapter:
+            def synthesize(self, text, output, **kwargs):
+                self.output = output
+                output.write_bytes(base64.b64decode(_silence_wav_base64()))
+                return output
+
+        adapter = Adapter()
+        with patch("openinterview_api.main.build_tts_adapter", return_value=adapter):
+            response = client.post("/v1/tts/speech", json={
+                "text": "你好", "provider_config": {"tts": {"provider": "cosyvoice"}}})
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.headers["content-type"], "audio/wav")
+        self.assertEqual(adapter.output.suffix, ".wav")
+        self.assertTrue(response.content.startswith(b"RIFF"))
+
     def test_catalog_includes_voice_profiles(self):
         response = client.get("/v1/catalog")
         self.assertEqual(response.status_code, 200)

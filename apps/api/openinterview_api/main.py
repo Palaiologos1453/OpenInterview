@@ -10,7 +10,7 @@ from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, PlainTextResponse, Response
+from fastapi.responses import JSONResponse, PlainTextResponse, Response, StreamingResponse
 
 from .adapters.llm import build_llm_adapter, is_real_llm, llm_temperature
 from .adapters.asr import build_asr_adapter
@@ -30,6 +30,7 @@ from .services.resume import analyze_resume
 from .services.resume_file import extract_resume_text
 from .services.realtime import RealtimeRegistry
 from .services.session_store import SQLiteBackedSessionStore
+from .services.tts_stream import iterate_tts_chunks
 from .services.voice_config import save_voice_model_config, voice_config_response
 from .storage import Storage
 from .settings import cors_origins, production_mode, require_auth
@@ -72,6 +73,7 @@ app.add_middleware(
     allow_origins=cors_origins(),
     allow_methods=["*"],
     allow_headers=["*"],
+    expose_headers=["X-OpenInterview-TTS-Synthesize-Ms", "X-OpenInterview-TTS-Total-Ms"],
 )
 app.middleware("http")(auth_middleware)
 
@@ -267,7 +269,8 @@ def text_to_speech(request: TTSRequest) -> Response:
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
 
-    audio_format = request.provider_config.tts.response_format or "mp3"
+    provider = request.provider_config.tts.provider.strip().lower()
+    audio_format = "wav" if provider in {"cosyvoice", "local_cosyvoice"} else request.provider_config.tts.response_format or "mp3"
     media_type = _audio_media_type(audio_format)
     try:
         with tempfile.TemporaryDirectory(prefix="openinterview-tts-") as temp_dir:
@@ -298,6 +301,77 @@ def text_to_speech(request: TTSRequest) -> Response:
             "X-OpenInterview-TTS-Total-Ms": str(_elapsed_ms(started_at)),
         },
     )
+
+
+@app.post("/v1/tts/speech/stream")
+def text_to_speech_stream(request: TTSRequest) -> StreamingResponse:
+    config = request.provider_config.model_dump()
+    if request.voice_profile_id:
+        config["tts"]["voice_profile_id"] = request.voice_profile_id
+    try:
+        adapter = build_tts_adapter(config)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not callable(getattr(adapter, "synthesize_stream", None)):
+        raise HTTPException(status_code=400, detail="This provider does not support PCM streaming.")
+
+    async def events():
+        started = perf_counter()
+        # Kept for adapter signature compatibility; streaming CosyVoice does not
+        # write or transcode an audio file.
+        with tempfile.TemporaryDirectory(prefix="openinterview-tts-stream-") as tmp:
+            stream = adapter.synthesize_stream(
+                request.text, Path(tmp) / "speech.wav",
+                voice=request.provider_config.tts.voice, voice_profile=tts_voice_profile(config),
+            )
+            iterator = iterate_tts_chunks(stream)
+            first_ms = None
+            try:
+                async for chunk in iterator:
+                    if first_ms is None:
+                        first_ms = _elapsed_ms(started)
+                    yield json.dumps(chunk) + "\n"
+                yield json.dumps({"type": "done", "first_chunk_ms": first_ms,
+                                  "total_ms": _elapsed_ms(started)}) + "\n"
+            except Exception as exc:
+                yield json.dumps({"type": "error", "error": str(exc)}) + "\n"
+            finally:
+                await iterator.aclose()
+
+    return StreamingResponse(events(), media_type="application/x-ndjson",
+                             headers={"Cache-Control": "no-store", "X-Accel-Buffering": "no"})
+
+
+@app.post("/v1/tts/warmup")
+def warmup_tts(request: TTSRequest) -> dict:
+    if request.provider_config.tts.provider.strip().lower() not in {"cosyvoice", "local_cosyvoice"}:
+        raise HTTPException(status_code=400, detail="Warmup is only available for local CosyVoice.")
+    config = request.provider_config.model_dump()
+    if request.voice_profile_id:
+        config["tts"]["voice_profile_id"] = request.voice_profile_id
+    started = perf_counter()
+    try:
+        adapter = build_tts_adapter(config)
+        with tempfile.TemporaryDirectory(prefix="openinterview-tts-warmup-") as tmp:
+            for _ in adapter.synthesize_stream(
+                "你好，我们开始面试。", Path(tmp) / "warmup.wav", voice_profile=tts_voice_profile(config)
+            ):
+                pass
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"ready": True, "warmup_ms": _elapsed_ms(started)}
+
+
+@app.post("/v1/asr/warmup")
+def warmup_local_asr() -> dict:
+    from .voice.local_asr import SenseVoiceASR
+
+    started = perf_counter()
+    try:
+        SenseVoiceASR().warmup()
+    except Exception as exc:
+        raise HTTPException(status_code=502, detail=str(exc)) from exc
+    return {"ready": True, "warmup_ms": _elapsed_ms(started)}
 
 
 @app.post("/v1/asr/transcribe", response_model=ASRResponse)

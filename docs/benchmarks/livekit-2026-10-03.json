@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "transport": "real local WebRTC",
+  "model_calls": "local SenseVoice and CosyVoice",
+  "first_agent_audio_after_join_ms": 5399.44,
+  "turn_result_after_candidate_playout_ms": 2000.73,
+  "reply_audio_after_candidate_playout_ms": 5450.33,
+  "received_non_silent_audio_frames": 141,
+  "recognized_answer": "我负责订单系统的缓存优化，使用radis和myCql，通过压测验证延迟降低30%。",
+  "persisted_turns": 1
+}

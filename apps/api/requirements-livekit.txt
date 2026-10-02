@@ -1,0 +1,6 @@
+# Local-only realtime voice transport and agent runtime.
+# Install in apps/livekit/.venv, NOT voice_venv (incompatible protobuf/aiofiles).
+# All inference is routed to the existing loopback API, not LiveKit Cloud.
+livekit-agents==1.8.3
+livekit-api==1.2.1
+livekit-plugins-silero==1.8.3

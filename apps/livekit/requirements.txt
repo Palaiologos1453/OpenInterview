@@ -1,0 +1,4 @@
+-r ../api/requirements-livekit.txt
+fastapi==0.142.2
+uvicorn==0.54.0
+httpx==0.28.1
