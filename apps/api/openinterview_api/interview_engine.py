@@ -76,6 +76,7 @@ class InterviewConfig:
     language: str = "zh-CN"
     provider_config: dict | None = None
     interview_strategy: str = "rules"
+    interview_plan: list[dict] | None = None
 
 
 @dataclass
@@ -134,7 +135,12 @@ class CampusInterviewEngine:
         session = InterviewSession(config=config)
         if config.interview_strategy == "semantic":
             from .services.semantic_interview import initial_state
-            session.semantic_state = initial_state()
+            session.semantic_state = initial_state(
+                mode_id=config.mode_id,
+                direction_id=config.direction_id,
+                plan=config.interview_plan,
+            )
+            config.interview_plan = session.semantic_state["plan"]
         session.provider_notice = provider_notice
         session.current_question = self._select_question(session, step=0)
         opening = self._opening_message(session)

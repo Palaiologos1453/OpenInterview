@@ -120,7 +120,11 @@ class SQLiteBackedSessionStore:
                 session.current_question = snapshot["question"]
                 session.current_question_meta = snapshot["question_meta"]
             else:
-                session.semantic_state = initial_state()
+                session.semantic_state = initial_state(
+                    mode_id=config.get("mode_id", "comprehensive"),
+                    direction_id=config.get("direction_id", "backend"),
+                    plan=config.get("interview_plan"),
+                )
                 session.current_question = self.engine._select_question(session, step=0)
         else:
             session.current_question = self.engine._select_question(session, step=session.turn_index)

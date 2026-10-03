@@ -3,6 +3,7 @@ from __future__ import annotations
 import base64
 import binascii
 from copy import deepcopy
+from dataclasses import asdict
 import json
 from pathlib import Path
 from time import perf_counter
@@ -201,7 +202,7 @@ def start_interview(request: Request, config_request: InterviewConfigRequest) ->
     session_store.save(session)
     storage.create_interview(
         session.session_id,
-        _redact_config(config_request.model_dump()),
+        _redact_config(asdict(session.config)),
         user_id=getattr(request.state, "user_id", None),
     )
     storage.save_trace(trace.as_dict(), interview_id=session.session_id)
@@ -272,7 +273,6 @@ def reconfigure_interview_llm(session_id: str, settings: LLMProviderSettings) ->
     except ValueError as exc:
         raise HTTPException(400, detail=str(exc)) from exc
     with session_store.session_lock(session_id):
-        from dataclasses import asdict
         session = deepcopy(_get_session(session_id))
         session.config.provider_config = {**(session.config.provider_config or {}), **config}
         storage.update_interview_config(session_id, _redact_config(asdict(session.config)))

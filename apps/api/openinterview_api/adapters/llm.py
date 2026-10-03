@@ -34,6 +34,9 @@ class OpenAICompatibleLLMAdapter:
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
+            # Decisions are short JSON objects. Capping generation prevents a
+            # provider from spending seconds on verbose explanations.
+            "max_tokens": 700,
         }
         headers = {
             "Content-Type": "application/json",
@@ -58,7 +61,7 @@ class OllamaLLMAdapter:
             "model": self.model,
             "messages": messages,
             "stream": False,
-            "options": {"temperature": temperature},
+            "options": {"temperature": temperature, "num_predict": 700},
         }
         data = _post_json(endpoint, payload, headers={"Content-Type": "application/json"}, timeout_seconds=self.timeout_seconds)
         try:
