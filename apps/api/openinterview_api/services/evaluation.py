@@ -90,15 +90,23 @@ def evaluate_scoring_cases(cases: list[EvaluationCase] | None = None) -> dict:
         return {
             "case_count": 0,
             "score_mae": 0,
+            "mean_signed_error": 0,
+            "max_abs_error": 0,
             "within_tolerance_rate": 0,
+            "within_8_rate": 0,
             "gap_precision": 0,
             "gap_recall": 0,
+            "over_score_count": 0,
+            "under_score_count": 0,
+            "severe_misjudgment_count": 0,
             "misjudgments": [],
             "cases": [],
         }
 
     score_errors = [abs(item["actual_score"] - item["expected_score"]) for item in evaluated]
+    signed_errors = [item["actual_score"] - item["expected_score"] for item in evaluated]
     within_tolerance = [item for item in evaluated if item["score_error"] <= SCORE_TOLERANCE]
+    within_8 = [item for item in evaluated if item["score_error"] <= 8]
     gap_precision_values = [item["gap_precision"] for item in evaluated if item["expected_gaps"] or item["actual_gaps"]]
     gap_recall_values = [item["gap_recall"] for item in evaluated if item["expected_gaps"] or item["actual_gaps"]]
     misjudgments = [
@@ -110,9 +118,15 @@ def evaluate_scoring_cases(cases: list[EvaluationCase] | None = None) -> dict:
     return {
         "case_count": len(evaluated),
         "score_mae": round(mean(score_errors), 2),
+        "mean_signed_error": round(mean(signed_errors), 2),
+        "max_abs_error": round(max(score_errors), 2),
         "within_tolerance_rate": round(len(within_tolerance) / len(evaluated), 3),
+        "within_8_rate": round(len(within_8) / len(evaluated), 3),
         "gap_precision": round(mean(gap_precision_values or [1.0]), 3),
         "gap_recall": round(mean(gap_recall_values or [1.0]), 3),
+        "over_score_count": sum(1 for error in signed_errors if error > SCORE_TOLERANCE),
+        "under_score_count": sum(1 for error in signed_errors if error < -SCORE_TOLERANCE),
+        "severe_misjudgment_count": sum(1 for error in score_errors if error >= 20),
         "misjudgment_count": len(misjudgments),
         "breakdown": _breakdown(evaluated),
         "misjudgments": misjudgments[:15],
@@ -130,10 +144,15 @@ def write_evaluation_report(output_path: Path, result: dict) -> None:
         "",
         f"- Cases: {result['case_count']}",
         f"- Score MAE: {result['score_mae']}",
+        f"- Mean signed error: {result.get('mean_signed_error', 0)}",
+        f"- Max absolute error: {result.get('max_abs_error', 0)}",
         f"- Within +/-{int(SCORE_TOLERANCE)} rate: {result['within_tolerance_rate']}",
+        f"- Within +/-8 rate: {result.get('within_8_rate', 0)}",
         f"- Gap precision: {result['gap_precision']}",
         f"- Gap recall: {result['gap_recall']}",
         f"- Misjudgments: {result.get('misjudgment_count', 0)}",
+        f"- Severe misjudgments: {result.get('severe_misjudgment_count', 0)}",
+        f"- Over/under scored: {result.get('over_score_count', 0)} / {result.get('under_score_count', 0)}",
         "",
         "## Breakdown",
         "",

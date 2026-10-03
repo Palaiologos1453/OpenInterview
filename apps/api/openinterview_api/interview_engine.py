@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import re
 from statistics import mean
 from time import perf_counter
+from urllib.parse import urlparse
 from uuid import uuid4
 
 from .adapters.llm import build_llm_adapter, is_real_llm, llm_temperature
@@ -122,7 +124,7 @@ class CampusInterviewEngine:
         find_difficulty(config.difficulty_id)
         find_mode(config.mode_id)
         find_interviewer_style(config.interviewer_style_id)
-        self._validate_provider_config(config)
+        provider_notice = self._validate_provider_config(config)
         if config.interview_strategy not in {"rules", "semantic"}:
             raise ValueError("Unknown interview strategy")
         if config.interview_strategy == "semantic":
@@ -133,6 +135,7 @@ class CampusInterviewEngine:
         if config.interview_strategy == "semantic":
             from .services.semantic_interview import initial_state
             session.semantic_state = initial_state()
+        session.provider_notice = provider_notice
         session.current_question = self._select_question(session, step=0)
         opening = self._opening_message(session)
         return {
@@ -230,6 +233,7 @@ class CampusInterviewEngine:
                     "question_meta": turn.question_meta,
                     "rubric_hits": self._rubric_coverage(turn.answer, turn.question_meta)[0],
                     "rubric_gaps": self._rubric_coverage(turn.answer, turn.question_meta)[1],
+                    "scoring": self._scoring_profile(turn),
                     "score_evidence": self._score_evidence(turn),
                     "rewrite_advice": self._rewrite_advice(turn),
                 }
@@ -434,14 +438,22 @@ class CampusInterviewEngine:
             for turn in session.history
         ):
             return None
-        followups = [
+        bank_followups = [
             str(item).strip()
             for item in previous_meta.get("followups", [])
             if str(item).strip()
         ]
-        followups = self._style_followups(session, previous_meta) + followups
-        followups = list(dict.fromkeys(followups))
         gaps = self._rubric_coverage(previous.answer, previous_meta)[1]
+        adaptive_followups = self._adaptive_followups(session, previous, gaps)
+        style_followups = self._style_followups(session, previous_meta)
+        followups = (
+            adaptive_followups[:1]
+            + style_followups[:1]
+            + adaptive_followups[1:]
+            + style_followups[1:]
+            + bank_followups
+        )
+        followups = list(dict.fromkeys(followups))
         if not followups or (previous.score >= 72 and not gaps):
             return None
 
@@ -456,11 +468,46 @@ class CampusInterviewEngine:
         meta["phase"] = phase
         meta["type"] = "followup"
         meta["parent_id"] = parent_id
+        meta["followup_reasons"] = list(dict.fromkeys(gaps + self._quality_flags(previous.answer, previous_meta)))[:5]
         meta["rubric"] = [
             f"是否回答：{followups[0]}",
             f"是否补充：{followups[1]}",
         ] if len(followups) > 1 else [f"是否回答：{followups[0]}"]
         return {"prompt": prompt, "meta": meta}
+
+    def _adaptive_followups(self, session: InterviewSession, previous: Turn, gaps: list[str]) -> list[str]:
+        meta = previous.question_meta or {}
+        phase = meta.get("phase") or self._current_phase(session)
+        topic = meta.get("topic") or "这个点"
+        flags = self._quality_flags(previous.answer, meta)
+        followups: list[str] = []
+
+        if gaps:
+            followups.append(
+                f"上一题缺了「{gaps[0]}」。请先把这个点补齐，并说明它在真实工程场景里怎么验证。"
+            )
+            if len(gaps) > 1:
+                followups.append(f"再补「{gaps[1]}」：不要只给名词，请讲机制、取舍和失败场景。")
+
+        if "too_short" in flags:
+            followups.append("你的上一题回答太短。请按结论、机制、边界、验证四步重新组织一版。")
+        if "weak_evidence" in flags:
+            followups.append("你用了体感或模糊效果描述。请给出指标来源、统计窗口、基线、对照和归因方式。")
+        if "overconfident_absolute" in flags:
+            followups.append("你用了绝对化判断。这个结论在哪些边界下不成立？线上出反例时怎么排查？")
+        if "keyword_stuffing" in flags:
+            followups.append("上一题像在堆关键词。请选一个关键词展开底层机制，并给一个工程反例。")
+        if "missing_concrete_evidence" in flags and phase in {"project", "system_design"}:
+            followups.append("请补一个可验证证据：日志、监控、压测、PR、评测集或故障复盘里哪一项能支撑你的结论？")
+
+        if phase == "project":
+            followups.append("把上一题拆成你本人的设计、编码、联调、上线和复盘动作，哪些是团队其他人完成的？")
+        elif phase == "system_design":
+            followups.append("把上一题落到容量和故障：核心指标怎么估算，瓶颈在哪里，降级和恢复怎么做？")
+        elif phase == "fundamentals":
+            followups.append(f"围绕 {topic} 继续讲底层原理、适用边界和一个常见误区。")
+
+        return list(dict.fromkeys(item for item in followups if item))
 
     def _select_project_question(self, session: InterviewSession, step: int) -> str:
         resume = session.config.resume_text or ""
@@ -686,7 +733,7 @@ class CampusInterviewEngine:
             - quality_penalty
         )
         score_cap = self._rubric_score_cap(answer, rubric_hits or [], question_meta)
-        min_score = 38 if self._looks_like_keyword_stuffing(answer, question_meta) else 25
+        min_score = self._score_floor(answer, question_meta)
         return round(
             max(
                 min_score,
@@ -697,6 +744,22 @@ class CampusInterviewEngine:
             ),
             1,
         )
+
+    def _score_floor(self, answer: str, question_meta: dict | None) -> int:
+        text = answer.strip()
+        if not text:
+            return 25
+        if self._looks_like_keyword_stuffing(answer, question_meta):
+            return 40
+        if any(marker in text for marker in ["一定", "肯定", "自然会", "不需要考虑", "不用考虑", "必然"]):
+            return 36
+        if len(text) < 12 or "不太清楚" in text:
+            return 25
+        if any(marker in text for marker in ["大概", "常规", "还没有深入", "没有深入总结", "效果还不错"]):
+            return 40
+        if len(text) >= 24:
+            return 36
+        return 25
 
     def _rubric_gap_penalty(self, rubric_hits: list[str], question_meta: dict | None) -> int:
         rubrics = list((question_meta or {}).get("rubric") or [])
@@ -711,16 +774,39 @@ class CampusInterviewEngine:
             return 95
         missing = max(len(rubrics) - len(rubric_hits), 0)
         if missing <= 0:
-            return 95
+            return 95 if self._has_concrete_evidence(answer) else 88
         if missing == 1:
             if any(marker in answer for marker in ["没有整理出明确的基线", "没有特别记录", "只能说体感"]):
                 return 72
-            return 82
+            return 76
         if missing == 2:
             return 68
         if missing == 3:
             return 52
         return 42
+
+    def _has_concrete_evidence(self, answer: str) -> bool:
+        if re.search(r"\d+(\.\d+)?\s*(%|ms|s|秒|分钟|天|QPS|qps|万|条|次)", answer):
+            return True
+        concrete_markers = [
+            "P95",
+            "P99",
+            "Prometheus",
+            "traceId",
+            "request_id",
+            "PR",
+            "工单",
+            "看板",
+            "慢 SQL",
+            "灰度",
+            "回滚",
+            "上线前",
+            "上线后",
+            "统计窗口",
+            "基线",
+            "压测报告",
+        ]
+        return any(marker in answer for marker in concrete_markers)
 
     def _quality_penalty(self, answer: str, question_meta: dict | None) -> int:
         penalty = 0
@@ -735,6 +821,37 @@ class CampusInterviewEngine:
         if any(marker in answer for marker in weak_evidence_markers):
             penalty += 12
         return min(penalty, 45)
+
+    def _quality_flags(self, answer: str, question_meta: dict | None) -> list[str]:
+        flags: list[str] = []
+        if self._looks_like_keyword_stuffing(answer, question_meta):
+            flags.append("keyword_stuffing")
+        if any(marker in answer for marker in ["一定", "肯定", "自然会", "不需要考虑", "不用考虑", "必然"]):
+            flags.append("overconfident_absolute")
+        if any(marker in answer for marker in ["没有特别记录", "只能说体感", "用户反馈更快", "看几个问题回答得还可以"]):
+            flags.append("weak_evidence")
+        if len(answer.strip()) < 80 and (question_meta or {}).get("phase") != "closing":
+            flags.append("too_short")
+        if not self._has_concrete_evidence(answer) and (question_meta or {}).get("phase") in {"project", "system_design"}:
+            flags.append("missing_concrete_evidence")
+        return flags
+
+    def _scoring_profile(self, turn: Turn) -> dict:
+        hits, gaps = self._rubric_coverage(turn.answer, turn.question_meta)
+        flags = self._quality_flags(turn.answer, turn.question_meta)
+        if turn.question_meta and len(turn.answer.strip()) >= 80 and len(gaps) <= 1 and not flags:
+            confidence = "high"
+        elif len(turn.answer.strip()) < 20 or "keyword_stuffing" in flags:
+            confidence = "low"
+        else:
+            confidence = "medium"
+        return {
+            "method": "deterministic_rubric_v2",
+            "confidence": confidence,
+            "rubric_hit_count": len(hits),
+            "rubric_gap_count": len(gaps),
+            "quality_flags": flags,
+        }
 
     def _closing_feedback(self, answer: str) -> str:
         if any(word in answer for word in ["团队", "培养", "成长", "代码", "业务", "技术栈", "owner", "ownership"]):
@@ -791,14 +908,18 @@ class CampusInterviewEngine:
         negation_markers = ["没有", "没", "缺少", "只能说", "还缺少", "没有整理", "没有特别记录", "不清楚"]
         if not any(marker in answer for marker in negation_markers):
             return False
-        if any(token in label for token in ["指标", "口径", "验证", "基线", "对比", "评测"]):
+        metric_or_validation_label = any(
+            token in label
+            for token in ["指标口径", "验证方式", "线上指标", "调参", "监控迭代"]
+        ) or label in {"给出指标结果、验证方式和复盘", "告警阈值、看板、SLO 和故障复盘"}
+        if metric_or_validation_label:
             return any(
                 phrase in answer
                 for phrase in [
                     "没有整理出明确的基线",
                     "没有特别记录",
                     "没有做得很复杂",
-                    "缺少具体指标",
+                    "没有结合项目里的边界和验证方式展开",
                     "还缺少具体指标",
                     "只能说体感",
                 ]
@@ -936,6 +1057,13 @@ class CampusInterviewEngine:
             "损坏诊断": ["integrity_check", "schema", "诊断", "data 目录"],
             "敏感字段": ["API key", "脱敏", "清空历史", "提示"],
             "诊断报告": ["诊断", "报告", "权限", "schema"],
+            "工具调用": ["工具", "幻觉", "误操作", "副作用", "下单", "退款"],
+            "权限边界": ["权限", "最小授权", "user_id", "越权", "服务端", "schema"],
+            "人工确认": ["人工", "二次确认", "人工审核", "确认"],
+            "回滚": ["回滚", "可回滚", "幂等", "request_id", "记录"],
+            "审计日志": ["审计", "trace", "记录", "参数摘要", "操作者"],
+            "沙箱": ["沙箱", "降级", "只给建议", "监控", "告警"],
+            "降级策略": ["降级", "只给建议", "异常", "监控", "告警"],
         }
         synonyms: list[str] = []
         for key, values in mapping.items():
@@ -1525,8 +1653,86 @@ class CampusInterviewEngine:
         session.provider_notice = None
         return cleaned
 
-    def _validate_provider_config(self, config: InterviewConfig) -> None:
-        del config
+    def _validate_provider_config(self, config: InterviewConfig) -> str | None:
+        provider_config = config.provider_config or {}
+        if not isinstance(provider_config, dict):
+            raise ValueError("provider_config must be an object.")
+
+        notices: list[str] = []
+        llm_notice = self._validate_llm_provider(provider_config.get("llm") or {})
+        if llm_notice:
+            notices.append(llm_notice)
+        self._validate_voice_provider(provider_config.get("asr") or {}, capability="ASR")
+        self._validate_voice_provider(provider_config.get("tts") or {}, capability="TTS")
+        return " ".join(notices) or None
+
+    def _validate_llm_provider(self, settings: dict) -> str | None:
+        if not isinstance(settings, dict):
+            raise ValueError("LLM provider config must be an object.")
+        provider = str(settings.get("provider") or "openai_compatible").strip().lower()
+        if provider in {"", "mock", "disabled"}:
+            return None
+        if provider in {"openai", "openai_compatible", "compatible"}:
+            api_base = str(settings.get("api_base") or "").strip()
+            model = str(settings.get("model") or "").strip()
+            api_key = str(settings.get("api_key") or "").strip()
+            if not any([api_base, model, api_key]):
+                return None
+            missing = [
+                label
+                for label, value in [("API Base", api_base), ("Model", model), ("API Key", api_key)]
+                if not value
+            ]
+            if missing:
+                raise ValueError(
+                    "LLM provider config incomplete: "
+                    + ", ".join(missing)
+                    + " required for OpenAI-compatible provider."
+                )
+            self._validate_http_url(api_base, "LLM API Base")
+            return None
+        if provider == "ollama":
+            model = str(settings.get("model") or "").strip()
+            if not model:
+                raise ValueError("Ollama LLM provider requires a model name.")
+            api_base = str(settings.get("api_base") or "http://127.0.0.1:11434").strip()
+            self._validate_http_url(api_base, "Ollama API Base")
+            return None
+        raise ValueError(f"Unknown LLM provider: {provider}")
+
+    def _validate_voice_provider(self, settings: dict, *, capability: str) -> None:
+        if not isinstance(settings, dict):
+            raise ValueError(f"{capability} provider config must be an object.")
+        provider = str(settings.get("provider") or "browser").strip().lower()
+        if capability == "ASR":
+            allowed = {"", "browser", "disabled", "openai", "openai_compatible", "compatible", "faster_whisper", "sensevoice", "local_sensevoice"}
+        else:
+            allowed = {"", "browser", "disabled", "openai", "openai_compatible", "compatible", "piper", "cosyvoice", "local_cosyvoice"}
+        if provider not in allowed:
+            raise ValueError(f"Unknown {capability} provider: {provider}")
+        if provider in {"openai", "openai_compatible", "compatible"}:
+            api_base = str(settings.get("api_base") or "").strip()
+            model = str(settings.get("model") or "").strip()
+            api_key = str(settings.get("api_key") or "").strip()
+            if not any([api_base, model, api_key]):
+                return
+            missing = [
+                label
+                for label, value in [("API Base", api_base), ("Model", model), ("API Key", api_key)]
+                if not value
+            ]
+            if missing:
+                raise ValueError(
+                    f"{capability} provider config incomplete: "
+                    + ", ".join(missing)
+                    + " required for OpenAI-compatible provider."
+                )
+            self._validate_http_url(api_base, f"{capability} API Base")
+
+    def _validate_http_url(self, value: str, label: str) -> None:
+        parsed = urlparse(value)
+        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
+            raise ValueError(f"{label} must be an http(s) URL.")
 
     def _llm_config_ready(self, provider_config: dict | None) -> bool:
         if not is_real_llm(provider_config):

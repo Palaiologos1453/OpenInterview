@@ -140,6 +140,114 @@ class OpenInterviewAPITest(unittest.TestCase):
         self.assertEqual(risky.status_code, 200)
         self.assertTrue(risky.json()["project_risk_flags"])
 
+    def test_resume_analyze_skips_llm_when_config_incomplete(self):
+        with patch(
+            "openinterview_api.services.resume.build_llm_adapter",
+            side_effect=AssertionError("LLM adapter should not be built for incomplete config"),
+        ):
+            response = client.post(
+                "/v1/resume/analyze",
+                json={
+                    "text": "项目：推荐系统。负责 Java 和 Redis 开发。",
+                    "provider_config": {
+                        "llm": {
+                            "provider": "openai_compatible",
+                            "api_base": "",
+                            "model": "",
+                            "api_key": "",
+                        }
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload["llm_used"])
+        self.assertEqual(payload["analysis_method"], "rules")
+        self.assertIn("LLM 配置缺少 Model, API Key", payload["llm_notice"])
+
+    def test_resume_analyze_uses_llm_when_configured(self):
+        llm_payload = {
+            "tech_stack": ["Kafka"],
+            "projects": ["订单风控系统"],
+            "contributions": ["独立设计风控规则灰度发布链路"],
+            "project_cards": [
+                {
+                    "name": "订单风控系统",
+                    "summary": "面向异常订单识别，负责规则引擎和灰度发布。",
+                    "tech_stack": ["Java", "Kafka", "Redis"],
+                    "contribution_signals": ["设计规则热更新和回滚流程"],
+                    "metrics": ["误杀率从 1.8% 降到 0.7%，统计窗口为 14 天"],
+                    "tech_choices": ["比较过同步校验和异步队列，最终用 Kafka 削峰"],
+                    "incident_signals": ["灰度期间出现规则误伤，按告警回滚并复盘"],
+                    "evidence": ["PR、灰度配置、监控看板"],
+                    "source_quotes": ["订单风控系统，负责规则引擎"],
+                    "followup_questions": ["误杀率统计口径和对照组是什么？"],
+                }
+            ],
+            "metric_questions": ["误杀率统计口径和对照组是什么？"],
+            "evidence_questions": ["如果看 PR，你会指哪段代码证明这是你做的？"],
+            "project_risk_flags": ["需要解释误杀率归因方式。"],
+        }
+
+        with patch(
+            "openinterview_api.services.resume.build_llm_adapter",
+            return_value=_StaticLLMAdapter(llm_payload),
+        ):
+            response = client.post(
+                "/v1/resume/analyze",
+                json={
+                    "text": "项目：订单风控系统，负责规则引擎，使用 Java、Redis。",
+                    "provider_config": {
+                        "llm": {
+                            "provider": "openai_compatible",
+                            "api_base": "http://127.0.0.1:9/v1",
+                            "model": "mock-json",
+                            "api_key": "test-key",
+                        },
+                        "asr": {"provider": "browser"},
+                        "tts": {"provider": "browser"},
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertTrue(payload["llm_used"])
+        self.assertEqual(payload["analysis_method"], "rules+llm")
+        self.assertIn("Kafka", payload["tech_stack"])
+        self.assertTrue(payload["project_cards"][0]["evidence"])
+        self.assertTrue(payload["evidence_questions"])
+
+    def test_resume_analyze_falls_back_when_llm_fails(self):
+        with patch(
+            "openinterview_api.services.resume.build_llm_adapter",
+            return_value=_FailingLLMAdapter(),
+        ):
+            response = client.post(
+                "/v1/resume/analyze",
+                json={
+                    "text": "项目：推荐系统。负责 Java 和 Redis 开发。",
+                    "provider_config": {
+                        "llm": {
+                            "provider": "openai_compatible",
+                            "api_base": "http://127.0.0.1:9/v1",
+                            "model": "bad-model",
+                            "api_key": "test-key",
+                        },
+                        "asr": {"provider": "browser"},
+                        "tts": {"provider": "browser"},
+                    },
+                },
+            )
+
+        self.assertEqual(response.status_code, 200)
+        payload = response.json()
+        self.assertFalse(payload["llm_used"])
+        self.assertEqual(payload["analysis_method"], "rules")
+        self.assertIn("回退到本地规则解析", payload["llm_notice"])
+        self.assertTrue(payload["project_cards"])
+
     def test_start_does_not_require_llm_config_by_default(self):
         response = client.post(
             "/v1/interviews",
@@ -169,6 +277,47 @@ class OpenInterviewAPITest(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertIn("八股连环追问型", response.json()["opening_message"])
+
+    def test_start_rejects_partial_llm_provider_config(self):
+        response = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "comprehensive",
+                "provider_config": {
+                    "llm": {
+                        "provider": "openai_compatible",
+                        "api_base": "https://api.openai.com/v1",
+                        "model": "",
+                        "api_key": "",
+                    },
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("LLM provider config incomplete", response.json()["detail"])
+
+    def test_start_rejects_unknown_provider(self):
+        response = client.post(
+            "/v1/interviews",
+            json={
+                "direction_id": "backend",
+                "difficulty_id": "campus",
+                "mode_id": "comprehensive",
+                "provider_config": {
+                    "llm": {"provider": "not-a-provider"},
+                    "asr": {"provider": "browser"},
+                    "tts": {"provider": "browser"},
+                },
+            },
+        )
+
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("Unknown LLM provider", response.json()["detail"])
 
     def test_report_response_includes_interviewer_style(self):
         interview = client.post(
@@ -1131,6 +1280,21 @@ class _EmptyLLMAdapter:
     def complete(self, messages: list[dict[str, str]], *, temperature: float = 0.4) -> str:
         del messages, temperature
         return ""
+
+
+class _StaticLLMAdapter:
+    def __init__(self, payload: dict):
+        self.payload = payload
+
+    def complete(self, messages: list[dict[str, str]], *, temperature: float = 0.4) -> str:
+        del messages, temperature
+        return json.dumps(self.payload, ensure_ascii=False)
+
+
+class _FailingLLMAdapter:
+    def complete(self, messages: list[dict[str, str]], *, temperature: float = 0.4) -> str:
+        del messages, temperature
+        raise RuntimeError("provider unavailable")
 
 
 def _minimal_docx_bytes(text: str) -> bytes:

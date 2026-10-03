@@ -27,7 +27,7 @@ from .services.coverage import question_coverage
 from .services.provider_diagnostics import diagnose_llm_error
 from .services.readiness import readiness_report, readiness_smoke_report
 from .services.review import report_to_markdown, review_items_from_report
-from .services.resume import analyze_resume
+from .services.resume import analyze_resume_with_llm
 from .services.resume_file import extract_resume_text
 from .services.realtime import RealtimeRegistry
 from .services.session_store import SQLiteBackedSessionStore
@@ -542,7 +542,8 @@ def get_question(question_id: str) -> dict:
 
 @app.post("/v1/resume/analyze")
 def resume_analyze(request: ResumeAnalyzeRequest) -> dict:
-    return analyze_resume(request.text).as_dict()
+    provider_config = request.provider_config.model_dump() if request.provider_config else None
+    return analyze_resume_with_llm(request.text, provider_config).as_dict()
 
 
 @app.post("/v1/resume/extract", response_model=ResumeExtractResponse)

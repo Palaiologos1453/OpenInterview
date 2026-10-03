@@ -1,7 +1,10 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import asdict, dataclass
+
+from ..adapters.llm import build_llm_adapter, is_real_llm
 
 
 TECH_KEYWORDS = [
@@ -89,6 +92,9 @@ class ResumeAnalysis:
     incident_questions: list[str]
     evidence_questions: list[str]
     project_risk_flags: list[str]
+    analysis_method: str = "rules"
+    llm_used: bool = False
+    llm_notice: str | None = None
 
     def as_dict(self) -> dict:
         return asdict(self)
@@ -124,6 +130,190 @@ def analyze_resume(text: str) -> ResumeAnalysis:
         evidence_questions=evidence_questions,
         project_risk_flags=project_risk_flags,
     )
+
+
+def analyze_resume_with_llm(text: str, provider_config: dict | None = None) -> ResumeAnalysis:
+    base = analyze_resume(text)
+    if not text.strip():
+        return base
+    config_notice = _resume_llm_config_notice(provider_config)
+    if config_notice:
+        base.llm_notice = config_notice
+        return base
+
+    try:
+        payload = _call_resume_llm(text, provider_config)
+    except Exception as exc:
+        base.llm_notice = f"LLM 简历解析失败，已回退到本地规则解析：{exc}"
+        return base
+
+    enhanced = _merge_llm_resume_analysis(base, payload)
+    enhanced.analysis_method = "rules+llm"
+    enhanced.llm_used = True
+    enhanced.llm_notice = "已使用用户配置的 LLM 辅助解析；本地规则结果作为兜底和约束。"
+    return enhanced
+
+
+def _resume_llm_config_notice(provider_config: dict | None) -> str | None:
+    if not is_real_llm(provider_config):
+        return "未配置真实 LLM，已使用本地规则解析。"
+
+    settings = (provider_config or {}).get("llm", provider_config or {})
+    provider = (settings.get("provider") or "mock").strip().lower()
+    if provider == "ollama":
+        if not (settings.get("model") or "").strip():
+            return "Ollama 未配置模型名，已使用本地规则解析。"
+        return None
+
+    if provider in {"openai", "openai_compatible", "compatible"}:
+        missing = []
+        if not (settings.get("model") or "").strip():
+            missing.append("Model")
+        if not (settings.get("api_key") or "").strip():
+            missing.append("API Key")
+        if missing:
+            return f"LLM 配置缺少 {', '.join(missing)}，已使用本地规则解析。"
+        return None
+
+    return None
+
+
+def _call_resume_llm(text: str, provider_config: dict | None) -> dict:
+    adapter = build_llm_adapter(provider_config)
+    messages = [
+        {
+            "role": "system",
+            "content": (
+                "你是大厂技术面试官，负责从候选人简历中提取可验证的项目事实。"
+                "只输出一个 JSON object，不要 Markdown，不要解释。"
+                "不要编造简历中没有的经历、指标或技术栈。"
+                "重点识别真实面试会追问的内容：个人贡献、指标口径、技术选型、替代方案、"
+                "故障复盘、证据来源、模糊表述和风险点。"
+            ),
+        },
+        {
+            "role": "user",
+            "content": (
+                "请按下面 schema 输出 JSON：\n"
+                "{\n"
+                "  \"tech_stack\": [\"...\"],\n"
+                "  \"projects\": [\"...\"],\n"
+                "  \"contributions\": [\"...\"],\n"
+                "  \"vague_claims\": [\"...\"],\n"
+                "  \"project_cards\": [{\n"
+                "    \"name\": \"项目名\",\n"
+                "    \"summary\": \"业务背景、个人职责和结果的简短摘要\",\n"
+                "    \"tech_stack\": [\"...\"],\n"
+                "    \"contribution_signals\": [\"设计/编码/联调/上线/复盘动作\"],\n"
+                "    \"metrics\": [\"指标、口径、基线或上线后对比\"],\n"
+                "    \"vague_claims\": [\"模糊或易被质疑表述\"],\n"
+                "    \"tech_choices\": [\"选型、替代方案和取舍\"],\n"
+                "    \"incident_signals\": [\"故障、压测、告警、回滚或复盘\"],\n"
+                "    \"evidence\": [\"PR/代码/日志/压测报告/监控看板等证据\"],\n"
+                "    \"source_quotes\": [\"简历原文中的短片段\"],\n"
+                "    \"followup_questions\": [\"真实面试追问\"]\n"
+                "  }],\n"
+                "  \"metric_questions\": [\"...\"],\n"
+                "  \"tech_choice_questions\": [\"...\"],\n"
+                "  \"incident_questions\": [\"...\"],\n"
+                "  \"evidence_questions\": [\"...\"],\n"
+                "  \"project_risk_flags\": [\"...\"],\n"
+                "  \"risks\": [\"...\"]\n"
+                "}\n\n"
+                "要求：问题要像真实大厂面试官追问，围绕本人贡献、指标来源、统计窗口、"
+                "上线基线、归因、替代方案、故障复盘和证据。\n"
+                f"简历文本：\n{text[:6000]}"
+            ),
+        },
+    ]
+    raw = adapter.complete(messages, temperature=0.1)
+    return _parse_json_object(raw)
+
+
+def _parse_json_object(text: str) -> dict:
+    stripped = text.strip()
+    if stripped.startswith("```"):
+        stripped = re.sub(r"^```(?:json)?", "", stripped, flags=re.IGNORECASE).strip()
+        stripped = re.sub(r"```$", "", stripped).strip()
+    start = stripped.find("{")
+    end = stripped.rfind("}")
+    if start < 0 or end <= start:
+        raise ValueError("LLM did not return a JSON object")
+    payload = json.loads(stripped[start : end + 1])
+    if not isinstance(payload, dict):
+        raise ValueError("LLM JSON root must be an object")
+    return payload
+
+
+def _merge_llm_resume_analysis(base: ResumeAnalysis, payload: dict) -> ResumeAnalysis:
+    data = base.as_dict()
+    for key in [
+        "tech_stack",
+        "projects",
+        "contributions",
+        "vague_claims",
+        "metric_questions",
+        "tech_choice_questions",
+        "incident_questions",
+        "evidence_questions",
+        "project_risk_flags",
+        "risks",
+    ]:
+        data[key] = _merge_lists(data.get(key), payload.get(key), limit=12)
+    data["project_cards"] = _merge_project_cards(data.get("project_cards"), payload.get("project_cards"))
+    data["analysis_method"] = "rules+llm"
+    data["llm_used"] = True
+    data["llm_notice"] = None
+    return ResumeAnalysis(**data)
+
+
+def _merge_lists(base_items: object, llm_items: object, *, limit: int) -> list[str]:
+    items = [str(item).strip() for item in base_items or [] if str(item).strip()]
+    if isinstance(llm_items, list):
+        items.extend(str(item).strip() for item in llm_items if str(item).strip())
+    return _dedupe(items)[:limit]
+
+
+def _merge_project_cards(base_cards: object, llm_cards: object) -> list[dict]:
+    cards: list[dict] = [dict(card) for card in base_cards or [] if isinstance(card, dict)]
+    by_name = {str(card.get("name") or "").strip(): card for card in cards}
+    if isinstance(llm_cards, list):
+        for item in llm_cards:
+            if not isinstance(item, dict):
+                continue
+            name = str(item.get("name") or "").strip()
+            if not name:
+                continue
+            target = by_name.get(name)
+            if not target:
+                target = {
+                    "name": name,
+                    "summary": "",
+                    "tech_stack": [],
+                    "contribution_signals": [],
+                    "metrics": [],
+                    "vague_claims": [],
+                    "tech_choices": [],
+                    "incident_signals": [],
+                    "followup_questions": [],
+                }
+                cards.append(target)
+                by_name[name] = target
+            if item.get("summary") and len(str(item["summary"])) > len(str(target.get("summary") or "")):
+                target["summary"] = _shorten(str(item["summary"]), 220)
+            for key in [
+                "tech_stack",
+                "contribution_signals",
+                "metrics",
+                "vague_claims",
+                "tech_choices",
+                "incident_signals",
+                "evidence",
+                "source_quotes",
+                "followup_questions",
+            ]:
+                target[key] = _merge_lists(target.get(key), item.get(key), limit=8)
+    return cards[:6]
 
 
 def _extract_tech_stack(text: str) -> list[str]:

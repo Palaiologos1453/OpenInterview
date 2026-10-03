@@ -66,5 +66,12 @@ python scripts/evaluate_semantic_interview.py --config configs/llm.local.json --
 输出 `logs/semantic-interview-evaluation.json` 包含实际问题、候选人回答、决策、引用、延迟与最终状态。
 连接/格式/校验失败标为 invalid_run；完成运行不等于面试质量合格，不用模型自打分代替人工评审。
 
-当前验证了接口、状态、证据约束和模拟响应回归；**尚未完成真实云端拟真对话评测**。
-本次环境中的既有服务配置在 TLS 阶段连接失败，且没有指定模型名，不能据此声称模型效果通过。
+已用 DeepSeek 官方 API（`https://api.deepseek.com/v1`，模型名 `deepseek-flash`，
+官方文档对应 DeepSeek-V4.1-Flash）完成一次八股和一次项目四轮合成对话。
+八股从错误的 equals/hashCode 命题追到 HashMap 桶定位、Redis 机制、MySQL 覆盖索引；
+项目从 P95 归因追到同事负责的 Redis、索引字段边界，并接受“记录没有，不能编”。
+逐轮原文、决策和延迟见 [DeepSeek 评测记录](benchmarks/deepseek-v41-semantic-2026-10-03.json)。
+
+这证明了工作流会根据回答变化，不能证明面试质量合格：单轮云端决策约 **5.2–22.5 秒**，
+项目约 **8.8–17.3 秒**，合成候选人也不能替代真人和专家评分。需要继续做多候选人、多难度、
+术语误识别和冲突事实测试；当前语义模式不应直接接入要求一秒起声的实时语音路径。

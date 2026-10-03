@@ -2,7 +2,7 @@
 
 OpenInterview 是一个面向 Java 后端和 AI 应用开发校招/实习准备的本地 AI 模拟面试工具。
 
-项目定位很明确：每个人把项目拉到自己的电脑上，启动本地 API 和静态前端，然后开始练习。文本面试默认使用本地题库和规则评分；模型 URL、模型名和 API Key 只用于可选 LLM 报告总结或语音 API。它默认不是公网 SaaS，不要求上传简历、语音或 API Key 到第三方服务端。
+项目定位很明确：每个人把项目拉到自己的电脑上，启动本地 API 和静态前端，然后开始练习。文本面试默认使用本地题库和规则评分；模型 URL、模型名和 API Key 只用于可选 LLM 简历解析增强、报告总结或语音 API。它默认不是公网 SaaS，不要求上传简历、语音或 API Key 到第三方服务端。
 
 新用户可以先看 [Quickstart](docs/quickstart.md)。
 现已提供[云端语义追问 + 本地语音](docs/cloud-semantic-interview.md)：八股与项目分别维护状态和评价，
@@ -45,7 +45,7 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
 
 1. 打开脚本打印的前端地址。
 2. 直接选择方向、难度、模式和面试官风格，开始文本面试。
-3. 如果需要 LLM 参与报告总结，可在左侧“模型配置（本机保存）”里填写 LLM：
+3. 如果需要 LLM 参与简历解析增强或报告总结，可在左侧“模型配置（本机保存）”里填写 LLM：
    - Provider 模板：可选 OpenAI、DeepSeek、阿里云百炼 DashScope、SiliconFlow、Moonshot/Kimi、Ollama
    - Provider：`openai_compatible`
    - API Base：例如 `https://api.openai.com/v1`，或其他兼容 `/v1/chat/completions` 的地址
@@ -53,7 +53,7 @@ http://127.0.0.1:5173/?api=http://127.0.0.1:8000
    - API Key：你的 key
 4. 点击“测试 LLM”，确认模型能返回。
 
-LLM 测试失败时会显示错误类型和修复建议，例如 Key 错、模型不存在、Base URL 不匹配、额度不足、超时或返回格式不兼容。面试进行中不会等待 LLM 出题或生成反馈；报告总结调用 LLM 失败时会回退到本地总结。
+LLM 测试失败时会显示错误类型和修复建议，例如 Key 错、模型不存在、Base URL 不匹配、额度不足、超时或返回格式不兼容。面试进行中不会等待 LLM 出题或生成反馈；简历解析增强或报告总结调用 LLM 失败时会回退到本地规则结果。
 
 ASR/TTS 默认走浏览器能力，文本面试不依赖本地语音。建议第一次先只跑文本。需要语音时，可在配置区点击“测试 ASR”“测试 TTS”或“语音自检”确认浏览器/本地语音环境。完整模型配置教程见 [Voice Setup](docs/voice-setup.md)。
 
@@ -92,7 +92,7 @@ python .\scripts\generate_javaguide_questions.py --javaguide-root D:\JavaGuide
 - `.docx`
 - `.pdf`
 
-文件只会发送到本机 API 做文本提取，不会上传公网服务。扫描版图片 PDF 可能无法提取文字，建议先复制成文本。
+文件只会发送到本机 API 做文本提取，不会上传公网服务。点击“分析简历”时，如果已配置真实 LLM，后端会用该 provider 辅助生成项目卡片、证据追问和风险点；如果未配置或调用失败，会回退到本地规则解析。扫描版图片 PDF 可能无法提取文字，建议先复制成文本。
 
 ## 历史和报告
 

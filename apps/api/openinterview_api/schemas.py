@@ -143,6 +143,7 @@ class VoiceModelConfigRequest(BaseModel):
 
 class ResumeAnalyzeRequest(BaseModel):
     text: str = Field(default="")
+    provider_config: ProviderSettings | None = None
 
 
 class ResumeExtractResponse(BaseModel):

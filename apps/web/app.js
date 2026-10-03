@@ -355,10 +355,14 @@ async function analyzeResume() {
   ensureBackend();
   const text = elements.resume.value.trim();
   if (!text) return;
-  const result = await postJson(`${API_BASE}/v1/resume/analyze`, { text });
+  const result = await postJson(`${API_BASE}/v1/resume/analyze`, {
+    text,
+    provider_config: readProviderConfig()
+  });
   elements.resumePanel.hidden = false;
   elements.resumePanel.innerHTML = `
     <strong>简历分析</strong>
+    <div class="muted-text">${escapeHtml(resumeAnalysisSource(result))}</div>
     ${renderMiniList("技术栈", result.tech_stack)}
     ${renderMiniList("项目", result.projects)}
     ${renderMiniList("个人贡献", result.contributions)}
@@ -368,6 +372,8 @@ async function analyzeResume() {
     ${renderResumeQuestionList("指标来源追问", result.metric_questions)}
     ${renderResumeQuestionList("技术选型追问", result.tech_choice_questions)}
     ${renderResumeQuestionList("故障复盘追问", result.incident_questions)}
+    ${renderResumeQuestionList("证据追问", result.evidence_questions)}
+    ${renderResumeQuestionList("项目风险点", result.project_risk_flags)}
   `;
 }
 
@@ -2297,6 +2303,8 @@ function renderTurnReview(turns) {
         const meta = turn.question_meta || {};
         const gaps = turn.rubric_gaps || [];
         const hits = turn.rubric_hits || [];
+        const scoring = turn.scoring || {};
+        const qualityFlags = scoring.quality_flags || [];
         const title = meta.topic || meta.id || `第 ${index + 1} 题`;
         return `
           <div class="turn-review-item">
@@ -2305,6 +2313,7 @@ function renderTurnReview(turns) {
               <span>${turn.score == null ? "待澄清，未评分" : `${escapeHtml(String(turn.score))} 分`}</span>
             </div>
             <p>${escapeHtml(shortText(turn.question, 120))}</p>
+            ${scoring.confidence ? `<div class="tags"><span class="tag">${escapeHtml(`置信度：${scoring.confidence}`)}</span><span class="tag">${escapeHtml(`评分点：${scoring.rubric_hit_count || 0}/${(scoring.rubric_hit_count || 0) + (scoring.rubric_gap_count || 0)}`)}</span>${qualityFlags.slice(0, 3).map((flag) => `<span class="tag">${escapeHtml(flag)}</span>`).join("")}</div>` : ""}
             ${hits.length ? `<div class="tags">${hits.slice(0, 3).map((hit) => `<span class="tag hit-tag">${escapeHtml(hit)}</span>`).join("")}</div>` : ""}
             ${gaps.length ? `<div class="tags">${gaps.slice(0, 3).map((gap) => `<span class="tag">${escapeHtml(gap)}</span>`).join("")}</div>` : ""}
             ${renderGuideList("评分证据", turn.score_evidence)}
@@ -2495,6 +2504,12 @@ function renderMiniList(title, items = []) {
   return `<div><b>${escapeHtml(title)}：</b>${items.length ? items.map(escapeHtml).join("、") : "无"}</div>`;
 }
 
+function resumeAnalysisSource(result) {
+  const method = result?.analysis_method === "rules+llm" ? "本地规则 + LLM 辅助" : "本地规则";
+  const notice = result?.llm_notice ? `；${result.llm_notice}` : "";
+  return `解析方式：${method}${notice}`;
+}
+
 function renderResumeProjectCards(cards = []) {
   if (!Array.isArray(cards) || !cards.length) return "";
   return `
@@ -2507,6 +2522,8 @@ function renderResumeProjectCards(cards = []) {
           ${renderGuideList("个人贡献信号", card.contribution_signals)}
           ${renderGuideList("指标信号", card.metrics)}
           ${renderGuideList("易被质疑表述", card.vague_claims)}
+          ${renderGuideList("证据线索", card.evidence)}
+          ${renderGuideList("原文片段", card.source_quotes)}
           ${renderGuideList("项目拷打问题", card.followup_questions)}
         </article>
       `).join("")}

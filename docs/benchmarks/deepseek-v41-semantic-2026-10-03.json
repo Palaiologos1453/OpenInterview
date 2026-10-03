@@ -1,0 +1,30 @@
+{
+  "provider": "DeepSeek official OpenAI-compatible API",
+  "api_base": "https://api.deepseek.com/v1",
+  "model": "deepseek-flash",
+  "model_note": "Official docs describe this API name as serving DeepSeek-V4.1-Flash; the models endpoint returned deepseek-flash and deepseek-v4-pro.",
+  "date": "2026-10-03",
+  "cases": [
+    "logs/deepseek-v41-knowledge-final.json",
+    "logs/deepseek-v41-project-final.json"
+  ],
+  "knowledge_result": {
+    "turns": 4,
+    "path": "initial equals/hashCode error -> HashMap bucket correction -> Redis mechanism -> MySQL B+ tree and covering-index boundary",
+    "decision_ms_observed": "5166-22490",
+    "finding": "The model identified the wrong claim, accepted the correction, and changed the next question from the answer."
+  },
+  "project_result": {
+    "turns": 4,
+    "path": "metric attribution -> colleague-owned Redis boundary -> index design -> hypothetical boundary after missing records",
+    "decision_ms_observed": "8854-17340",
+    "finding": "The model kept project claims separate from knowledge evidence and treated missing records as uncertainty rather than proof of fabrication."
+  },
+  "limitations": [
+    "Synthetic candidate, not human speech or independent human grading.",
+    "One scenario per track; no p95 or repeated randomized runs.",
+    "Cloud semantic decisions are too slow for direct per-turn real-time speech without a fast draft model or prefetch.",
+    "A model can produce a plausible but wrong assessment; evidence and schema validation do not replace expert review.",
+    "DeepSeek official API JSON/model documentation was checked; the API key is not included here."
+  ]
+}

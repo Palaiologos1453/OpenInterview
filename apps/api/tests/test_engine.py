@@ -129,8 +129,29 @@ class CampusInterviewEngineTest(unittest.TestCase):
         turn = engine.answer(session, "不太清楚。")
 
         self.assertIn("围绕上一题继续追问", turn["next_question"])
+        self.assertTrue(session.current_question_meta["followup_reasons"])
         self.assertEqual(session.current_question_meta["type"], "followup")
         self.assertEqual(turn["interviewer_message"], "")
+
+    def test_report_turns_include_scoring_profile(self):
+        engine = CampusInterviewEngine()
+        result = engine.start(
+            InterviewConfig(
+                direction_id="backend",
+                difficulty_id="campus",
+                mode_id="fundamentals",
+                provider_config=MOCK_PROVIDER,
+            )
+        )
+        session = result["session"]
+
+        engine.answer(session, "这个问题我大概知道，但具体边界和验证方式还没有深入总结。")
+        report = engine.report(session)
+
+        scoring = report["turns"][0]["scoring"]
+        self.assertEqual(scoring["method"], "deterministic_rubric_v2")
+        self.assertIn(scoring["confidence"], {"low", "medium", "high"})
+        self.assertIn("quality_flags", scoring)
 
     def test_project_deep_dive_followup_is_project_specific(self):
         engine = CampusInterviewEngine()

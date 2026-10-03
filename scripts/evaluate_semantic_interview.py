@@ -74,6 +74,7 @@ def run_case(name, scenario, providers, rounds):
         except Exception as exc:
             result["status"] = "invalid_run"
             result["error_type"] = type(exc).__name__
+            result["reason_code"] = getattr(exc, "reason_code", "request_error")
             result["failure_stage"] = "candidate_or_interviewer_request"
             return result
     result["status"] = "completed"
@@ -86,6 +87,7 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, help="Local JSON with api_base/model/api_key (never committed)")
     parser.add_argument("--rounds", type=int, default=4)
+    parser.add_argument("--scenario", choices=["all", "knowledge", "project"], default="all")
     parser.add_argument("--output", type=Path, default=ROOT / "logs/semantic-interview-evaluation.json")
     args = parser.parse_args()
     if not 1 <= args.rounds <= 8:
@@ -100,7 +102,8 @@ def main():
         validate_cloud(providers)
     except ValueError:
         parser.error("Provide local --config or OPENINTERVIEW_LLM_API_BASE/MODEL/API_KEY; no real cloud test was run.")
-    results = [run_case(name, scenario, providers, args.rounds) for name, scenario in SCENARIOS.items()]
+    results = [run_case(name, scenario, providers, args.rounds) for name, scenario in SCENARIOS.items()
+               if args.scenario in {"all", name}]
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps({"model": settings["model"], "cases": results,
         "note": "Synthetic caller; manually review transcript relevance, corrections, grounding and depth. Completion is not a quality pass."},

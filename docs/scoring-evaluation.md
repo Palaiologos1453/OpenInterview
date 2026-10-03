@@ -30,15 +30,20 @@ python .\scripts\evaluate_scoring.py --output apps/api/eval/scoring-report.md --
 - `score_mae <= 10.0`
 - `gap_recall >= 0.9`
 
-报告会输出整体指标、按题型分组指标、真实场景样本指标和 Top 误判案例。
+报告会输出整体指标、平均有符号误差、最大绝对误差、`+/-8` 与 `+/-12` 命中率、过高/过低估计数量、按题型分组指标、真实场景样本指标和 Top 误判案例。逐题报告还会给出 rubric 命中、缺口、评分置信度和质量标记。
 
 ## Current Result
 
 当前报告见 `apps/api/eval/scoring-report.md`。最近一次结果：
 
 - Cases: 109
-- Score MAE: 9.29
-- Gap recall: 0.972
+- Score MAE: 3.98
+- Mean signed error: 0.81
+- Max absolute error: 13.0
+- Within +/-8 rate: 0.89
+- Gap recall: 0.996
+- Misjudgments: 4
+- Severe misjudgments: 0
 - Keyword-stuffing 高分误判已被压低，不再因为堆术语直接高分。
 
 ## Limitations

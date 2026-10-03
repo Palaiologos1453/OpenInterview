@@ -105,6 +105,8 @@ def report_to_markdown(report: dict) -> str:
             "",
             f"反馈：{turn.get('feedback', '')}",
             "",
+            f"评分方法：{(turn.get('scoring') or {}).get('method', '')}，置信度：{(turn.get('scoring') or {}).get('confidence', '')}",
+            "",
             "评分证据：",
         ])
         for item in turn.get("score_evidence") or []:
