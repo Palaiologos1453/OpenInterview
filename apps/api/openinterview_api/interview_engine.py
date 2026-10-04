@@ -47,6 +47,9 @@ QUESTION_BANK = {
 
 
 YAML_QUESTION_BANK = default_question_bank()
+# Parse the all-direction index during application import so the first
+# semantic turn does not pay the YAML disk/parsing cost.
+YAML_QUESTION_BANK.list_questions()
 
 
 MODE_FLOW = {
