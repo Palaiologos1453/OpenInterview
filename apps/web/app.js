@@ -131,6 +131,12 @@ const state = {
   currentAudio: null,
   bargeInSpeechMs: 0,
   bargeInTriggered: false,
+  bargeInRing: [],
+  bargeInRingSamples: 0,
+  bargeInReplay: [],
+  bargeInSilenceTimer: null,
+  streamEpoch: 0,
+  currentQuestionText: "",
   recordedChunks: [],
   voiceConfig: null,
   providerConfig: loadProviderConfig()
@@ -981,6 +987,7 @@ function detectVoiceMode(config = readProviderConfig()) {
   const asrProvider = config.asr.provider;
   const ttsProvider = config.tts.provider;
   if (asrProvider === "disabled" && ttsProvider === "disabled") return "disabled";
+  if (ttsProvider === "cosyvoice_wsl") return "wsl";
   if (asrProvider === "sensevoice" || ttsProvider === "cosyvoice") return "local";
   if (asrProvider === "openai_compatible" || ttsProvider === "openai_compatible") return "api";
   return "browser";
@@ -1528,6 +1535,8 @@ async function startBargeInCapture() {
     await startPcmDuplexCapture(stream, readProviderConfig(), { sendStart: false });
     state.bargeInSpeechMs = 0;
     state.bargeInTriggered = false;
+    state.bargeInRing = [];
+    state.bargeInRingSamples = 0;
   } catch (error) {
     console.warn("Barge-in capture unavailable:", error.message);
   }
@@ -1582,17 +1591,26 @@ function handlePcmCaptureMessage(message) {
     return;
   }
   if (message?.type !== "chunk" || !message.buffer) return;
+  const samples = new Int16Array(message.buffer);
   if (state.realtimeMode === "speaking" && !state.bargeInTriggered) {
-    const samples = new Int16Array(message.buffer);
     let energy = 0;
     for (const sample of samples) energy += Math.abs(sample) / 32768;
     const chunkMs = samples.length / 16;
+    state.bargeInRing.push(message.buffer);
+    state.bargeInRingSamples += samples.length;
+    while (state.bargeInRingSamples > 4800 && state.bargeInRing.length) {
+      state.bargeInRingSamples -= new Int16Array(state.bargeInRing.shift()).length;
+    }
     state.bargeInSpeechMs = energy / Math.max(samples.length, 1) > 0.025
       ? state.bargeInSpeechMs + chunkMs : 0;
     if (state.bargeInSpeechMs >= 200) {
       state.bargeInTriggered = true;
+      state.bargeInReplay = state.bargeInRing.slice();
+      state.bargeInRing = [];
+      state.bargeInRingSamples = 0;
       void interruptDuplexPlayback("barge_in");
     }
+    return;
   }
   sendDuplexPcmChunk(message.buffer);
 }
@@ -1723,12 +1741,26 @@ async function interruptDuplexPlayback(reason = "barge_in") {
       type: "interrupt",
       reason,
       played_ms: elapsedSinceVoiceTurnStart(),
-      played_chars: 0
+      played_chars: estimatePlayedChars()
     }));
   }
 }
 
+function estimatePlayedChars() {
+  const text = String(state.currentQuestionText || "");
+  if (!text) return 0;
+  const estimated = Math.min(text.length, Math.max(0, Math.round(elapsedSinceVoiceTurnStart() / 210)));
+  const punctuation = /[，。！？；：,.!?;:]/;
+  let boundary = 0;
+  for (let index = 0; index < text.length && index < estimated; index += 1) {
+    if (punctuation.test(text[index])) boundary = index + 1;
+  }
+  return boundary || estimated;
+}
+
 function handleDuplexMessage(message) {
+  if (message.stream_epoch !== undefined && message.stream_epoch < state.streamEpoch) return;
+  if (message.stream_epoch !== undefined) state.streamEpoch = message.stream_epoch;
   if (message.type === "ready" || message.type === "listening") return;
   if (message.type === "timing") {
     updateVoiceTiming(message.name, message.duration_ms);
@@ -1792,6 +1824,7 @@ function handleDuplexMessage(message) {
     state.realtimeMode = "speaking";
     elements.listenButton.textContent = "取消";
     elements.sendButton.disabled = true;
+    state.currentQuestionText = turn.next_question || "";
     void startBargeInCapture();
     return;
   }
@@ -1845,6 +1878,16 @@ function handleDuplexMessage(message) {
     resetPcmPlayback();
     updateTranscriptStatus("已打断，继续回答当前问题");
     setStatus("已停止面试官播报，可以继续回答。 ");
+    for (const buffered of state.bargeInReplay || []) sendDuplexPcmChunk(buffered);
+    state.bargeInReplay = [];
+    state.bargeInSpeechMs = 0;
+    clearTimeout(state.bargeInSilenceTimer);
+    state.bargeInSilenceTimer = setTimeout(() => {
+      if (state.realtimeMode === "recording" && !state.bargeInSpeechMs) {
+        void speakWithBrowser("刚才没听清，请继续。 ");
+        setStatus("暂时没有检测到新的回答，请继续。 ");
+      }
+    }, 5000);
     return;
   }
   if (message.type === "error") {

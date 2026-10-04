@@ -88,6 +88,7 @@ class DuplexRealtimeConnection:
         self.turn_timings: dict[str, float] = {}
         self.last_filler_text: str | None = None
         self.active_turn_index: int | None = None
+        self.stream_epoch = 0
 
     async def run(self) -> None:
         await self.websocket.accept()
@@ -176,6 +177,7 @@ class DuplexRealtimeConnection:
             if self.turn_task and not self.turn_task.done():
                 await self._send({"type": "error", "error": "A turn is already running."})
                 return
+            self.stream_epoch += 1
             self.turn_task = asyncio.create_task(self._finalize_audio_turn(
                 {**message, "_generation": self.cancel_generation}))
             return
@@ -406,6 +408,7 @@ class DuplexRealtimeConnection:
     async def _interrupt_turn(self, message: dict) -> None:
         """Stop playback/generation and persist a resumable interruption."""
         self.cancel_generation += 1
+        self.stream_epoch += 1
         if self.turn_task and not self.turn_task.done():
             # The running task checks generation between ASR/LLM/TTS stages;
             # cancelling the asyncio wrapper also stops pending network I/O.
@@ -633,6 +636,10 @@ class DuplexRealtimeConnection:
                 await asyncio.sleep(0)
 
     async def _send(self, payload: dict) -> None:
+        if payload.get("type", "").startswith("tts_") or payload.get("type") in {
+            "turn", "done", "question_preview", "llm_delta", "interrupted"
+        }:
+            payload = {**payload, "stream_epoch": self.stream_epoch}
         async with self.send_lock:
             await self.websocket.send_json(payload)
 
