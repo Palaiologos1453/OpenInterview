@@ -87,6 +87,7 @@ class DuplexRealtimeConnection:
         self.turn_started_at = 0.0
         self.turn_timings: dict[str, float] = {}
         self.last_filler_text: str | None = None
+        self.active_turn_index: int | None = None
 
     async def run(self) -> None:
         await self.websocket.accept()
@@ -185,6 +186,10 @@ class DuplexRealtimeConnection:
             self.realtime_session.record("cancel", {"reason": "client_cancel"})
             self._persist_realtime()
             await self._send({"type": "cancelled", "session": self.realtime_session.as_dict()})
+            return
+
+        if event_type == "interrupt":
+            await self._interrupt_turn(message)
             return
 
         await self._send({"type": "error", "error": f"Unknown realtime event: {event_type}"})
@@ -295,6 +300,7 @@ class DuplexRealtimeConnection:
                         temp_root / "speech-preview",
                     )
                     turn = self.interview_session.history[-1]
+                    self.active_turn_index = turn_payload["turn_index"]
                     self.storage.save_turn(
                         self.interview_session.session_id,
                         turn_index=turn_payload["turn_index"],
@@ -397,6 +403,36 @@ class DuplexRealtimeConnection:
             await preview_tts_task
         return turn_payload, preview_tts_task is not None
 
+    async def _interrupt_turn(self, message: dict) -> None:
+        """Stop playback/generation and persist a resumable interruption."""
+        self.cancel_generation += 1
+        if self.turn_task and not self.turn_task.done():
+            # The running task checks generation between ASR/LLM/TTS stages;
+            # cancelling the asyncio wrapper also stops pending network I/O.
+            self.turn_task.cancel()
+        self.audio_chunks = []
+        if self.partial_task and not self.partial_task.done():
+            self.partial_task.cancel()
+        played_ms = float(message.get("played_ms") or 0)
+        played_chars = int(message.get("played_chars") or 0)
+        reason = str(message.get("reason") or "barge_in")[:80]
+        if self.active_turn_index is not None and self.realtime_session.interview_id:
+            self.storage.mark_turn_interrupted(
+                self.realtime_session.interview_id,
+                self.active_turn_index,
+                played_ms=played_ms,
+                played_chars=played_chars,
+                reason=reason,
+            )
+        self.realtime_session.record("interrupt", {
+            "reason": reason, "played_ms": played_ms, "played_chars": played_chars,
+        })
+        self._persist_realtime()
+        await self._send({
+            "type": "interrupted", "reason": reason, "played_ms": played_ms,
+            "played_chars": played_chars, "session": self.realtime_session.as_dict(),
+        })
+
     async def _stream_tts(
         self,
         text: str,
@@ -461,6 +497,9 @@ class DuplexRealtimeConnection:
                 )
                 await self._stream_pcm_from_audio(output_path, generation)
             if generation != self.cancel_generation:
+                abort = getattr(adapter, "abort", None)
+                if callable(abort):
+                    await asyncio.to_thread(abort)
                 return
             await self._send(
                 {

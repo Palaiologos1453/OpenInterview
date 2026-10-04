@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 import base64
+import uuid
 from typing import Protocol
 
 from ..settings import default_tts_model_dir
@@ -108,16 +109,19 @@ class CosyVoiceRemoteTTSAdapter:
     """Stream PCM from a separately hosted CosyVoice vLLM/TensorRT worker."""
     api_base: str
     timeout_seconds: int = 120
+    request_id: str | None = None
 
     def synthesize_stream(self, text, output_path, *, voice_profile=None, voice=None):
         del voice
         profile = voice_profile
         payload = {
+            "request_id": self.request_id or uuid.uuid4().hex,
             "text": text,
             "reference_audio": str(profile.resolved_reference_audio()) if profile and profile.resolved_reference_audio() else None,
             "reference_text": profile.reference_text if profile else None,
             "style_prompt": profile.style_prompt if profile else None,
         }
+        self.request_id = payload["request_id"]
         request = Request(
             f"{self.api_base.rstrip('/')}/v1/tts/stream",
             data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
@@ -145,6 +149,19 @@ class CosyVoiceRemoteTTSAdapter:
             raise RuntimeError(f"CosyVoice service HTTP {exc.code}: {exc.read().decode(errors='replace')[:300]}") from exc
         except URLError as exc:
             raise RuntimeError(f"CosyVoice service network error: {exc.reason}") from exc
+
+    def abort(self) -> None:
+        if not self.request_id:
+            return
+        request = Request(
+            f"{self.api_base.rstrip('/')}/v1/tts/abort/{self.request_id}",
+            data=b"{}", headers={"Content-Type": "application/json"}, method="POST",
+        )
+        try:
+            with urlopen(request, timeout=5):
+                pass
+        except Exception:
+            pass
 
     def synthesize(self, text, output_path, *, voice=None, voice_profile=None):
         import wave

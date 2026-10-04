@@ -796,7 +796,7 @@ voice_profiles:
             deleted = storage.clear_interviews()
             imported = storage.import_interviews(exported)
 
-            self.assertEqual(exported["schema_version"], 5)
+            self.assertEqual(exported["schema_version"], 6)
             self.assertEqual(len(exported["interviews"]), 1)
             self.assertEqual(exported["interviews"][0]["report"]["overall_score"], 75)
             self.assertEqual(len(exported["turns"]), 1)

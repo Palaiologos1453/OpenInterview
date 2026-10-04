@@ -42,6 +42,10 @@ CREATE TABLE IF NOT EXISTS turns (
     question_meta_json TEXT,
     payload_json TEXT,
     score REAL NOT NULL,
+    is_interrupted INTEGER NOT NULL DEFAULT 0,
+    played_ms REAL NOT NULL DEFAULT 0,
+    played_chars INTEGER NOT NULL DEFAULT 0,
+    interrupt_reason TEXT,
     created_at TEXT NOT NULL
 );
 
@@ -87,7 +91,7 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 """
 
-SCHEMA_VERSION = 5
+SCHEMA_VERSION = 6
 
 MIGRATIONS = [
     (1, "add_turn_question_meta", "ALTER TABLE turns ADD COLUMN question_meta_json TEXT"),
@@ -95,6 +99,7 @@ MIGRATIONS = [
     (3, "add_review_items_table", None),
     (4, "add_turn_request_id", "ALTER TABLE turns ADD COLUMN request_id TEXT"),
     (5, "add_turn_payload", "ALTER TABLE turns ADD COLUMN payload_json TEXT"),
+    (6, "add_turn_interrupt_state", None),
 ]
 
 
@@ -127,6 +132,10 @@ class Storage:
         _ensure_column(connection, "turns", "question_meta_json", "TEXT")
         _ensure_column(connection, "turns", "request_id", "TEXT")
         _ensure_column(connection, "turns", "payload_json", "TEXT")
+        _ensure_column(connection, "turns", "is_interrupted", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(connection, "turns", "played_ms", "REAL NOT NULL DEFAULT 0")
+        _ensure_column(connection, "turns", "played_chars", "INTEGER NOT NULL DEFAULT 0")
+        _ensure_column(connection, "turns", "interrupt_reason", "TEXT")
         _ensure_review_items_table(connection)
         _ensure_turn_request_index(connection)
         applied = {
@@ -207,15 +216,20 @@ class Storage:
         score: float,
         question_meta: dict | None = None,
         payload: dict | None = None,
+        is_interrupted: bool = False,
+        played_ms: float = 0,
+        played_chars: int = 0,
+        interrupt_reason: str | None = None,
     ) -> None:
         with self.connect() as connection:
             connection.execute(
                 """
                 INSERT INTO turns (
                     interview_id, request_id, turn_index, question, answer, feedback, tags_json,
-                    question_meta_json, payload_json, score, created_at
+                    question_meta_json, payload_json, score, is_interrupted, played_ms,
+                    played_chars, interrupt_reason, created_at
                 )
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """,
                 (
                     interview_id,
@@ -228,6 +242,7 @@ class Storage:
                     json.dumps(question_meta, ensure_ascii=False) if question_meta else None,
                     json.dumps(payload, ensure_ascii=False) if payload else None,
                     score,
+                    int(is_interrupted), played_ms, played_chars, interrupt_reason,
                     utc_now(),
                 ),
             )
@@ -243,6 +258,20 @@ class Storage:
                 UPDATE interviews SET report_json = ?, status = ?, updated_at = ? WHERE id = ?
                 """,
                 (json.dumps(report, ensure_ascii=False), "reported", utc_now(), interview_id),
+            )
+
+    def mark_turn_interrupted(
+        self, interview_id: str, turn_index: int, *, played_ms: float = 0,
+        played_chars: int = 0, reason: str = "barge_in",
+    ) -> None:
+        with self.connect() as connection:
+            connection.execute(
+                """
+                UPDATE turns
+                SET is_interrupted = 1, played_ms = ?, played_chars = ?, interrupt_reason = ?
+                WHERE interview_id = ? AND turn_index = ?
+                """,
+                (played_ms, played_chars, reason, interview_id, turn_index),
             )
 
     def update_interview_config(self, interview_id: str, redacted_config: dict) -> None:
@@ -561,7 +590,8 @@ class Storage:
             rows = connection.execute(
                 """
                 SELECT turn_index, question, answer, feedback, tags_json,
-                       request_id, question_meta_json, payload_json, score, created_at
+                       request_id, question_meta_json, payload_json, score,
+                       is_interrupted, played_ms, played_chars, interrupt_reason, created_at
                 FROM turns
                 WHERE interview_id = ?
                 ORDER BY turn_index ASC
@@ -579,6 +609,10 @@ class Storage:
                 "question_meta": json.loads(row["question_meta_json"]) if row["question_meta_json"] else None,
                 "payload": json.loads(row["payload_json"]) if row["payload_json"] else None,
                 "score": row["score"],
+                "is_interrupted": bool(row["is_interrupted"]),
+                "played_ms": row["played_ms"],
+                "played_chars": row["played_chars"],
+                "interrupt_reason": row["interrupt_reason"],
                 "created_at": row["created_at"],
             }
             for row in rows
@@ -591,7 +625,8 @@ class Storage:
             row = connection.execute(
                 """
                 SELECT turn_index, question, answer, feedback, tags_json,
-                       request_id, question_meta_json, payload_json, score, created_at
+                       request_id, question_meta_json, payload_json, score,
+                       is_interrupted, played_ms, played_chars, interrupt_reason, created_at
                 FROM turns
                 WHERE interview_id = ? AND request_id = ?
                 """,
@@ -609,6 +644,10 @@ class Storage:
             "question_meta": json.loads(row["question_meta_json"]) if row["question_meta_json"] else None,
             "payload": json.loads(row["payload_json"]) if row["payload_json"] else None,
             "score": row["score"],
+            "is_interrupted": bool(row["is_interrupted"]),
+            "played_ms": row["played_ms"],
+            "played_chars": row["played_chars"],
+            "interrupt_reason": row["interrupt_reason"],
             "created_at": row["created_at"],
         }
 

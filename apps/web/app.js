@@ -129,6 +129,8 @@ const state = {
   pcmSampleRate: 16000,
   pcmChannels: 1,
   currentAudio: null,
+  bargeInSpeechMs: 0,
+  bargeInTriggered: false,
   recordedChunks: [],
   voiceConfig: null,
   providerConfig: loadProviderConfig()
@@ -1484,7 +1486,7 @@ function supportsPcmCapture() {
   );
 }
 
-async function startPcmDuplexCapture(stream, config) {
+async function startPcmDuplexCapture(stream, config, { sendStart = true } = {}) {
   const AudioContextClass = window.AudioContext || window.webkitAudioContext;
   if (!AudioContextClass || typeof AudioWorkletNode === "undefined") throw new Error("AudioWorklet is not supported.");
   const context = new AudioContextClass({ sampleRate: 16000 });
@@ -1505,13 +1507,30 @@ async function startPcmDuplexCapture(stream, config) {
   state.pcmCaptureChunkCount = 0;
   state.pcmCaptureBytes = 0;
   if (context.state === "suspended") await context.resume();
-  sendDuplexStart(config, {
-    mime_type: "audio/pcm",
-    audio_encoding: "pcm_s16le",
-    sample_rate: 16000,
-    channels: 1,
-    partial_interval_chunks: 5
-  });
+  if (sendStart) {
+    sendDuplexStart(config, {
+      mime_type: "audio/pcm",
+      audio_encoding: "pcm_s16le",
+      sample_rate: 16000,
+      channels: 1,
+      partial_interval_chunks: 5
+    });
+  }
+}
+
+async function startBargeInCapture() {
+  if (state.realtimeMode !== "speaking" || state.pcmCaptureNode || !state.realtimeSocket) return;
+  try {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true, channelCount: 1 }
+    });
+    state.mediaStream = stream;
+    await startPcmDuplexCapture(stream, readProviderConfig(), { sendStart: false });
+    state.bargeInSpeechMs = 0;
+    state.bargeInTriggered = false;
+  } catch (error) {
+    console.warn("Barge-in capture unavailable:", error.message);
+  }
 }
 
 function startMediaRecorderDuplexCapture(stream, config) {
@@ -1563,6 +1582,18 @@ function handlePcmCaptureMessage(message) {
     return;
   }
   if (message?.type !== "chunk" || !message.buffer) return;
+  if (state.realtimeMode === "speaking" && !state.bargeInTriggered) {
+    const samples = new Int16Array(message.buffer);
+    let energy = 0;
+    for (const sample of samples) energy += Math.abs(sample) / 32768;
+    const chunkMs = samples.length / 16;
+    state.bargeInSpeechMs = energy / Math.max(samples.length, 1) > 0.025
+      ? state.bargeInSpeechMs + chunkMs : 0;
+    if (state.bargeInSpeechMs >= 200) {
+      state.bargeInTriggered = true;
+      void interruptDuplexPlayback("barge_in");
+    }
+  }
   sendDuplexPcmChunk(message.buffer);
 }
 
@@ -1679,6 +1710,24 @@ async function cancelDuplexTurn() {
   setStatus("已取消实时语音轮次。");
 }
 
+async function interruptDuplexPlayback(reason = "barge_in") {
+  state.pcmPlayer?.stop();
+  state.pcmPlayer = null;
+  if (state.currentAudio) {
+    state.currentAudio.pause();
+    state.currentAudio = null;
+  }
+  window.speechSynthesis?.cancel();
+  if (state.realtimeSocket?.readyState === WebSocket.OPEN) {
+    state.realtimeSocket.send(JSON.stringify({
+      type: "interrupt",
+      reason,
+      played_ms: elapsedSinceVoiceTurnStart(),
+      played_chars: 0
+    }));
+  }
+}
+
 function handleDuplexMessage(message) {
   if (message.type === "ready" || message.type === "listening") return;
   if (message.type === "timing") {
@@ -1743,6 +1792,7 @@ function handleDuplexMessage(message) {
     state.realtimeMode = "speaking";
     elements.listenButton.textContent = "取消";
     elements.sendButton.disabled = true;
+    void startBargeInCapture();
     return;
   }
   if (message.type === "tts_text") {
@@ -1786,6 +1836,15 @@ function handleDuplexMessage(message) {
     resetRealtimeUi();
     updateTranscriptStatus("实时语音轮次已取消");
     setStatus("实时语音轮次已取消。");
+    return;
+  }
+  if (message.type === "interrupted") {
+    state.realtimeMode = "recording";
+    elements.listenButton.textContent = "提交语音";
+    elements.sendButton.disabled = true;
+    resetPcmPlayback();
+    updateTranscriptStatus("已打断，继续回答当前问题");
+    setStatus("已停止面试官播报，可以继续回答。 ");
     return;
   }
   if (message.type === "error") {

@@ -87,6 +87,20 @@ class StreamingTests(unittest.IsolatedAsyncioTestCase):
         release.set()
         await connection.turn_task
 
+    async def test_interrupt_stops_generation_and_marks_turn(self):
+        connection = self.connection()
+        connection.realtime_session.interview_id = "i1"
+        connection.active_turn_index = 2
+        connection.storage.mark_turn_interrupted = Mock()
+        await connection._handle_message({
+            "type": "interrupt", "reason": "barge_in", "played_ms": 420, "played_chars": 12,
+        })
+        self.assertEqual(connection.cancel_generation, 1)
+        connection.storage.mark_turn_interrupted.assert_called_once_with(
+            "i1", 2, played_ms=420.0, played_chars=12, reason="barge_in"
+        )
+        self.assertEqual(self.events[-1]["type"], "interrupted")
+
     async def test_disconnect_closes_generator_after_inflight_next(self):
         entered, release, closed = threading.Event(), threading.Event(), threading.Event()
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 import base64
 import json
 import os
+import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import librosa
@@ -36,10 +37,19 @@ REFERENCE_TEXT = os.environ.get(
 )
 PORT = int(os.environ.get("OPENINTERVIEW_COSYVOICE_PORT", "50051"))
 MODEL_INSTANCE = None
+CANCEL_EVENTS: dict[str, threading.Event] = {}
 
 
 class Handler(BaseHTTPRequestHandler):
     def do_POST(self):
+        if self.path.startswith("/v1/tts/abort/"):
+            request_id = self.path.rsplit("/", 1)[-1]
+            event = CANCEL_EVENTS.get(request_id)
+            if event:
+                event.set()
+            self.send_response(200)
+            self.end_headers()
+            return
         if self.path != "/v1/tts/stream":
             self.send_error(404)
             return
@@ -49,6 +59,10 @@ class Handler(BaseHTTPRequestHandler):
             text = str(payload.get("text") or "").strip()
             if not text:
                 raise ValueError("text is required")
+            request_id = str(payload.get("request_id") or "")
+            cancel_event = threading.Event()
+            if request_id:
+                CANCEL_EVENTS[request_id] = cancel_event
             reference_audio = payload.get("reference_audio") or REFERENCE_AUDIO
             reference_text = payload.get("reference_text") or REFERENCE_TEXT
             style_prompt = payload.get("style_prompt")
@@ -59,6 +73,8 @@ class Handler(BaseHTTPRequestHandler):
             self.send_header("Cache-Control", "no-cache")
             self.end_headers()
             for index, item in enumerate(MODEL_INSTANCE.inference_zero_shot(text, reference_text, reference_audio, stream=True)):
+                if cancel_event.is_set():
+                    break
                 pcm = item["tts_speech"].detach().cpu().float()
                 if pcm.ndim == 2:
                     pcm = pcm[0]
@@ -71,6 +87,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.flush()
             self.wfile.write(b'{"type":"done"}\n')
             self.wfile.flush()
+            if request_id:
+                CANCEL_EVENTS.pop(request_id, None)
         except Exception as exc:
             try:
                 self.wfile.write((json.dumps({"type": "error", "error": str(exc)}) + "\n").encode("utf-8"))
