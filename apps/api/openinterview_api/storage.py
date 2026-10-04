@@ -262,16 +262,37 @@ class Storage:
 
     def mark_turn_interrupted(
         self, interview_id: str, turn_index: int, *, played_ms: float = 0,
-        played_chars: int = 0, reason: str = "barge_in",
+        played_chars: int = 0, reason: str = "barge_in", interrupted_question: str | None = None,
     ) -> None:
         with self.connect() as connection:
+            row = connection.execute(
+                "SELECT payload_json FROM turns WHERE interview_id = ? AND turn_index = ?",
+                (interview_id, turn_index),
+            ).fetchone()
+            payload = json.loads(row["payload_json"]) if row and row["payload_json"] else None
+            if isinstance(payload, dict) and isinstance(payload.get("semantic_snapshot"), dict):
+                snapshot = payload["semantic_snapshot"]
+                if interrupted_question:
+                    snapshot["question"] = interrupted_question
+                snapshot["question_meta"] = {
+                    **(snapshot.get("question_meta") or {}),
+                    "interrupted": True,
+                    "played_ms": played_ms,
+                    "played_chars": played_chars,
+                    "interrupt_reason": reason,
+                }
             connection.execute(
                 """
                 UPDATE turns
-                SET is_interrupted = 1, played_ms = ?, played_chars = ?, interrupt_reason = ?
+                SET is_interrupted = 1, played_ms = ?, played_chars = ?, interrupt_reason = ?,
+                    payload_json = COALESCE(?, payload_json)
                 WHERE interview_id = ? AND turn_index = ?
                 """,
-                (played_ms, played_chars, reason, interview_id, turn_index),
+                (
+                    played_ms, played_chars, reason,
+                    json.dumps(payload, ensure_ascii=False) if payload else None,
+                    interview_id, turn_index,
+                ),
             )
 
     def update_interview_config(self, interview_id: str, redacted_config: dict) -> None:

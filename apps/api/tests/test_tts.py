@@ -13,7 +13,7 @@ from unittest.mock import Mock, patch
 
 import anyio
 
-from openinterview_api.services.duplex import DuplexRealtimeConnection
+from openinterview_api.services.duplex import DuplexRealtimeConnection, _question_prefix
 from openinterview_api.services.realtime import RealtimeSession
 from openinterview_api.services.tts_stream import iterate_tts_chunks
 from openinterview_api.voice.cosyvoice_worker import _Runtime
@@ -26,6 +26,9 @@ def chunk(index=0):
 
 
 class StreamingTests(unittest.IsolatedAsyncioTestCase):
+    def test_interruption_prefix_aligns_to_punctuation(self):
+        self.assertEqual(_question_prefix("请说明项目背景、你的职责和最终指标。", 8), "请说明项目背景、")
+        self.assertEqual(_question_prefix("请说明项目背景、你的职责和最终指标。", 100), "请说明项目背景、你的职责和最终指标。")
     def connection(self):
         connection = DuplexRealtimeConnection(
             websocket=Mock(), realtime_session=RealtimeSession(),
@@ -97,7 +100,8 @@ class StreamingTests(unittest.IsolatedAsyncioTestCase):
         })
         self.assertEqual(connection.cancel_generation, 1)
         connection.storage.mark_turn_interrupted.assert_called_once_with(
-            "i1", 2, played_ms=420.0, played_chars=12, reason="barge_in"
+            "i1", 2, played_ms=420.0, played_chars=12, reason="barge_in",
+            interrupted_question=""
         )
         self.assertEqual(self.events[-1]["type"], "interrupted")
 

@@ -420,13 +420,28 @@ class DuplexRealtimeConnection:
         played_chars = int(message.get("played_chars") or 0)
         reason = str(message.get("reason") or "barge_in")[:80]
         if self.active_turn_index is not None and self.realtime_session.interview_id:
+            full_question = getattr(self.interview_session, "current_question", "")
+            interrupted_question = _question_prefix(full_question, played_chars)
+            if interrupted_question and interrupted_question != full_question:
+                self.interview_session.current_question = interrupted_question
+                self.interview_session.current_question_meta = {
+                    **(self.interview_session.current_question_meta or {}),
+                    "interrupted": True,
+                    "played_ms": played_ms,
+                    "played_chars": played_chars,
+                    "interrupt_reason": reason,
+                    "full_question": full_question,
+                }
             self.storage.mark_turn_interrupted(
                 self.realtime_session.interview_id,
                 self.active_turn_index,
                 played_ms=played_ms,
                 played_chars=played_chars,
                 reason=reason,
+                interrupted_question=interrupted_question,
             )
+            if self.on_session_updated:
+                self.on_session_updated(self.interview_session)
         self.realtime_session.record("interrupt", {
             "reason": reason, "played_ms": played_ms, "played_chars": played_chars,
         })
@@ -669,6 +684,15 @@ def _decode_audio_chunk(message: dict) -> bytes:
         return base64.b64decode(data, validate=True)
     except (binascii.Error, ValueError) as exc:
         raise ValueError("Audio chunk must be valid base64.") from exc
+
+
+def _question_prefix(text: str, played_chars: int) -> str:
+    if not text or played_chars <= 0 or played_chars >= len(text):
+        return text
+    end = min(len(text), played_chars)
+    punctuation = set("，。！？；：,.!?;:")
+    boundary = max((index + 1 for index, char in enumerate(text[:end]) if char in punctuation), default=0)
+    return text[:boundary].strip() if boundary else text[:end].strip()
 
 
 def _suffix_for_mime(mime_type: str) -> str:
