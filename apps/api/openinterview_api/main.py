@@ -6,8 +6,10 @@ from copy import deepcopy
 from dataclasses import asdict
 import json
 from pathlib import Path
+from queue import Queue
 from time import perf_counter
 import tempfile
+from threading import Thread
 from uuid import uuid4
 
 from fastapi import FastAPI, File, HTTPException, Request, UploadFile, WebSocket
@@ -244,6 +246,63 @@ def answer_turn(session_id: str, request: TurnRequest) -> dict:
         session_store.save(session)
         storage.save_trace(trace.as_dict(), interview_id=session_id)
         return payload
+
+
+@app.post("/v1/interviews/{session_id}/turn/stream")
+def stream_answer_turn(session_id: str, request: TurnRequest) -> StreamingResponse:
+    """Stream LLM deltas while preserving the normal atomic turn commit."""
+    events: Queue[dict] = Queue()
+
+    def emit(event: dict) -> None:
+        events.put(event)
+
+    def worker() -> None:
+        try:
+            with session_store.session_lock(session_id):
+                existing_turn = storage.get_turn_by_request_id(session_id, request.request_id)
+                if existing_turn and existing_turn.get("payload"):
+                    emit({"type": "turn", "turn": existing_turn["payload"]})
+                    return
+
+                session = deepcopy(_get_session(session_id))
+                trace = Trace()
+                with trace.span("interview.turn", answer_chars=len(request.answer), streaming=True):
+                    payload = engine.answer(session, request.answer, stream_callback=emit)
+                turn = session.history[-1]
+                storage.save_turn(
+                    session_id,
+                    turn_index=payload["turn_index"],
+                    question=turn.question,
+                    answer=turn.answer,
+                    feedback=turn.feedback,
+                    tags=turn.tags,
+                    score=turn.score,
+                    question_meta=turn.question_meta,
+                    request_id=request.request_id,
+                    payload=payload,
+                )
+                session_store.save(session)
+                storage.save_trace(trace.as_dict(), interview_id=session_id)
+                emit({"type": "turn", "turn": payload})
+        except Exception as exc:
+            emit({"type": "error", "error": str(exc)})
+        finally:
+            emit({"type": "done"})
+
+    Thread(target=worker, name="openinterview-turn-stream", daemon=True).start()
+
+    def body():
+        while True:
+            event = events.get()
+            yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            if event.get("type") == "done":
+                break
+
+    return StreamingResponse(
+        body(),
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
+    )
 
 
 @app.post("/v1/interviews/{session_id}/preview")

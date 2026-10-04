@@ -2,14 +2,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import json
+from typing import Iterator, Protocol
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
-from typing import Protocol
 
 
 class LLMAdapter(Protocol):
     def complete(self, messages: list[dict[str, str]], *, temperature: float = 0.4) -> str:
         """Return a text completion for interview generation or evaluation."""
+
+    def complete_stream(self, messages: list[dict[str, str]], *, temperature: float = 0.4) -> Iterator[str]:
+        """Yield completion text as it arrives from a streaming provider."""
 
 
 @dataclass
@@ -19,6 +22,9 @@ class MockLLMAdapter:
     def complete(self, messages: list[dict[str, str]], *, temperature: float = 0.4) -> str:
         del messages, temperature
         return "这是 mock LLM 回复。请在 provider 配置中接入真实模型。"
+
+    def complete_stream(self, messages: list[dict[str, str]], *, temperature: float = 0.4) -> Iterator[str]:
+        yield self.complete(messages, temperature=temperature)
 
 
 @dataclass
@@ -48,6 +54,30 @@ class OpenAICompatibleLLMAdapter:
         except (KeyError, IndexError, TypeError) as exc:
             raise RuntimeError("LLM provider returned an unexpected response shape.") from exc
 
+    def complete_stream(self, messages: list[dict[str, str]], *, temperature: float = 0.4) -> Iterator[str]:
+        endpoint = _openai_chat_endpoint(self.api_base)
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "temperature": temperature,
+            "max_tokens": 700,
+            "stream": True,
+        }
+        headers = {
+            "Content-Type": "application/json",
+            "Authorization": f"Bearer {self.api_key}",
+            "Accept": "text/event-stream",
+        }
+        for item in _post_stream(endpoint, payload, headers=headers, timeout_seconds=self.timeout_seconds):
+            if item == "[DONE]":
+                break
+            try:
+                content = item["choices"][0].get("delta", {}).get("content")
+            except (KeyError, IndexError, TypeError) as exc:
+                raise RuntimeError("LLM provider returned an unexpected streaming response shape.") from exc
+            if content:
+                yield content
+
 
 @dataclass
 class OllamaLLMAdapter:
@@ -68,6 +98,23 @@ class OllamaLLMAdapter:
             return data["message"]["content"].strip()
         except (KeyError, TypeError) as exc:
             raise RuntimeError("Ollama returned an unexpected response shape.") from exc
+
+    def complete_stream(self, messages: list[dict[str, str]], *, temperature: float = 0.4) -> Iterator[str]:
+        endpoint = f"{self.api_base.rstrip('/')}/api/chat"
+        payload = {
+            "model": self.model,
+            "messages": messages,
+            "stream": True,
+            "options": {"temperature": temperature, "num_predict": 700},
+        }
+        for item in _post_stream(
+            endpoint, payload, headers={"Content-Type": "application/json"}, timeout_seconds=self.timeout_seconds
+        ):
+            if item.get("done"):
+                break
+            content = (item.get("message") or {}).get("content")
+            if content:
+                yield content
 
 
 def build_llm_adapter(config: dict | None) -> LLMAdapter:
@@ -135,6 +182,35 @@ def _post_json(endpoint: str, payload: dict, *, headers: dict[str, str], timeout
     try:
         with urlopen(request, timeout=timeout_seconds) as response:
             return json.loads(response.read().decode("utf-8"))
+    except HTTPError as exc:
+        body = exc.read().decode("utf-8", errors="replace")
+        raise RuntimeError(f"Provider HTTP {exc.code}: {body[:300]}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"Provider network error: {exc.reason}") from exc
+
+
+def _post_stream(endpoint: str, payload: dict, *, headers: dict[str, str], timeout_seconds: int) -> Iterator[object]:
+    request = Request(
+        endpoint,
+        data=json.dumps(payload).encode("utf-8"),
+        headers=headers,
+        method="POST",
+    )
+    try:
+        with urlopen(request, timeout=timeout_seconds) as response:
+            for raw_line in response:
+                line = raw_line.decode("utf-8", errors="replace").strip()
+                if not line:
+                    continue
+                if line.startswith("data:"):
+                    line = line[5:].strip()
+                    if line == "[DONE]":
+                        yield line
+                        return
+                try:
+                    yield json.loads(line)
+                except json.JSONDecodeError as exc:
+                    raise RuntimeError("LLM provider returned invalid streaming JSON.") from exc
     except HTTPError as exc:
         body = exc.read().decode("utf-8", errors="replace")
         raise RuntimeError(f"Provider HTTP {exc.code}: {body[:300]}") from exc

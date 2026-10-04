@@ -8,7 +8,7 @@ import json
 import re
 from statistics import mean
 from time import perf_counter
-from typing import Literal
+from typing import Callable, Literal
 from urllib.parse import urlsplit
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
@@ -118,7 +118,7 @@ def _decision_schema_hint():
     }
 
 
-def decide(session) -> tuple[Decision, dict]:
+def decide(session, *, stream_callback: Callable[[dict], None] | None = None) -> tuple[Decision, dict]:
     """The pending answer lives on a copy supplied by answer_semantically."""
     state = session.semantic_state
     phase = (session.current_question_meta or {}).get("phase", "fundamentals")
@@ -186,7 +186,28 @@ def decide(session) -> tuple[Decision, dict]:
         ]
         llm_started = perf_counter()
         try:
-            text = adapter.complete(messages, temperature=0.1)
+            if stream_callback and callable(getattr(adapter, "complete_stream", None)):
+                chunks: list[str] = []
+                streamed_text = ""
+                preview_sent = False
+                for chunk in adapter.complete_stream(messages, temperature=0.1):
+                    chunks.append(chunk)
+                    streamed_text += chunk
+                    stream_callback({"type": "llm_delta", "text": chunk})
+                    if not preview_sent:
+                        action_match = re.search(r'"action"\s*:\s*"(clarify|probe|advance)"', streamed_text)
+                        question_match = re.search(r'"question"\s*:\s*"((?:\\.|[^"\\])*)"', streamed_text)
+                        if action_match and action_match.group(1) in {"clarify", "probe"} and question_match:
+                            try:
+                                preview = json.loads('"' + question_match.group(1) + '"')
+                            except json.JSONDecodeError:
+                                preview = ""
+                            if preview:
+                                stream_callback({"type": "question_preview", "text": preview})
+                                preview_sent = True
+                text = "".join(chunks)
+            else:
+                text = adapter.complete(messages, temperature=0.1)
         except Exception as exc:
             metrics_registry.record_llm_call(
                 (session.config.provider_config.get("llm") or {}).get("provider", "unknown"),
@@ -292,7 +313,7 @@ def validate_decision(decision, track, sources, current_id, knowledge, asked):
             raise ValueError("Invented project metric")
 
 
-def answer_semantically(engine, session, answer):
+def answer_semantically(engine, session, answer, *, stream_callback=None):
     from ..interview_engine import Turn, MODE_FLOW
 
     validate_cloud(session.config.provider_config)
@@ -309,7 +330,7 @@ def answer_semantically(engine, session, answer):
     decision_budget = _decision_timeout_seconds(session)
     timed_out = False
     decision_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="semantic-decision")
-    decision_future = decision_executor.submit(decide, scratch)
+    decision_future = decision_executor.submit(decide, scratch, stream_callback=stream_callback)
     try:
         decision, sources = decision_future.result(timeout=decision_budget)
     except FutureTimeoutError:

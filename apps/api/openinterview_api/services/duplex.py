@@ -260,8 +260,7 @@ class DuplexRealtimeConnection:
 
                 with self._session_lock():
                     started = perf_counter()
-                    with trace.span("interview.turn", answer_chars=len(text)):
-                        turn_payload = self.engine.answer(self.interview_session, text)
+                    turn_payload = await self._answer_interview_streaming(text, trace)
                     turn = self.interview_session.history[-1]
                     self.storage.save_turn(
                         self.interview_session.session_id,
@@ -303,6 +302,35 @@ class DuplexRealtimeConnection:
                 self._persist_realtime()
                 self.storage.save_trace(trace.as_dict(), interview_id=self.realtime_session.interview_id)
                 await self._send({"type": "error", "error": str(exc)})
+
+    async def _answer_interview_streaming(self, text: str, trace: Trace) -> dict:
+        """Run the blocking director off the event loop and forward LLM chunks."""
+        loop = asyncio.get_running_loop()
+        events: asyncio.Queue[dict] = asyncio.Queue()
+
+        def on_stream_event(event: dict) -> None:
+            loop.call_soon_threadsafe(events.put_nowait, event)
+
+        with trace.span("interview.turn", answer_chars=len(text)):
+            task = asyncio.create_task(
+                asyncio.to_thread(
+                    self.engine.answer,
+                    self.interview_session,
+                    text,
+                    stream_callback=on_stream_event,
+                )
+            )
+            while not task.done():
+                try:
+                    event = await asyncio.wait_for(events.get(), timeout=0.1)
+                except asyncio.TimeoutError:
+                    continue
+                await self._send(event)
+            turn_payload = await task
+
+        while not events.empty():
+            await self._send(events.get_nowait())
+        return turn_payload
 
     async def _stream_tts(
         self,

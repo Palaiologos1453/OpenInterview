@@ -156,10 +156,10 @@ class CampusInterviewEngine:
             },
         }
 
-    def answer(self, session: InterviewSession, answer: str) -> dict:
+    def answer(self, session: InterviewSession, answer: str, *, stream_callback=None) -> dict:
         if session.config.interview_strategy == "semantic":
             from .services.semantic_interview import answer_semantically
-            return answer_semantically(self, session, answer)
+            return answer_semantically(self, session, answer, stream_callback=stream_callback)
         if self._is_finished(session):
             raise RuntimeError("Interview is already finished. Generate a report or start a new interview.")
 

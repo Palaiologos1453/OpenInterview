@@ -333,7 +333,12 @@ async function submitAnswer(event) {
   state.pendingAnswer = {sessionId: state.sessionId, answer, id: requestId};
   elements.sendButton.disabled = true;
   try {
-    const payload = await postJson(`${API_BASE}/v1/interviews/${state.sessionId}/turn`, { answer, request_id: requestId });
+    const payload = await streamTurn(`${API_BASE}/v1/interviews/${state.sessionId}/turn/stream`, {
+      answer,
+      request_id: requestId
+    }, (event) => {
+      if (event.type === "llm_delta") setStatus("面试官正在流式生成下一题。 ");
+    });
     addMessage("candidate", "候选人", answer);
     elements.answer.value = "";
     state.pendingAnswer = null;
@@ -1698,6 +1703,16 @@ function handleDuplexMessage(message) {
     if (message.text) addMessage("candidate", "候选人", message.text);
     return;
   }
+  if (message.type === "llm_delta") {
+    updateTranscriptStatus("面试官正在生成下一题");
+    setStatus("面试官正在流式生成下一题。 ");
+    return;
+  }
+  if (message.type === "question_preview") {
+    updateTranscriptStatus("已生成追问草稿，正在完成校验");
+    setStatus(`追问草稿：${message.text}`);
+    return;
+  }
   if (message.type === "turn") {
     const turn = message.turn;
     addTurnQuestion(turn);
@@ -2647,6 +2662,44 @@ async function postJson(url, body) {
   });
   if (!response.ok) throw new Error(await response.text());
   return response.json();
+}
+
+async function streamTurn(url, body, onEvent = () => {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 12000);
+  try {
+    const response = await authedFetch(url, {
+      method: "POST",
+      headers: jsonHeaders(),
+      body: JSON.stringify(body),
+      signal: controller.signal
+    });
+    if (!response.ok) throw new Error(await response.text());
+    if (!response.body) throw new Error("流式响应不可用。");
+    const reader = response.body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = "";
+    let payload = null;
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value || new Uint8Array(), { stream: !done });
+      const frames = buffer.split("\n\n");
+      buffer = frames.pop() || "";
+      for (const frame of frames) {
+        const line = frame.split("\n").find((item) => item.startsWith("data:"));
+        if (!line) continue;
+        const event = JSON.parse(line.slice(5).trim());
+        onEvent(event);
+        if (event.type === "turn") payload = event.turn;
+        if (event.type === "error") throw new Error(event.error || "流式面试失败。");
+      }
+      if (done) break;
+    }
+    if (!payload) throw new Error("流式面试未返回结果。");
+    return payload;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 async function deleteJson(url) {
