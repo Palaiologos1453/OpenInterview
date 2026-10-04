@@ -202,7 +202,7 @@ def decide(session, *, stream_callback: Callable[[dict], None] | None = None) ->
                                 preview = json.loads('"' + question_match.group(1) + '"')
                             except json.JSONDecodeError:
                                 preview = ""
-                            if preview:
+                            if preview and state.get("depth", 0) < 3 and phase != "closing":
                                 stream_callback({"type": "question_preview", "text": preview})
                                 preview_sent = True
                 text = "".join(chunks)

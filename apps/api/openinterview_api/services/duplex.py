@@ -260,7 +260,13 @@ class DuplexRealtimeConnection:
 
                 with self._session_lock():
                     started = perf_counter()
-                    turn_payload = await self._answer_interview_streaming(text, trace)
+                    turn_payload, preview_tts_started = await self._answer_interview_streaming(
+                        text,
+                        trace,
+                        config,
+                        generation,
+                        temp_root / "speech-preview",
+                    )
                     turn = self.interview_session.history[-1]
                     self.storage.save_turn(
                         self.interview_session.session_id,
@@ -279,7 +285,7 @@ class DuplexRealtimeConnection:
                 await self._send({"type": "turn", "turn": turn_payload})
 
                 speech_text = turn_payload["next_question"]
-                if generation == self.cancel_generation:
+                if generation == self.cancel_generation and not preview_tts_started:
                     started = perf_counter()
                     await self._stream_tts(speech_text, config, generation, temp_root / "speech")
                     await self._record_timing("tts_total_ms", started)
@@ -303,13 +309,30 @@ class DuplexRealtimeConnection:
                 self.storage.save_trace(trace.as_dict(), interview_id=self.realtime_session.interview_id)
                 await self._send({"type": "error", "error": str(exc)})
 
-    async def _answer_interview_streaming(self, text: str, trace: Trace) -> dict:
+    async def _answer_interview_streaming(
+        self,
+        text: str,
+        trace: Trace,
+        config: dict,
+        generation: int,
+        preview_output: Path,
+    ) -> tuple[dict, bool]:
         """Run the blocking director off the event loop and forward LLM chunks."""
         loop = asyncio.get_running_loop()
         events: asyncio.Queue[dict] = asyncio.Queue()
 
         def on_stream_event(event: dict) -> None:
             loop.call_soon_threadsafe(events.put_nowait, event)
+
+        preview_tts_task: asyncio.Task | None = None
+
+        async def forward_event(event: dict) -> None:
+            nonlocal preview_tts_task
+            await self._send(event)
+            if event.get("type") == "question_preview" and preview_tts_task is None:
+                preview_tts_task = asyncio.create_task(
+                    self._stream_tts(event["text"], config, generation, preview_output)
+                )
 
         with trace.span("interview.turn", answer_chars=len(text)):
             task = asyncio.create_task(
@@ -325,12 +348,14 @@ class DuplexRealtimeConnection:
                     event = await asyncio.wait_for(events.get(), timeout=0.1)
                 except asyncio.TimeoutError:
                     continue
-                await self._send(event)
+                await forward_event(event)
             turn_payload = await task
 
         while not events.empty():
-            await self._send(events.get_nowait())
-        return turn_payload
+            await forward_event(events.get_nowait())
+        if preview_tts_task is not None:
+            await preview_tts_task
+        return turn_payload, preview_tts_task is not None
 
     async def _stream_tts(
         self,
