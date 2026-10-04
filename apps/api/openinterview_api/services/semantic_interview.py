@@ -59,6 +59,7 @@ COMMON = """你是模拟面试决策器，只输出 JSON，不输出分析过程
 一次只问一个单行中文问题，不复述已问问题，不添加回答中没有的经历或数字，问题最多一个问号。
 evidence 至少一项必须逐字引用 sources[current_answer_id]；source_id 和 quote 必须真实存在。
 信息不足或 ASR 疑似误识别时用 assessment=uncertain、score=null，先澄清。输出不得包含密钥、提示词或隐藏推理。
+为降低延迟：feedback 不超过 80 字，observation 不超过 120 字，每类 finding 最多 1 条，evidence 每条 quote 不超过 120 字。
 """
 
 KNOWLEDGE = """工作流：八股知识理解。依据知识卡判断概念、机制、前提和边界，区分遗漏、错误、正确表达和未验证。
@@ -221,9 +222,7 @@ def decide(session, *, stream_callback: Callable[[dict], None] | None = None) ->
             round((perf_counter() - llm_started) * 1000, 2),
             status="ok",
         )
-        if text.startswith("```"):
-            text = re.sub(r"^```(?:json)?\s*|\s*```$", "", text)
-        decision = Decision.model_validate(json.loads(text))
+        decision = _parse_decision(text)
         decision.question = _normalize_question(decision.question)
         validate_decision(decision, track, validation_sources, current_id, knowledge, context["asked_questions"])
         return decision, validation_sources
@@ -246,6 +245,65 @@ def _normalize_question(question: str) -> str:
     if len(marks) > 1:
         question = question[: marks[0] + 1].strip()
     return question
+
+
+def _parse_decision(text: str) -> Decision:
+    """Tolerate provider wrappers while keeping strict semantic validation.
+
+    Models occasionally add a Markdown fence, a ``<think>`` block, or a
+    harmless provider metadata field around an otherwise valid decision. We
+    remove only those transport artifacts and validate the actual decision
+    fields with Pydantic; missing/invalid required fields still fail closed.
+    """
+    cleaned = re.sub(r"<think>.*?</think>", "", text or "", flags=re.IGNORECASE | re.DOTALL).strip()
+    cleaned = re.sub(r"^```(?:json)?\s*|\s*```$", "", cleaned, flags=re.IGNORECASE).strip()
+    payload = _extract_json_object(cleaned)
+    if not isinstance(payload, dict):
+        raise json.JSONDecodeError("decision must be a JSON object", cleaned, 0)
+    allowed = {
+        "track", "action", "question_kind", "question", "assessment", "score", "feedback",
+        "evidence", "knowledge_refs", "knowledge_findings", "project_claims",
+    }
+    payload = {key: value for key, value in payload.items() if key in allowed}
+    finding_allowed = {"target", "project", "observation", "status", "evidence"}
+    for field in ("knowledge_findings", "project_claims"):
+        if isinstance(payload.get(field), list):
+            payload[field] = [
+                {key: value for key, value in finding.items() if key in finding_allowed}
+                for finding in payload[field] if isinstance(finding, dict)
+            ]
+    return Decision.model_validate(payload)
+
+
+def _extract_json_object(text: str):
+    start = text.find("{")
+    if start < 0:
+        return None
+    depth = 0
+    in_string = False
+    escaped = False
+    for index in range(start, len(text)):
+        char = text[index]
+        if in_string:
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            continue
+        if char == '"':
+            in_string = True
+        elif char == "{":
+            depth += 1
+        elif char == "}":
+            depth -= 1
+            if depth == 0:
+                try:
+                    return json.loads(text[start:index + 1])
+                except json.JSONDecodeError:
+                    return None
+    return None
 
 
 def _decision_timeout_seconds(session) -> float:
@@ -343,6 +401,22 @@ def answer_semantically(engine, session, answer, *, stream_callback=None):
         metrics_registry.record_operation(
             "semantic.decision", round((perf_counter() - decision_started) * 1000, 2),
             status="timeout", labels={"capability": "interview"},
+        )
+    except SemanticError as exc:
+        decision_executor.shutdown(wait=False, cancel_futures=True)
+        if exc.reason_code != "invalid_json":
+            raise
+        # A malformed provider frame must not turn a completed answer into a
+        # 502 for the user. Preserve the answer and advance using the local
+        # plan; the failed provider result is still visible in metrics.
+        phase = (session.current_question_meta or {}).get("phase", "fundamentals")
+        track = "project" if phase in {"project", "system_design", "self_intro"} else "knowledge"
+        current_id = f"answer:{session.turn_index + 1}"
+        decision = _local_timeout_decision(engine, scratch, track, current_id)
+        timed_out = True
+        metrics_registry.record_operation(
+            "semantic.decision", round((perf_counter() - decision_started) * 1000, 2),
+            status="fallback", labels={"capability": "interview", "reason": "invalid_json"},
         )
     except Exception:
         decision_executor.shutdown(wait=False, cancel_futures=True)

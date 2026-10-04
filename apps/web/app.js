@@ -233,7 +233,7 @@ async function init() {
   renderSetupChecklist();
   if (state.backendReady) {
     refreshReadiness();
-    void warmupLocalTts();
+    void warmupLocalVoice();
   }
 }
 
@@ -1001,7 +1001,7 @@ function applyVoiceMode(mode, options = {}) {
   updateVoiceModeUi();
   if (!options.silent) {
     setStatus(voiceModeStatus(nextMode));
-    if (nextMode === "local") void warmupLocalTts();
+    if (nextMode === "local") void warmupLocalVoice();
   }
 }
 
@@ -2109,6 +2109,30 @@ async function speakWithServer(text, config) {
 }
 
 const ttsWarmups = new Map();
+const asrWarmups = new Map();
+async function warmupLocalVoice() {
+  await Promise.allSettled([warmupLocalAsr(), warmupLocalTts()]);
+}
+
+async function warmupLocalAsr() {
+  if (!state.backendReady || elements.voiceMode?.value !== "local") return;
+  const key = JSON.stringify([elements.localAsrModelDir?.value || "default"]);
+  if (asrWarmups.has(key)) return asrWarmups.get(key);
+  const task = (async () => {
+    try {
+      const started = performance.now();
+      const response = await authedFetch(`${API_BASE}/v1/asr/warmup`, { method: "POST" });
+      if (!response.ok) throw new Error(await response.text());
+      updateVoiceTiming("asr_warmup_ms", (await response.json()).warmup_ms || Math.round(performance.now() - started));
+    } catch (error) {
+      asrWarmups.delete(key);
+      console.warn("Local ASR warmup failed:", error.message);
+    }
+  })();
+  asrWarmups.set(key, task);
+  return task;
+}
+
 async function warmupLocalTts() {
   if (!state.backendReady) return;
   const config = readProviderConfig();

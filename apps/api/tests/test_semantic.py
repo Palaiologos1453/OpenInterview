@@ -4,7 +4,7 @@ import unittest
 from unittest.mock import patch
 
 from openinterview_api.interview_engine import CampusInterviewEngine, InterviewConfig
-from openinterview_api.services.semantic_interview import SemanticError
+from openinterview_api.services.semantic_interview import SemanticError, _parse_decision
 from test_api import client
 from openinterview_api.main import session_store, storage
 
@@ -41,6 +41,18 @@ class Provider:
 
 
 class SemanticTests(unittest.TestCase):
+    def test_decision_parser_accepts_provider_wrappers_and_metadata(self):
+        payload = {
+            "track": "knowledge", "action": "probe", "question_kind": "grounded",
+            "question": "请说明边界？", "assessment": "partial", "score": 60,
+            "feedback": "补充边界。", "evidence": [{"source_id": "answer:1", "quote": "回答"}],
+            "knowledge_refs": [], "knowledge_findings": [], "project_claims": [],
+            "type": "final", "usage": {"completion_tokens": 20},
+        }
+        parsed = _parse_decision("思考完成\n<think>隐藏内容</think>\n```json\n" + json.dumps(payload, ensure_ascii=False) + "\n```")
+        self.assertEqual(parsed.action, "probe")
+        self.assertEqual(parsed.question, "请说明边界？")
+
     def start(self, mode="fundamentals"):
         engine = CampusInterviewEngine()
         session = engine.start(InterviewConfig(direction_id="backend", difficulty_id="campus", mode_id=mode,
@@ -59,6 +71,21 @@ class SemanticTests(unittest.TestCase):
         self.assertEqual(session.semantic_state["projects"], [])
         self.assertTrue(provider.contexts[0]["knowledge"])
         self.assertIn("八股知识理解", provider.prompts[0])
+
+    def test_invalid_json_falls_back_to_local_plan(self):
+        class InvalidProvider:
+            def complete(self, messages, **kwargs):
+                return "```json {invalid"
+
+            def complete_stream(self, messages, **kwargs):
+                yield "```json {invalid"
+
+        engine, session = self.start()
+        with patch("openinterview_api.services.semantic_interview.build_llm_adapter",
+                   return_value=InvalidProvider()):
+            result = engine.answer(session, "需要结合查询条件解释索引机制。")
+        self.assertEqual(result["turn_index"], 1)
+        self.assertIn("本轮云端决策超过", result["provider_notice"])
 
     def test_project_has_separate_claim_state_and_no_knowledge_substitution(self):
         engine, session = self.start("project_deep_dive")
