@@ -6,6 +6,7 @@ import binascii
 from contextlib import nullcontext
 from pathlib import Path
 import re
+import random
 import tempfile
 from time import perf_counter
 from typing import Awaitable, Callable, ContextManager
@@ -28,6 +29,25 @@ from .tts_stream import iterate_tts_chunks
 SendJson = Callable[[dict], Awaitable[None]]
 MAX_WEBSOCKET_AUDIO_BYTES = 24 * 1024 * 1024
 MAX_WEBSOCKET_CHUNK_BYTES = 2 * 1024 * 1024
+
+DEFAULT_FILLER_TEXTS = (
+    "好的，我先整理一下。",
+    "嗯，我先看一下这个回答。",
+    "好的，这里我接着追问一点。",
+    "明白了，我顺着这个点继续问。",
+    "好，我先确认一下你的思路。",
+    "嗯，这个点值得再展开一下。",
+    "好的，我换一个角度继续问。",
+    "收到，我先把前面的信息串起来。",
+    "好，我们继续看这个问题。",
+    "嗯，我想再确认一个细节。",
+    "好的，这里再补一个场景。",
+    "明白，我接着问具体一点。",
+    "好，我先记下这个判断。",
+    "嗯，我们继续往实现细节走。",
+    "好的，我再追问一个边界情况。",
+    "收到，下面看你会怎么验证。",
+)
 
 
 class DuplexRealtimeConnection:
@@ -66,6 +86,7 @@ class DuplexRealtimeConnection:
         self.send_lock = asyncio.Lock()
         self.turn_started_at = 0.0
         self.turn_timings: dict[str, float] = {}
+        self.last_filler_text: str | None = None
 
     async def run(self) -> None:
         await self.websocket.accept()
@@ -200,7 +221,7 @@ class DuplexRealtimeConnection:
                     # the decision pipeline continue in parallel. It is
                     # deliberately a separate event so local/API TTS can opt
                     # out without delaying the critical path.
-                    await self._send({"type": "filler", "text": "好的，我先整理一下。"})
+                    await self._send({"type": "filler", "text": self._choose_filler()})
                 await self._send({"type": "vad_start"})
                 started = perf_counter()
                 with trace.span("realtime.ws.audio.convert"):
@@ -314,6 +335,19 @@ class DuplexRealtimeConnection:
                 self._persist_realtime()
                 self.storage.save_trace(trace.as_dict(), interview_id=self.realtime_session.interview_id)
                 await self._send({"type": "error", "error": str(exc)})
+
+    def _choose_filler(self) -> str:
+        settings = self.provider_config.get("tts") or {}
+        configured = settings.get("filler_texts")
+        phrases = [str(item).strip() for item in (configured or DEFAULT_FILLER_TEXTS) if str(item).strip()]
+        if not phrases:
+            phrases = list(DEFAULT_FILLER_TEXTS)
+        if len(phrases) > 1 and self.last_filler_text in phrases:
+            choices = [item for item in phrases if item != self.last_filler_text]
+        else:
+            choices = phrases
+        self.last_filler_text = random.choice(choices)
+        return self.last_filler_text
 
     async def _answer_interview_streaming(
         self,
