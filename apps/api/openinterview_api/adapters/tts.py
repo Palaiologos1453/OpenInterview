@@ -5,6 +5,7 @@ import json
 from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
+import base64
 from typing import Protocol
 
 from ..settings import default_tts_model_dir
@@ -102,6 +103,62 @@ class APITTSAdapter:
         return output_path
 
 
+@dataclass
+class CosyVoiceRemoteTTSAdapter:
+    """Stream PCM from a separately hosted CosyVoice vLLM/TensorRT worker."""
+    api_base: str
+    timeout_seconds: int = 120
+
+    def synthesize_stream(self, text, output_path, *, voice_profile=None, voice=None):
+        del voice
+        profile = voice_profile
+        payload = {
+            "text": text,
+            "reference_audio": str(profile.resolved_reference_audio()) if profile and profile.resolved_reference_audio() else None,
+            "reference_text": profile.reference_text if profile else None,
+            "style_prompt": profile.style_prompt if profile else None,
+        }
+        request = Request(
+            f"{self.api_base.rstrip('/')}/v1/tts/stream",
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={"Content-Type": "application/json", "Accept": "application/x-ndjson"},
+            method="POST",
+        )
+        try:
+            with urlopen(request, timeout=self.timeout_seconds) as response:
+                for raw_line in response:
+                    line = raw_line.decode("utf-8", errors="replace").strip()
+                    if not line:
+                        continue
+                    item = json.loads(line)
+                    if item.get("type") == "chunk":
+                        yield {
+                            "index": item.get("index", 0),
+                            "sample_rate": item["sample_rate"],
+                            "channels": item.get("channels", 1),
+                            "sample_width": item.get("sample_width", 2),
+                            "data": base64.b64decode(item["data"]),
+                        }
+                    elif item.get("type") == "error":
+                        raise RuntimeError(item.get("error") or "Remote CosyVoice failed")
+        except HTTPError as exc:
+            raise RuntimeError(f"CosyVoice service HTTP {exc.code}: {exc.read().decode(errors='replace')[:300]}") from exc
+        except URLError as exc:
+            raise RuntimeError(f"CosyVoice service network error: {exc.reason}") from exc
+
+    def synthesize(self, text, output_path, *, voice=None, voice_profile=None):
+        import wave
+        chunks = list(self.synthesize_stream(text, output_path, voice_profile=voice_profile, voice=voice))
+        if not chunks:
+            raise RuntimeError("CosyVoice service returned no audio chunks")
+        with wave.open(str(output_path), "wb") as wav:
+            wav.setnchannels(chunks[0]["channels"])
+            wav.setsampwidth(chunks[0]["sample_width"])
+            wav.setframerate(chunks[0]["sample_rate"])
+            wav.writeframes(b"".join(item["data"] for item in chunks))
+        return output_path
+
+
 def build_tts_adapter(config: dict | None) -> TTSAdapter:
     settings = (config or {}).get("tts", config or {})
     provider = (settings.get("provider") or "browser").strip().lower()
@@ -124,6 +181,11 @@ def build_tts_adapter(config: dict | None) -> TTSAdapter:
         return PiperTTSAdapter(model_path=Path(settings["model"]) if settings.get("model") else None)
     if provider in {"cosyvoice", "local_cosyvoice"}:
         return CosyVoiceTTS(model_dir=Path(settings.get("model") or default_tts_model_dir()))
+    if provider in {"cosyvoice_wsl", "cosyvoice_remote"}:
+        return CosyVoiceRemoteTTSAdapter(
+            api_base=settings.get("api_base") or "http://127.0.0.1:50051",
+            timeout_seconds=int(settings.get("timeout_seconds") or 120),
+        )
     raise ValueError(f"Unknown TTS provider: {provider}")
 
 

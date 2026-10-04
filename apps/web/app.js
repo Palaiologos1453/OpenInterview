@@ -997,6 +997,10 @@ function applyVoiceMode(mode, options = {}) {
     elements.asrProvider.value = "sensevoice";
     elements.ttsProvider.value = "cosyvoice";
     syncLocalPathsToProviderFields();
+  } else if (nextMode === "wsl") {
+    elements.asrProvider.value = "sensevoice";
+    elements.ttsProvider.value = "cosyvoice_wsl";
+    elements.ttsApiBase.value = elements.ttsApiBase.value || "http://127.0.0.1:50051";
   } else {
     elements.asrProvider.value = "disabled";
     elements.ttsProvider.value = "disabled";
