@@ -195,6 +195,12 @@ class DuplexRealtimeConnection:
             input_path = temp_root / f"input{suffix}"
             wav_path = temp_root / "input.wav"
             try:
+                if (self.provider_config.get("tts") or {}).get("filler_enabled", True):
+                    # Browser playback starts immediately while VAD, ASR and
+                    # the decision pipeline continue in parallel. It is
+                    # deliberately a separate event so local/API TTS can opt
+                    # out without delaying the critical path.
+                    await self._send({"type": "filler", "text": "好的，我先整理一下。"})
                 await self._send({"type": "vad_start"})
                 started = perf_counter()
                 with trace.span("realtime.ws.audio.convert"):

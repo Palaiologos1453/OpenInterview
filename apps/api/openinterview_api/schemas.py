@@ -36,6 +36,7 @@ class TTSProviderSettings(BaseModel):
     response_format: str = Field(default="mp3")
     timeout_seconds: int = Field(default=60, ge=5, le=300)
     voice_profile_id: str | None = None
+    filler_enabled: bool = True
 
 
 class ProviderSettings(BaseModel):

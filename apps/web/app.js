@@ -31,7 +31,8 @@ const defaultProviderConfig = {
     voice: "",
     response_format: "mp3",
     timeout_seconds: 60,
-    voice_profile_id: "young_engineer"
+    voice_profile_id: "young_engineer",
+    filler_enabled: true
   }
 };
 
@@ -145,6 +146,7 @@ const elements = {
   candidateName: $("#candidate-name"),
   resume: $("#resume"),
   voiceOutput: $("#voice-output"),
+  voiceFiller: $("#voice-filler"),
   voiceProfileHelp: $("#voice-profile-help"),
   llmProvider: $("#llm-provider"),
   llmTemplate: $("#llm-template"),
@@ -750,6 +752,7 @@ function readProviderConfig() {
       voice: elements.ttsVoice.value.trim(),
       response_format: elements.ttsProvider.value === "cosyvoice" ? "wav" : "mp3",
       timeout_seconds: 60,
+      filler_enabled: Boolean(elements.voiceFiller?.checked),
       voice_profile_id: elements.voiceProfile.value || "young_engineer"
     }
   };
@@ -1314,6 +1317,7 @@ function providerInputs() {
     elements.ttsModel,
     elements.ttsVoice,
     elements.ttsApiKey,
+    elements.voiceFiller,
     elements.resume
   ].filter(Boolean);
 }
@@ -1334,6 +1338,7 @@ function fillProviderForm(config) {
   elements.ttsModel.value = config.tts.model || "";
   elements.ttsVoice.value = config.tts.voice || "";
   elements.ttsApiKey.value = config.tts.api_key || "";
+  if (elements.voiceFiller) elements.voiceFiller.checked = config.tts.filler_enabled !== false;
   if (config.tts.voice_profile_id) elements.voiceProfile.value = config.tts.voice_profile_id;
   applyVoiceMode(detectVoiceMode(config), { silent: true });
   updateVoiceProfileHelp();
@@ -1708,6 +1713,13 @@ function handleDuplexMessage(message) {
       status: message.text ? "最终转写已提交" : "未识别到文本"
     });
     if (message.text) addMessage("candidate", "候选人", message.text);
+    return;
+  }
+  if (message.type === "filler") {
+    if (elements.voiceOutput.checked && readProviderConfig().tts.filler_enabled) {
+      state.fillerPlaybackPromise = speakWithBrowser(message.text || "好的，我先整理一下。");
+    }
+    updateVoiceTiming("filler_start_ms", elapsedSinceVoiceTurnStart());
     return;
   }
   if (message.type === "llm_delta") {
@@ -2479,6 +2491,7 @@ function voiceTimingEntries() {
     "asr_ms",
     "turn_ms",
     "tts_start_ms",
+    "filler_start_ms",
     "tts_first_output_ms",
     "tts_first_chunk_received_ms",
     "tts_first_chunk_ms",
@@ -2510,6 +2523,7 @@ function voiceTimingLabel(name) {
     asr_ms: "ASR",
     turn_ms: "下一题",
     tts_start_ms: "TTS开始",
+    filler_start_ms: "垫音开始",
     tts_first_output_ms: "首个播报",
     tts_first_chunk_received_ms: "收到首段音频",
     tts_first_chunk_ms: "TTS首块生成",
