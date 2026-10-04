@@ -21,8 +21,12 @@
           <label>面试方向<select id="direction"></select></label>
           <label>难度<select id="difficulty"></select></label>
           <label>模式<select id="mode"></select></label>
-          <label>追问方式<select id="interview-strategy"><option value="semantic">云端语义追问</option><option value="rules">离线规则练习</option></select></label>
-          <p class="provider-note">云端语义追问会将最终回答、简历和相关上下文发送给下方配置的 LLM 服务商。</p>
+          <label>面试决策模式<select id="interview-strategy">
+            <option value="hybrid">混合模式（推荐）</option>
+            <option value="speed">速度优先</option>
+            <option value="deep">深度优先</option>
+          </select></label>
+          <p class="provider-note">速度优先使用本地题目分支；深度节点和深度优先模式会把精简回答上下文发送给 LLM。</p>
           <label>面试官风格<select id="interviewer-style"></select></label>
           <label>本地 CosyVoice 音色 Profile<select id="voice-profile"></select></label>
           <p id="voice-profile-help" class="voice-profile-help"></p>

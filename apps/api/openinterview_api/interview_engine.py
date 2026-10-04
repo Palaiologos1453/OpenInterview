@@ -80,6 +80,7 @@ class InterviewConfig:
     provider_config: dict | None = None
     interview_strategy: str = "rules"
     interview_plan: list[dict] | None = None
+    interview_mode: str | None = None
 
 
 @dataclass
@@ -128,15 +129,20 @@ class CampusInterviewEngine:
         find_difficulty(config.difficulty_id)
         find_mode(config.mode_id)
         find_interviewer_style(config.interviewer_style_id)
+        mode = self._resolve_interview_mode(config)
+        config.interview_mode = mode
+        config.interview_strategy = "semantic" if mode == "deep" else "rules"
         provider_notice = self._validate_provider_config(config)
         if config.interview_strategy not in {"rules", "semantic"}:
             raise ValueError("Unknown interview strategy")
-        if config.interview_strategy == "semantic":
+        if mode == "deep":
             from .services.semantic_interview import validate_cloud
             validate_cloud(config.provider_config)
+        elif mode == "hybrid" and not self._cloud_available(config):
+            provider_notice = "混合模式未配置云端 LLM；本轮将使用速度优先的本地分支。"
 
         session = InterviewSession(config=config)
-        if config.interview_strategy == "semantic":
+        if mode in {"deep", "hybrid"}:
             from .services.semantic_interview import initial_state
             session.semantic_state = initial_state(
                 mode_id=config.mode_id,
@@ -156,13 +162,21 @@ class CampusInterviewEngine:
                 "rubric": RUBRIC,
                 "provider_notice": session.provider_notice,
                 "interview_strategy": config.interview_strategy,
+                "interview_mode": mode,
             },
         }
 
     def answer(self, session: InterviewSession, answer: str, *, stream_callback=None) -> dict:
-        if session.config.interview_strategy == "semantic":
+        mode = self._resolve_interview_mode(session.config)
+        if mode == "deep" or (mode == "hybrid" and self._should_deep_dive(session, answer)):
             from .services.semantic_interview import answer_semantically
+            if mode == "hybrid":
+                self._sync_semantic_state(session)
+                session.semantic_state["deep_active"] = True
             return answer_semantically(self, session, answer, stream_callback=stream_callback)
+        return self._answer_locally(session, answer)
+
+    def _answer_locally(self, session: InterviewSession, answer: str) -> dict:
         if self._is_finished(session):
             raise RuntimeError("Interview is already finished. Generate a report or start a new interview.")
 
@@ -191,6 +205,49 @@ class CampusInterviewEngine:
             "is_finished": self._is_finished(session),
             "provider_notice": session.provider_notice,
         }
+
+    def _resolve_interview_mode(self, config: InterviewConfig) -> str:
+        mode = (config.interview_mode or "").strip().lower()
+        if mode in {"speed", "deep", "hybrid"}:
+            return mode
+        return "deep" if config.interview_strategy == "semantic" else "speed"
+
+    def _cloud_available(self, config: InterviewConfig) -> bool:
+        settings = (config.provider_config or {}).get("llm") or {}
+        provider = str(settings.get("provider") or "").strip().lower()
+        return provider in {"openai", "openai_compatible", "compatible"} and all(
+            str(settings.get(key) or "").strip() not in {"", "***"}
+            for key in ("api_base", "model", "api_key")
+        )
+
+    def _should_deep_dive(self, session: InterviewSession, answer: str) -> bool:
+        if not self._cloud_available(session.config):
+            return False
+        if session.semantic_state.get("deep_active"):
+            return True
+        phase = (session.current_question_meta or {}).get("phase", "fundamentals")
+        if phase in {"project", "system_design"}:
+            return True
+        cleaned = answer.strip()
+        if len(cleaned) < 35:
+            return True
+        # Answers that expose a claim, metric, trade-off or incident are more
+        # valuable to probe semantically than to score with keyword rules.
+        trigger_words = ("我负责", "指标", "P95", "P99", "压测", "取舍", "故障", "上线", "复盘")
+        return any(word.lower() in cleaned.lower() for word in trigger_words)
+
+    def _sync_semantic_state(self, session: InterviewSession) -> None:
+        state = session.semantic_state
+        plan = state.get("plan") or []
+        phase = (session.current_question_meta or {}).get("phase")
+        if phase and plan:
+            indexes = [item["stage_index"] for item in plan if item.get("phase") == phase]
+            if indexes:
+                state["stage_index"] = min(indexes, key=lambda index: abs(index - session.turn_index))
+        state["depth"] = sum(
+            1 for turn in session.history[-4:]
+            if (turn.question_meta or {}).get("phase") == phase
+        )
 
     def report(self, session: InterviewSession) -> dict:
         if session.config.interview_strategy == "semantic":
@@ -265,7 +322,7 @@ class CampusInterviewEngine:
             return "本轮问题已经结束。你可以生成报告，或重新选择方向和难度开始下一轮。"
 
         phase = flow[step]
-        followup = self._select_followup_question(session, phase) if session.config.interview_strategy == "rules" else None
+        followup = self._select_followup_question(session, phase) if self._uses_local_flow(session) else None
         if followup:
             session.current_question_meta = followup["meta"]
             return followup["prompt"]
@@ -1094,7 +1151,7 @@ class CampusInterviewEngine:
         return ["表达结构", "岗位匹配", "技术亮点"]
 
     def _current_phase(self, session: InterviewSession) -> str:
-        if session.config.interview_strategy == "semantic":
+        if self._resolve_interview_mode(session.config) == "deep":
             return (session.current_question_meta or {}).get("phase", "closing")
         flow = MODE_FLOW.get(session.config.mode_id, MODE_FLOW["comprehensive"])
         if session.turn_index >= len(flow):
@@ -1102,10 +1159,13 @@ class CampusInterviewEngine:
         return flow[session.turn_index]
 
     def _is_finished(self, session: InterviewSession) -> bool:
-        if session.config.interview_strategy == "semantic":
+        if self._resolve_interview_mode(session.config) in {"deep", "hybrid"} and session.semantic_state.get("finished"):
             return bool(session.semantic_state.get("finished"))
         flow = MODE_FLOW.get(session.config.mode_id, MODE_FLOW["comprehensive"])
         return session.turn_index >= len(flow)
+
+    def _uses_local_flow(self, session: InterviewSession) -> bool:
+        return self._resolve_interview_mode(session.config) in {"speed", "hybrid"}
 
     def _dimension_scores(self, session: InterviewSession) -> list[dict]:
         base = mean([turn.score for turn in session.history] or [0])

@@ -699,12 +699,14 @@ async function openHistoryDrills(sessionId) {
 }
 
 function readConfig() {
+  const interviewMode = elements.interviewStrategy.value || "hybrid";
   return {
     direction_id: elements.direction.value,
     difficulty_id: elements.difficulty.value,
     mode_id: elements.mode.value,
     interviewer_style_id: elements.interviewerStyle.value || "small_company_basic",
-    interview_strategy: elements.interviewStrategy.value || "rules",
+    interview_strategy: interviewMode === "deep" ? "semantic" : "rules",
+    interview_mode: interviewMode,
     candidate_name: elements.candidateName.value.trim() || null,
     resume_text: elements.resume.value.trim() || null,
     duration_minutes: 30,
@@ -1121,12 +1123,17 @@ function renderSetupChecklist() {
 }
 
 function llmChecklistItem(llm) {
-  if (elements.interviewStrategy?.value === "semantic") {
+  const interviewMode = elements.interviewStrategy?.value || "hybrid";
+  if (interviewMode === "deep" || interviewMode === "hybrid") {
     const supported = ["openai", "openai_compatible", "compatible"].includes(llm.provider);
     const missing = llmMissingFields(llm);
-    return {label: "云端语义追问", status: supported && !missing.length ? "ok" : "warn",
-      detail: supported && !missing.length ? `${llm.model}；最终回答将发送给该服务商`
-        : "需要配置云端兼容 API、模型名和 Key；失败时不会自动改用规则评分"};
+    const label = interviewMode === "deep" ? "深度语义追问" : "混合模式深度节点";
+    return {label, status: interviewMode === "hybrid" || (supported && !missing.length) ? "ok" : "warn",
+      detail: supported && !missing.length
+        ? `${llm.model}；命中深度节点时发送精简回答上下文`
+        : interviewMode === "hybrid"
+          ? "未配置云端 LLM；仍可使用速度优先的本地分支"
+          : "深度优先需要配置云端兼容 API、模型名和 Key"};
   }
   if (llm.provider === "mock") {
     return { label: "LLM 报告总结", status: "warn", detail: "未接入 LLM；面试题库和本地报告仍可用" };

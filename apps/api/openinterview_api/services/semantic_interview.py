@@ -88,7 +88,7 @@ def initial_state(*, mode_id: str = "comprehensive", direction_id: str = "backen
     outline = clone_plan(plan, mode_id, direction_id)
     return {"stage_index": 0, "depth": 0, "finished": False,
             "knowledge": [], "projects": [], "key_points": [], "revision": 0,
-            "plan": outline}
+            "plan": outline, "deep_active": False}
 
 
 @lru_cache(maxsize=128)
@@ -373,6 +373,8 @@ def answer_semantically(engine, session, answer, *, stream_callback=None):
         "project": finding.project,
     } for finding in findings)
     state["key_points"] = state["key_points"][-20:]
+    if scratch.config.interview_mode == "hybrid" and decision.action == "advance":
+        state["deep_active"] = False
     state["revision"] += 1
     state["depth"] += 1
     scratch.turn_index += 1

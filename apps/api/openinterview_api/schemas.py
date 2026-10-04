@@ -59,6 +59,7 @@ class InterviewConfigRequest(BaseModel):
     language: str = Field(default="zh-CN")
     provider_config: ProviderSettings = Field(default_factory=ProviderSettings)
     interview_strategy: Literal["rules", "semantic"] = "rules"
+    interview_mode: Literal["speed", "deep", "hybrid"] | None = None
 
 
 class InterviewStartResponse(BaseModel):
@@ -68,6 +69,7 @@ class InterviewStartResponse(BaseModel):
     rubric: list[dict]
     provider_notice: str | None = None
     interview_strategy: str = "rules"
+    interview_mode: Literal["speed", "deep", "hybrid"] = "speed"
 
 
 class TurnRequest(BaseModel):

@@ -112,7 +112,11 @@ class SQLiteBackedSessionStore:
                 )
             )
         session.turn_index = len(session.history)
-        if config.get("interview_strategy") == "semantic":
+        interview_mode = config.get("interview_mode")
+        semantic_state_mode = interview_mode in {"deep", "hybrid"} or (
+            not interview_mode and config.get("interview_strategy") == "semantic"
+        )
+        if semantic_state_mode:
             from .semantic_interview import initial_state
             snapshot = (stored_turns[-1].get("payload") or {}).get("semantic_snapshot") if stored_turns else None
             if snapshot:
@@ -125,7 +129,7 @@ class SQLiteBackedSessionStore:
                     direction_id=config.get("direction_id", "backend"),
                     plan=config.get("interview_plan"),
                 )
-                session.current_question = self.engine._select_question(session, step=0)
+                session.current_question = self.engine._select_question(session, step=session.turn_index)
         else:
             session.current_question = self.engine._select_question(session, step=session.turn_index)
         return session
