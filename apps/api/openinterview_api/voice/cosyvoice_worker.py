@@ -66,7 +66,15 @@ class _Runtime:
 
         cosyvoice_file_utils.load_wav = _load_wav_with_soundfile(torch, librosa, sf)
         cosyvoice_frontend.load_wav = cosyvoice_file_utils.load_wav
-        self.model = CosyVoice3(model_dir, load_trt=False, fp16=torch.cuda.is_available())
+        load_vllm = _env_flag("OPENINTERVIEW_COSYVOICE_LOAD_VLLM")
+        load_trt = _env_flag("OPENINTERVIEW_COSYVOICE_LOAD_TRT")
+        self.model = CosyVoice3(
+            model_dir,
+            load_trt=load_trt,
+            load_vllm=load_vllm,
+            fp16=torch.cuda.is_available(),
+        )
+        self.backend = {"vllm": load_vllm, "tensorrt": load_trt}
         self.sample_rate = self.model.sample_rate
         self.sf = sf
         self.cosyvoice_path = cosyvoice_path
@@ -173,6 +181,10 @@ def _cuda_is_supported(torch_module) -> bool:
         return f"sm_{major}{minor}" in supported
     except Exception:
         return False
+
+
+def _env_flag(name: str) -> bool:
+    return os.environ.get(name, "").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _load_wav_with_soundfile(torch_module, librosa_module, soundfile_module):

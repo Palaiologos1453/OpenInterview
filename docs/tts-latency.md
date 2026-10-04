@@ -96,3 +96,16 @@ node --check apps/web/app.js
 要继续压到亚秒级，应在兼容的 CUDA/runtime 环境中分别评测 LLM token 生成和 flow/vocoder 加速，
 同时测首块、RTF、音质与长句稳定性。直接把不兼容的 token 块大小调小或只报 HTTP 响应头到达时间，
 都不能证明实际体验达到了即时水准。
+
+### CosyVoice vLLM / TensorRT 实验开关
+
+OpenInterview 的 CosyVoice worker 支持通过环境变量开启官方拆分后端：
+
+```powershell
+$env:OPENINTERVIEW_COSYVOICE_LOAD_VLLM = "1"
+$env:OPENINTERVIEW_COSYVOICE_LOAD_TRT = "1"
+```
+
+这两个开关默认关闭。它们要求 `voice_venv` 中安装与当前 CosyVoice 兼容的 vLLM，
+并准备好 TensorRT 运行时和对应 engine；缺少 vLLM 时 worker 会明确报告
+`ModuleNotFoundError: No module named 'vllm'`，不会静默退回并误报加速成功。
